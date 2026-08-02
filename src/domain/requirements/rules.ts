@@ -10,11 +10,21 @@ export type ApplicantProfile = {
   wantsGsa: boolean
   /** One entry per licence held. Empty means none. */
   licenses: readonly LicenseType[]
+  /**
+   * Declared by the applicant, not inferred. The live registration asks it
+   * outright, and an address that does not match the ID needs separate proof.
+   */
+  addressDiffersFromId: boolean
 }
+
+/** Asked of everyone, on the first screen. */
+export const CORE_PROFILE: readonly FieldId[] = [
+  'primary_activity', 'preferred_language',
+]
 
 export const CORE_IDENTITY: readonly FieldId[] = [
   'first_name', 'last_name', 'id_form', 'dl_number', 'dl_expiry',
-  'dob', 'id_images',
+  'id_country', 'id_state', 'dob', 'id_images',
 ]
 
 export const CORE_ADDRESS: readonly FieldId[] = [
@@ -32,7 +42,7 @@ export const BUSINESS_CORE: readonly FieldId[] = [
 /** Repeated once per licence held. Emitted as instance-qualified keys. */
 export const LICENSE_GROUP: readonly FieldId[] = [
   'license_type', 'license_number', 'license_effective',
-  'license_expiry', 'license_image',
+  'license_expiry', 'license_country', 'license_image',
 ]
 
 export const GSA_CORE: readonly FieldId[] = ['gsa_bidder_number', 'gsa_email']

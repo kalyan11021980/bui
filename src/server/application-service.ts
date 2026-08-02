@@ -25,6 +25,7 @@ const STARTING_PROFILE: ApplicantProfile = {
   state: null,
   wantsGsa: false,
   licenses: [],
+  addressDiffersFromId: false,
 }
 
 /**

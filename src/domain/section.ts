@@ -4,6 +4,7 @@
  * it without a second edit.
  */
 export type Section =
+  | 'profile'
   | 'identification'
   | 'address'
   | 'contact'
@@ -14,6 +15,7 @@ export type Section =
   | 'state_forms'
 
 export const SECTION_LABEL: Record<Section, string> = {
+  profile: 'About you',
   identification: 'Identification',
   address: 'Address',
   contact: 'Contact',

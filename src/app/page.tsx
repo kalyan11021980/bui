@@ -6,20 +6,22 @@ import { applicationReducer, createApplication } from '@/domain/application/redu
 import { isComplete, outstandingFields } from '@/domain/application/queries'
 import { applyCarry, carryNotice, type CarryNotice } from '@/domain/application/carry'
 import { revealField } from '@/ui/panel/reveal'
+import { ProfileControls } from '@/ui/demo/ProfileControls'
 import { COLOR } from '@/ui/theme/tokens'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
-const profile: ApplicantProfile = {
+const initialProfile: ApplicantProfile = {
   applicantType: 'business',
   country: 'US',
   state: 'GA',
   wantsGsa: false,
   licenses: ['dealer'],
+  addressDiffersFromId: false,
 }
 
 export default function Page() {
-  const [state, setState] = useState(() => createApplication('demo', profile))
+  const [state, setState] = useState(() => createApplication('demo', initialProfile))
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
@@ -62,6 +64,18 @@ export default function Page() {
   // editable in place.
   const edit = (id: RequirementKey) => revealField(id)
 
+  // Carry runs after the patch: a change that newly requires biz_addr_* should
+  // fill them from an address already given, not leave them blank.
+  const updateProfile = (patch: Partial<ApplicantProfile>) => {
+    const at = new Date().toISOString()
+    const result = applyCarry(
+      applicationReducer(state, { type: 'UPDATE_PROFILE', patch, at }),
+      at,
+    )
+    setState(result.state)
+    setCarry(null)
+  }
+
   const outstanding = outstandingFields(state)
   const complete = isComplete(state)
   // The reducer refuses every change once submitted, so the panel must stop
@@ -78,6 +92,12 @@ export default function Page() {
 
   return (
     <main style={{ padding: 24 }}>
+      <ProfileControls
+        profile={state.profile}
+        onChange={updateProfile}
+        disabled={closed}
+      />
+
       <ApplicationPanel
         state={state}
         onSubmit={submit}

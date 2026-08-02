@@ -1,5 +1,6 @@
 import type { FieldDef } from '../field-def'
 import type { FieldId } from '../field-id'
+import { PREFERENCE_FIELDS } from './preferences'
 import { IDENTITY_FIELDS } from './identity'
 import { ADDRESS_FIELDS } from './address'
 import { CONTACT_FIELDS } from './contact'
@@ -10,6 +11,7 @@ import { GSA_FIELDS } from './gsa'
 import { STATE_FORM_FIELDS } from './state-forms'
 
 export const ALL_FIELDS: readonly FieldDef[] = [
+  ...PREFERENCE_FIELDS,
   ...IDENTITY_FIELDS,
   ...ADDRESS_FIELDS,
   ...CONTACT_FIELDS,
@@ -31,6 +33,7 @@ export function fieldDef(id: FieldId): FieldDef {
 }
 
 export {
+  PREFERENCE_FIELDS,
   IDENTITY_FIELDS, ADDRESS_FIELDS, CONTACT_FIELDS,
   BUSINESS_FIELDS, LICENSE_FIELDS, TAX_FIELDS, GSA_FIELDS,
   STATE_FORM_FIELDS,

@@ -10,7 +10,7 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const AT = '2026-08-01T12:00:00.000Z'
 const profile: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
-  wantsGsa: false, licenses: [],
+  wantsGsa: false, licenses: [], addressDiffersFromId: false,
 }
 
 describe('ApplicationPanel', () => {
@@ -118,13 +118,13 @@ describe('ApplicationPanel', () => {
     // Identification is untouched, so the two counts must differ — a bug that
     // rendered the OVERALL count in every heading would pass otherwise.
     const identification = screen.getByRole('region', { name: /^identification$/i })
-    expect(within(identification).getByText('0 of 7')).toBeInTheDocument()
+    expect(within(identification).getByText('0 of 9')).toBeInTheDocument()
   })
 
   it('reads two licences as two numbered sections', () => {
     const bizProfile: ApplicantProfile = {
       applicantType: 'business', country: 'US', state: 'GA',
-      wantsGsa: false, licenses: ['dealer', 'salvage'],
+      wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
     }
     const s = createApplication('app-2', bizProfile)
     render(<ApplicationPanel state={s} />)
@@ -143,7 +143,7 @@ describe('ApplicationPanel', () => {
     const onConfirm = vi.fn()
     const bizProfile: ApplicantProfile = {
       applicantType: 'business', country: 'US', state: 'GA',
-      wantsGsa: false, licenses: ['dealer', 'salvage'],
+      wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
     }
     let s = createApplication('app-2', bizProfile)
     s = applicationReducer(s, {

@@ -11,6 +11,7 @@ const profile: ApplicantProfile = {
   state: 'GA',
   wantsGsa: false,
   licenses: [],
+  addressDiffersFromId: false,
 }
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -297,7 +298,7 @@ describe('a submitted application is closed to further change', () => {
 describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)', () => {
   const twoLicences: ApplicantProfile = {
     applicantType: 'business', country: 'US', state: 'GA',
-    wantsGsa: false, licenses: ['dealer', 'salvage'],
+    wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
   }
 
   function withTwoLicenceNumbers() {

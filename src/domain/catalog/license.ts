@@ -44,6 +44,17 @@ export const LICENSE_FIELDS: readonly FieldDef[] = [
     derivableFrom: ['dealer_license'],
   }),
   defineField({
+    id: 'license_country',
+    label: 'License country',
+    type: 'select',
+    section: 'license',
+    purpose: 'Which country’s board issued it, so we verify against the right one',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().min(2, 'Select the issuing country'),
+    derivableFrom: ['dealer_license'],
+    orchestratorVisible: true,
+  }),
+  defineField({
     id: 'license_image',
     label: 'Photo of your license',
     type: 'file',

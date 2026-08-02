@@ -13,6 +13,7 @@ const business: ApplicantProfile = {
   state: 'GA',
   wantsGsa: false,
   licenses: ['dealer'],
+  addressDiffersFromId: false,
 }
 
 function withAddress() {
@@ -133,7 +134,7 @@ function everyEmittableKey(): Set<string> {
       for (const state of [null, 'GA', 'OH', 'ZZ']) {
         for (const licenses of licenceSets) {
           const profile: ApplicantProfile = {
-            applicantType, country: 'US', state, wantsGsa, licenses,
+            applicantType, country: 'US', state, wantsGsa, licenses, addressDiffersFromId: false,
           }
           for (const key of requiredFields(profile)) keys.add(key)
         }

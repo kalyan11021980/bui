@@ -13,12 +13,12 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
-  wantsGsa: false, licenses: [],
+  wantsGsa: false, licenses: [], addressDiffersFromId: false,
 }
 
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenses: ['dealer'],
+  wantsGsa: false, licenses: ['dealer'], addressDiffersFromId: false,
 }
 
 /** Scoped to the form element — the row wrapper carries an aria-label too. */
@@ -89,10 +89,14 @@ describe('completing an application through the panel', () => {
     // Real values, each one satisfying its own catalog schema — not the
     // string 'x' shoved past a reducer that never validated anything.
     const answers: Array<[RegExp, string]> = [
+      [/primary activity/i, 'dealer'],
+      [/preferred language/i, 'English'],
       [/first name/i, 'Ada'],
       [/last name/i, 'Lovelace'],
       [/driver's license number/i, 'D1234567'],
       [/id expiration date/i, '2030-04-30'],
+      [/country that issued/i, 'US'],
+      [/state that issued/i, 'GA'],
       [/date of birth/i, '1982-08-31'],
       [/^address$/i, '2345 Anywhere St'],
       [/^city$/i, 'Atlanta'],

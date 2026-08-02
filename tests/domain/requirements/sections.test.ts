@@ -8,12 +8,12 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
-  wantsGsa: false, licenses: [],
+  wantsGsa: false, licenses: [], addressDiffersFromId: false,
 }
 
 const twoLicences: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'OH',
-  wantsGsa: true, licenses: ['dealer', 'salvage'],
+  wantsGsa: true, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
 }
 
 describe('field sections', () => {
@@ -32,7 +32,7 @@ describe('field sections', () => {
     const groups = groupIntoSections(keys)
 
     expect(groups.map((g) => g.label)).toEqual([
-      'Identification', 'Address', 'Contact',
+      'About you', 'Identification', 'Address', 'Contact',
     ])
     // Flattening the groups must reproduce the engine's list exactly — same
     // keys, same order. Anything else means the panel is showing a different
@@ -55,7 +55,7 @@ describe('field sections', () => {
     expect(licence.map((g) => g.label)).toEqual(['License 1', 'License 2'])
     expect(licence[0]?.id).not.toBe(licence[1]?.id)
     for (const [index, group] of licence.entries()) {
-      expect(group.fields).toHaveLength(5)
+      expect(group.fields).toHaveLength(6)
       for (const key of group.fields) {
         expect(parseReqKey(key).instance).toBe(index)
       }

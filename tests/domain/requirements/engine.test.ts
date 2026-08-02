@@ -10,6 +10,7 @@ const base: ApplicantProfile = {
   state: 'GA',
   wantsGsa: false,
   licenses: [],
+  addressDiffersFromId: false,
 }
 
 describe('requiredFields', () => {
@@ -93,7 +94,8 @@ describe('requiredFields', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
       'dl_expiry', 'dl_number', 'dob', 'first_name',
-      'id_form', 'id_images', 'last_name', 'phone_mobile',
+      'id_country', 'id_form', 'id_images', 'id_state',
+      'last_name', 'phone_mobile', 'preferred_language', 'primary_activity',
     ])
   })
 

@@ -11,7 +11,7 @@ import type { Action } from '@/domain/application/state'
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenses: ['dealer'],
+  wantsGsa: false, licenses: ['dealer'], addressDiffersFromId: false,
 }
 const digest = createDigester('integration-test-secret-32-chars-min!')
 
