@@ -8,12 +8,22 @@ import { COLOR } from '@/ui/theme/tokens'
 import { FieldRow } from './FieldRow'
 import { ProgressSummary } from './ProgressSummary'
 
-type Props = {
+/**
+ * Supplying these makes every row editable (spec §15 / §11.1), and they come
+ * as a pair for the reason FieldRow spells out: a row that can record a value
+ * and cannot unrecord it lets the stored record drift away from the screen.
+ */
+type EditHandlers =
+  | {
+      onChange: (id: RequirementKey, value: unknown) => void
+      onClear: (id: RequirementKey) => void
+    }
+  | { onChange?: undefined; onClear?: undefined }
+
+type Props = EditHandlers & {
   state: ApplicationState
   onConfirm?: (id: RequirementKey) => void
   onEdit?: (id: RequirementKey) => void
-  /** Supplying this makes every row editable. Spec §15 / §11.1. */
-  onChange?: (id: RequirementKey, value: unknown) => void
   onSubmit?: () => void
   /**
    * What the applicant's last edit carried elsewhere, so the row they typed
@@ -34,13 +44,17 @@ type Props = {
  * IAA screens being replaced, which at least separated Identification,
  * Address and License Information.
  */
-export function ApplicationPanel({
-  state, onConfirm, onEdit, onChange, onSubmit, carry,
-}: Props) {
+export function ApplicationPanel(props: Props) {
+  const { state, onConfirm, onEdit, onSubmit, carry } = props
   const required = requiredFields(state.profile)
   const outstanding = new Set(outstandingFields(state))
   const done = required.length - outstanding.size
   const sections = groupIntoSections(required)
+  // Passed on as one object so the pairing survives the hand-off; splitting
+  // them into two spreads would let one arrive without the other.
+  const editing: EditHandlers = props.onChange !== undefined
+    ? { onChange: props.onChange, onClear: props.onClear }
+    : {}
 
   return (
     <section
@@ -100,10 +114,12 @@ export function ApplicationPanel({
                   key={id}
                   fieldId={id}
                   state={state.fields[id]}
+                  {...editing}
                   {...(onConfirm && { onConfirm })}
                   {...(onEdit && { onEdit })}
-                  {...(onChange && { onChange })}
-                  {...(carry?.from === id && { carriedInto: carry.filled })}
+                  {...(carry?.from === id && {
+                    carriedInto: carry.filled, carriedOut: carry.cleared,
+                  })}
                 />
               ))}
             </section>

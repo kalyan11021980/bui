@@ -48,10 +48,26 @@ export default function Page() {
     )
     setState(result.state)
     // Replaced on every edit, including with null: the acknowledgement belongs
-    // to the LAST edit that actually saved the applicant something, and one
-    // left behind on a row they have moved on from is a claim about the wrong
+    // to the LAST edit that actually changed something elsewhere, and one left
+    // behind on a row they have moved on from is a claim about the wrong
     // keystroke. Computed outside the state updater because updaters must stay
     // pure — React is entitled to run them twice.
+    setCarry(carryNotice(id, result.applied))
+  }
+
+  /**
+   * The applicant's on-screen text is no longer a valid value, so the record
+   * must stop holding the one that was. Carry runs afterwards for the same
+   * reason it runs on a change: an unconfirmed mirror of a value that has
+   * just been deleted is a stale plausible value (§10.4).
+   */
+  const clear = (id: RequirementKey) => {
+    const at = new Date().toISOString()
+    const result = applyCarry(
+      applicationReducer(state, { type: 'CLEAR_VALUE', fieldId: id, at }),
+      at,
+    )
+    setState(result.state)
     setCarry(carryNotice(id, result.applied))
   }
 
@@ -82,7 +98,9 @@ export default function Page() {
       <ApplicationPanel
         state={state}
         onSubmit={submit}
-        {...(!closed && { onConfirm: confirm, onEdit: edit, onChange: change })}
+        {...(!closed && {
+          onConfirm: confirm, onEdit: edit, onChange: change, onClear: clear,
+        })}
         {...(carry && !closed && { carry })}
       />
 

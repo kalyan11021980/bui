@@ -3,7 +3,7 @@ import type { ProvenanceSource } from '../application/state'
 import type { ApplicantProfile } from '../requirements/rules'
 
 export type AuditKind =
-  | 'value_set' | 'confirmed' | 'verified'
+  | 'value_set' | 'value_cleared' | 'confirmed' | 'verified'
   | 'rejected' | 'superseded' | 'profile_updated' | 'submitted'
 
 export type AuditEvent = {

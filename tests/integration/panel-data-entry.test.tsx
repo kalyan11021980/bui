@@ -8,7 +8,7 @@ import {
 } from '@/domain/application/reducer'
 import { applyCarry, carryNotice, type CarryNotice } from '@/domain/application/carry'
 import { fieldInputId } from '@/ui/panel/FieldInput'
-import type { ApplicationState } from '@/domain/application/state'
+import type { Action, ApplicationState } from '@/domain/application/state'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
@@ -42,23 +42,27 @@ function Harness({
   const [state, setState] = useState(() => createApplication('app-1', profile))
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
-  const change = (id: RequirementKey, value: unknown) => {
-    const at = '2026-08-01T12:00:00.000Z'
-    const result = applyCarry(
-      applicationReducer(state, {
-        type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
-      }),
-      at,
-    )
+  const at = '2026-08-01T12:00:00.000Z'
+
+  /** Applies one action, carries what follows, and reports both, as page.tsx does. */
+  const dispatch = (id: RequirementKey, action: Action) => {
+    const result = applyCarry(applicationReducer(state, action), at)
     setState(result.state)
     setCarry(carryNotice(id, result.applied))
     onState?.(result.state)
   }
 
+  const change = (id: RequirementKey, value: unknown) =>
+    dispatch(id, { type: 'SET_VALUE', fieldId: id, value, source: 'user', at })
+
+  const clear = (id: RequirementKey) =>
+    dispatch(id, { type: 'CLEAR_VALUE', fieldId: id, at })
+
   return (
     <ApplicationPanel
       state={state}
       onChange={change}
+      onClear={clear}
       onSubmit={() => undefined}
       {...(carry && { carry })}
     />
@@ -166,6 +170,55 @@ describe('completing an application through the panel', () => {
     render(<Harness profile={business} />)
     await userEvent.type(control(/first name/i), 'Ada')
     expect(screen.queryByText(/also filled in/i)).toBeNull()
+  })
+
+  it('lowers the done count again when a field is cleared', async () => {
+    // F3: the record used to go on holding "Ada" with status confirmed after
+    // the applicant emptied the box, and the footer went on reading 1 of 12.
+    // They would then submit a value that was not on their screen.
+    let latest: ApplicationState | undefined
+    render(<Harness onState={(s) => { latest = s }} />)
+
+    await userEvent.type(control(/first name/i), 'Ada')
+    expect(screen.getByText(/^1 of \d+ done$/)).toBeInTheDocument()
+
+    await userEvent.clear(control(/first name/i))
+
+    expect(screen.getByText(/^0 of \d+ done$/)).toBeInTheDocument()
+    expect(latest?.fields.first_name?.value).toBeNull()
+    expect(outstandingFields(latest!)).toContain('first_name')
+  })
+
+  it('drops a stale valid value when a correction passes through invalid', async () => {
+    let latest: ApplicationState | undefined
+    render(<Harness onState={(s) => { latest = s }} />)
+
+    await userEvent.type(control(/zip code/i), '30301')
+    expect(latest?.fields.addr_zip?.value).toBe('30301')
+
+    await userEvent.type(control(/zip code/i), '9')
+
+    expect(control(/zip code/i)).toHaveValue('303019')
+    expect(latest?.fields.addr_zip?.value).toBeNull()
+    expect(screen.getByText(/^0 of \d+ done$/)).toBeInTheDocument()
+    // The value is dropped, not the message: suppressing the error would be
+    // solving the wrong half of this.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ZIP/i)
+  })
+
+  it('clears the business address it carried when the source is cleared', async () => {
+    // A plausible carried value with nothing behind it is exactly what gets
+    // rubber-stamped (§10.4), and it is a value the applicant deleted.
+    let latest: ApplicationState | undefined
+    render(<Harness profile={business} onState={(s) => { latest = s }} />)
+
+    await userEvent.type(control(/^address$/i), '2345 Anywhere St')
+    expect(latest?.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+
+    await userEvent.clear(control(/^address$/i))
+
+    expect(latest?.fields.biz_addr_line1?.value).toBeNull()
+    expect(screen.getByText(/also cleared/i)).toHaveTextContent(/business address/i)
   })
 
   it('keeps a rejected value out of state and out of the count', async () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ZodEnum } from 'zod'
 import type { FieldState } from '@/domain/application/state'
 import type { FieldDef } from '@/domain/field-def'
@@ -13,6 +13,12 @@ type Props = {
   def: FieldDef
   state: FieldState | undefined
   onChange: (id: RequirementKey, value: unknown) => void
+  /**
+   * Drop the recorded answer: what is on screen is no longer a valid value.
+   * Required, not optional — a field that can record a value and cannot
+   * unrecord it is how the record ends up disagreeing with the screen.
+   */
+  onClear: (id: RequirementKey) => void
 }
 
 /**
@@ -66,11 +72,22 @@ function toInputValue(value: unknown): string {
  * every keystroke of a phone number to a handler that must reject nine of
  * them. What the user has typed so far still stays on screen; only the
  * dispatch waits.
+ *
+ * The corollary, and the whole of F3: when the draft stops being a valid
+ * value, the RECORD must not go on holding the last one that was. Waiting
+ * quietly is only honest while the record and the screen still agree. Type
+ * "Ada" and then clear the box, or type a good ZIP and append a digit, and
+ * the applicant was left attesting to a value that was no longer in front of
+ * them, still counted as done.
  */
-export function FieldInput({ fieldId, def, state, onChange }: Props) {
+export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
   const external = toInputValue(state?.value)
   const [draft, setDraft] = useState(external)
   const [lastExternal, setLastExternal] = useState(external)
+  // The draft that caused us to ask for a clear. The clear comes back as an
+  // empty external value, and that echo must not reset the box the applicant
+  // is still typing in — they cleared the RECORD, not the field.
+  const clearedFrom = useRef<string | null>(null)
 
   // Adjusting state during render, rather than in an effect: when a value is
   // carried in from another field (§9) the input must show it immediately,
@@ -78,7 +95,10 @@ export function FieldInput({ fieldId, def, state, onChange }: Props) {
   // props.
   if (external !== lastExternal) {
     setLastExternal(external)
-    setDraft(external)
+    // Anything else — a carried value, an OCR fill, a clear from somewhere
+    // else — is news from outside and does belong on screen.
+    if (!(external === '' && clearedFrom.current === draft)) setDraft(external)
+    clearedFrom.current = null
   }
 
   const options = optionsFor(def)
@@ -93,8 +113,23 @@ export function FieldInput({ fieldId, def, state, onChange }: Props) {
 
   function report(next: string) {
     setDraft(next)
-    const parsed = def.validation.safeParse(next)
-    if (parsed.success) onChange(fieldId, next)
+
+    // An empty box is an answer removed, never a value — some catalog schemas
+    // are `.optional()` and would happily accept "" as a recorded answer.
+    if (next !== '' && def.validation.safeParse(next).success) {
+      onChange(fieldId, next)
+      return
+    }
+
+    // Nothing valid is on screen any more. If the record still holds
+    // something, it now disagrees with what the applicant can see, and the
+    // field must go back to outstanding rather than count as done. Only when
+    // there IS something to drop: typing rubbish into an empty field is not a
+    // divergence, and a clear per keystroke would be noise in the trail.
+    if (state?.value !== null && state?.value !== undefined) {
+      clearedFrom.current = next
+      onClear(fieldId)
+    }
   }
 
   const shared = {

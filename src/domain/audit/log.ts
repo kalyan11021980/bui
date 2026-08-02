@@ -6,6 +6,11 @@ import type { Digester } from './digest'
 
 const KIND: Record<Action['type'], AuditKind> = {
   SET_VALUE: 'value_set',
+  // Deliberately carries no `value`: the field now holds nothing, and the
+  // value that was there is already in the SET_VALUE that put it there —
+  // digested, if the field is sensitive. Repeating it here would open a
+  // second plaintext path out of the domain for no reconstruction gain.
+  CLEAR_VALUE: 'value_cleared',
   CONFIRM: 'confirmed',
   VERIFY: 'verified',
   REJECT: 'rejected',

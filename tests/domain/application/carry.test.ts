@@ -287,3 +287,54 @@ describe('carryNotice', () => {
     expect(carryNotice('addr_line1', applyCarry(settled, AT).applied)).toBeNull()
   })
 })
+
+describe('carry and a cleared source', () => {
+  it('clears an unconfirmed mirror when its source goes away', () => {
+    // Otherwise correcting a home address by clearing it leaves a plausible
+    // business address behind with nothing backing it — a stale carried value
+    // is exactly what gets rubber-stamped (§10.4).
+    let s = applyCarry(withAddress(), AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'addr_line1', at: AT })
+    const result = applyCarry(s, AT)
+
+    expect(result.state.fields.biz_addr_line1?.value).toBeNull()
+    expect(result.applied).toContainEqual({
+      type: 'CLEAR_VALUE', fieldId: 'biz_addr_line1', at: AT,
+    })
+    // Only the mirror of the cleared source. The others still have theirs.
+    expect(result.state.fields.biz_addr_city?.value).toBe('Atlanta')
+  })
+
+  it('leaves a business address the applicant made their own alone', () => {
+    let s = applyCarry(withAddress(), AT).state
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: '1 Dealership Way',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'addr_line1', at: AT })
+
+    const result = applyCarry(s, AT)
+    expect(result.state.fields.biz_addr_line1?.value).toBe('1 Dealership Way')
+    expect(result.applied).toEqual([])
+  })
+
+  it('reports what it cleared, so the applicant is told', () => {
+    let s = applyCarry(withAddress(), AT).state
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'addr_zip', at: AT })
+    const notice = carryNotice('addr_zip', applyCarry(s, AT).applied)
+
+    expect(notice?.filled).toEqual([])
+    expect(notice?.cleared).toEqual(['biz_addr_zip'])
+  })
+
+  it('clears nothing twice', () => {
+    let s = applyCarry(withAddress(), AT).state
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'addr_line1', at: AT })
+    s = applyCarry(s, AT).state
+    const second = applyCarry(s, AT)
+    expect(second.applied).toEqual([])
+    expect(second.state).toBe(s)
+  })
+})

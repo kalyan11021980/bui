@@ -44,6 +44,18 @@ export type Action =
       confidence?: number
       fromFieldId?: RequirementKey
     }
+  /**
+   * Removes the recorded answer, returning the field to outstanding.
+   *
+   * Distinct from `SET_VALUE` with a null value, which would have to be
+   * exempted from the field's own catalog schema at the route (§8.2) and
+   * would land as `confirmed` by the "the user typed it" rule — an empty
+   * answer counting as done is the bug, not the fix.
+   *
+   * The trail is still append-only: the value that was there is in the
+   * SET_VALUE that put it there, and this records that it stopped applying.
+   */
+  | { type: 'CLEAR_VALUE'; fieldId: RequirementKey; at: string }
   | { type: 'CONFIRM'; fieldId: RequirementKey; at: string; shownCopyHash: string }
   | { type: 'VERIFY'; fieldId: RequirementKey; at: string }
   | { type: 'REJECT'; fieldId: RequirementKey; at: string; reason: string }

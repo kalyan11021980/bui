@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe('revealField', () => {
   it('scrolls the field into view and puts the caret in it', () => {
-    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} />)
+    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
     const input = document.getElementById(fieldInputId('biz_addr_line1'))!
     const scroll = vi.fn()
     input.scrollIntoView = scroll
@@ -38,7 +38,7 @@ describe('revealField', () => {
   it('does not animate when the user has asked for less motion', () => {
     // A smooth scroll is exactly the vestibular trigger that setting exists
     // for. Honouring it is not optional, and the field still gets revealed.
-    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} />)
+    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
     const input = document.getElementById(fieldInputId('biz_addr_line1'))!
     const scroll = vi.fn()
     input.scrollIntoView = scroll
@@ -58,7 +58,7 @@ describe('revealField', () => {
   })
 
   it('survives an environment with no scrollIntoView', () => {
-    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} />)
+    render(<FieldRow fieldId="biz_addr_line1" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
     stubMatchMedia(false)
     expect(() => revealField('biz_addr_line1')).not.toThrow()
     expect(document.activeElement).toBe(

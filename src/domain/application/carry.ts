@@ -72,17 +72,32 @@ export function applyCarry(state: ApplicationState, at: string): CarryResult {
   for (const rule of CARRY_RULES) {
     if (!required.has(rule.to)) continue
 
-    const source = next.fields[rule.from]
-    if (!source || source.value === null || source.value === undefined) continue
-
     const dest = next.fields[rule.to]
     if (!isCarryable(dest, rule.from)) continue
-    if (dest && dest.value === source.value) continue
+
+    const source = next.fields[rule.from]
+    const sourceValue = source?.value ?? null
+
+    if (sourceValue === null || sourceValue === undefined) {
+      // The source answer is gone. Anything still holding a mirror of it is
+      // now a plausible value with nothing behind it, which is precisely what
+      // §10.4 says gets rubber-stamped — and it is a value the applicant
+      // deleted. `isCarryable` above has already established that this
+      // destination is nothing but an unconfirmed mirror of THIS source.
+      if (dest && dest.value !== null && dest.value !== undefined) {
+        const clear: Action = { type: 'CLEAR_VALUE', fieldId: rule.to, at }
+        next = applicationReducer(next, clear)
+        applied.push(clear)
+      }
+      continue
+    }
+
+    if (dest && dest.value === sourceValue) continue
 
     const action: Action = {
       type: 'SET_VALUE',
       fieldId: rule.to,
-      value: source.value,
+      value: sourceValue,
       source: 'carried',
       fromFieldId: rule.from,
       at,
@@ -141,9 +156,16 @@ export type CarryNotice = {
   from: RequirementKey
   /** What carry filled in as a result, in the order it was applied. */
   filled: readonly RequirementKey[]
+  /**
+   * What carry removed because this edit took away the answer it was copied
+   * from. Told, not done quietly: a field silently emptying somewhere the
+   * applicant cannot see is the same invisibility problem as a field silently
+   * filling in, and this one loses them work rather than saving it.
+   */
+  cleared: readonly RequirementKey[]
 }
 
-/** Null when the edit saved the applicant nothing — there is then nothing to say. */
+/** Null when the edit changed nothing elsewhere — there is then nothing to say. */
 export function carryNotice(
   from: RequirementKey,
   applied: readonly Action[],
@@ -151,8 +173,11 @@ export function carryNotice(
   const filled = applied.flatMap((a) =>
     a.type === 'SET_VALUE' ? [a.fieldId] : [],
   )
-  if (filled.length === 0) return null
-  return { from, filled }
+  const cleared = applied.flatMap((a) =>
+    a.type === 'CLEAR_VALUE' ? [a.fieldId] : [],
+  )
+  if (filled.length === 0 && cleared.length === 0) return null
+  return { from, filled, cleared }
 }
 
 export function carriedFrom(

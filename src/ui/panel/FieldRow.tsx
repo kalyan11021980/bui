@@ -8,20 +8,36 @@ import { formatValue } from './format'
 import { displayLabel } from './label'
 import { Rationale } from './Rationale'
 
-type Props = {
+/**
+ * Supplying these makes the field editable (spec §15 / §11.1) — and they come
+ * as a PAIR, at compile time.
+ *
+ * A row that can record a value and cannot unrecord it is exactly how the
+ * stored record drifts away from what is on screen (F3), so `onChange`
+ * without `onClear` is not a thing this component will render. The union
+ * makes forgetting one a type error rather than a silent divergence.
+ */
+type EditHandlers =
+  | {
+      onChange: (id: RequirementKey, value: unknown) => void
+      onClear: (id: RequirementKey) => void
+    }
+  | { onChange?: undefined; onClear?: undefined }
+
+type Props = EditHandlers & {
   /** A RequirementKey: a plain FieldId, or `license_number#0` for licences. */
   fieldId: RequirementKey
   state: FieldState | undefined
   onConfirm?: (id: RequirementKey) => void
   onEdit?: (id: RequirementKey) => void
-  /** Supplying this makes the field editable. Spec §15 / §11.1. */
-  onChange?: (id: RequirementKey, value: unknown) => void
   /**
-   * Fields the applicant's last edit to THIS row carried a value into. Shown
+   * Fields the applicant's last edit to THIS row carried a value into, and
+   * fields it emptied because this edit took away what they mirrored. Shown
    * here, at the point of typing, because the destinations are in other
    * sections and often below the fold.
    */
   carriedInto?: readonly RequirementKey[]
+  carriedOut?: readonly RequirementKey[]
 }
 
 /**
@@ -37,9 +53,14 @@ const SOURCE_LABEL: Record<string, string> = {
   user: 'entered by you',
 }
 
-export function FieldRow({
-  fieldId, state, onConfirm, onEdit, onChange, carriedInto,
-}: Props) {
+export function FieldRow(props: Props) {
+  // `onChange` and `onClear` stay on `props` rather than being destructured:
+  // destructuring a union loses the correlation between them, and it is that
+  // correlation the type is here to enforce.
+  const {
+    fieldId, state, onConfirm, onEdit, carriedInto, carriedOut,
+  } = props
+  const onChange = props.onChange
   // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
   const { fieldId: bareId } = parseReqKey(fieldId)
   const def = fieldDef(bareId)
@@ -94,13 +115,22 @@ export function FieldRow({
         </div>
       )}
 
-      {onChange && (
-        <FieldInput fieldId={fieldId} def={def} state={state} onChange={onChange} />
+      {/* Both, at runtime as well as in the type. A cast that got one past
+          the compiler would otherwise produce a field that records values and
+          throws when asked to unrecord one, mid-keystroke, on a KYC form. */}
+      {props.onChange !== undefined && props.onClear !== undefined && (
+        <FieldInput
+          fieldId={fieldId}
+          def={def}
+          state={state}
+          onChange={props.onChange}
+          onClear={props.onClear}
+        />
       )}
 
       {/* Directly under the control, above the rationale: the acknowledgement
           has to be inside the same eyeline as the caret that caused it. */}
-      {carriedInto && carriedInto.length > 0 && <CarryAck filled={carriedInto} />}
+      <CarryAck filled={carriedInto ?? []} cleared={carriedOut ?? []} />
 
       <Rationale field={def} id={rationaleId} />
 

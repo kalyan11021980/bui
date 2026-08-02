@@ -114,6 +114,19 @@ export function applicationReducer(
       return withField(state, action.fieldId, next)
     }
 
+    case 'CLEAR_VALUE': {
+      const current = state.fields[action.fieldId]
+      // Clearing what was never recorded is not an error, it is the state the
+      // caller asked for. Returning `state` itself keeps a no-op cheap and
+      // keeps carry's `applied` list honest about what actually happened.
+      if (!current || current.value === null) return state
+      // Provenance goes with the value. "Read from your license, high
+      // confidence" describing a value that is gone is a lie about the
+      // record, and provenance is what a reviewer reads to decide how hard
+      // to look. Any rejection goes too: it was about the old value.
+      return withField(state, action.fieldId, { value: null, status: 'empty' })
+    }
+
     case 'CONFIRM': {
       const current = requireField(state, action.fieldId, 'confirm', { withValue: true })
       return withField(state, action.fieldId, {

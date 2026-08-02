@@ -37,6 +37,19 @@ const setValue = z
   })
   .strict()
 
+/**
+ * Strict and value-less. A CLEAR_VALUE carrying a `value` has misunderstood
+ * what it is asking for, and guessing on the caller's behalf is how a field
+ * ends up holding something nobody meant to record.
+ */
+const clearValue = z
+  .object({
+    type: z.literal('CLEAR_VALUE'),
+    fieldId: requirementKey,
+    at: timestamp,
+  })
+  .strict()
+
 const confirm = z
   .object({
     type: z.literal('CONFIRM'),
@@ -94,7 +107,8 @@ const submit = z
   .strict()
 
 export const actionSchema = z.discriminatedUnion('type', [
-  setValue, confirm, verify, reject, supersede, updateProfile, submit,
+  setValue, clearValue, confirm, verify, reject, supersede, updateProfile,
+  submit,
 ])
 
 export const requestBodySchema = z
@@ -126,6 +140,8 @@ export function toAction(parsed: ParsedAction): Action {
         ...(parsed.confidence !== undefined && { confidence: parsed.confidence }),
         ...(parsed.fromFieldId !== undefined && { fromFieldId: parsed.fromFieldId }),
       }
+    case 'CLEAR_VALUE':
+      return { type: 'CLEAR_VALUE', fieldId: parsed.fieldId, at: parsed.at }
     case 'CONFIRM':
       return {
         type: 'CONFIRM', fieldId: parsed.fieldId, at: parsed.at,

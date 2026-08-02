@@ -479,3 +479,66 @@ describe('POST /api/application — a submitted application is closed', () => {
     expect(((await res.json()) as ApplicationState).submittedAt).toBe(AT)
   })
 })
+
+describe('POST /api/application — CLEAR_VALUE', () => {
+  it('returns a field to outstanding and records it in the trail', async () => {
+    const id = await newApp()
+    await post(id, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada', source: 'user', at: AT,
+    })
+
+    const res = await post(id, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT })
+
+    expect(res.status).toBe(200)
+    expect((await stateOf(id)).fields.first_name?.value).toBeNull()
+    expect(getAuditLog().entriesFor(id).at(-1)).toMatchObject({
+      kind: 'value_cleared', fieldId: 'first_name',
+    })
+  })
+
+  it('never writes the cleared value into the trail, sensitive or not', async () => {
+    // There is no value to record — the field now holds nothing — and a
+    // "cleared" event carrying the old plaintext would be a second PII path
+    // out of the domain for no gain. The SET_VALUE that put it there is
+    // already in the trail, digested if the field is sensitive.
+    const id = await newApp()
+    await post(id, {
+      type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31', source: 'user', at: AT,
+    })
+    await post(id, { type: 'CLEAR_VALUE', fieldId: 'dob', at: AT })
+
+    const event = getAuditLog().entriesFor(id).at(-1)
+    expect(event?.kind).toBe('value_cleared')
+    expect(event).not.toHaveProperty('value')
+    expect(JSON.stringify(event)).not.toContain('1982-08-31')
+  })
+
+  it('refuses to clear a field that is not part of this application', async () => {
+    const id = await newApp()
+    const res = await post(id, { type: 'CLEAR_VALUE', fieldId: 'tax_id', at: AT })
+    expect(res.status).toBe(422)
+  })
+
+  it('clears the carried mirror alongside it, and audits that too', async () => {
+    const id = await newBusiness()
+    await post(id, {
+      type: 'SET_VALUE', fieldId: 'addr_line1', value: '2345 Anywhere St',
+      source: 'user', at: AT,
+    })
+    expect((await stateOf(id)).fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+
+    await post(id, { type: 'CLEAR_VALUE', fieldId: 'addr_line1', at: AT })
+
+    expect((await stateOf(id)).fields.biz_addr_line1?.value).toBeNull()
+    const kinds = getAuditLog().entriesFor(id).slice(-2).map((e) => e.kind)
+    expect(kinds).toEqual(['value_cleared', 'value_cleared'])
+  })
+
+  it('400s a CLEAR_VALUE carrying anything it should not', async () => {
+    const id = await newApp()
+    const res = await post(id, {
+      type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT, value: 'Mallory',
+    })
+    expect(res.status).toBe(400)
+  })
+})

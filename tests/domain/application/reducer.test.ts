@@ -401,3 +401,60 @@ describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)',
     expect(s.fields['license_number#1']?.status).toBe('superseded')
   })
 })
+
+describe('CLEAR_VALUE — the record must not outlive what is on screen', () => {
+  it('returns a field to outstanding and holds no value', () => {
+    let s = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    expect(outstandingFields(s)).not.toContain('first_name')
+
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT })
+
+    expect(s.fields.first_name?.value).toBeNull()
+    expect(s.fields.first_name?.status).toBe('empty')
+    expect(outstandingFields(s)).toContain('first_name')
+  })
+
+  it('drops the provenance along with the value', () => {
+    // "Read from your license, high confidence" describing a value that is
+    // gone is a lie about the record, and provenance is what a reviewer reads
+    // to decide how hard to look.
+    let s = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31',
+      source: 'ocr', at: AT, confidence: 0.96, documentId: 'doc-1',
+    })
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'dob', at: AT })
+    expect(s.fields.dob?.provenance).toBeUndefined()
+  })
+
+  it('is a no-op on a field that holds nothing, rather than an error', () => {
+    const s = createApplication('app-1', profile)
+    expect(applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'dob', at: AT }))
+      .toBe(s)
+  })
+
+  it('does not mutate the state it clears from', () => {
+    const before = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    const snapshot = JSON.stringify(before)
+    applicationReducer(before, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT })
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('is refused once the application has been sent for review', () => {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    s = applicationReducer(s, { type: 'SUBMIT', at: AT })
+    expect(() =>
+      applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT }),
+    ).toThrow(ApplicationSubmittedError)
+  })
+})
