@@ -54,12 +54,7 @@ export function applicationReducer(
     }
 
     case 'CONFIRM': {
-      const current = state.fields[action.fieldId]
-      if (!current || current.value === null) {
-        throw new Error(
-          `Cannot confirm "${action.fieldId}": it has no value yet`,
-        )
-      }
+      const current = requireField(state, action.fieldId, 'confirm', { withValue: true })
       return withField(state, action.fieldId, {
         ...current,
         status: 'confirmed',
@@ -97,9 +92,13 @@ function requireField(
   state: ApplicationState,
   id: RequirementKey,
   verb: string,
+  opts: { withValue?: boolean } = {},
 ): FieldState {
   const f = state.fields[id]
   if (!f) throw new Error(`Cannot ${verb} "${id}": it has no value yet`)
+  if (opts.withValue && f.value === null) {
+    throw new Error(`Cannot ${verb} "${id}": it has no value yet`)
+  }
   return f
 }
 

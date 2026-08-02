@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applicationReducer, createApplication, isComplete, outstandingFields,
 } from '@/domain/application/reducer'
+import type { Action } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const profile: ApplicantProfile = {
@@ -117,13 +118,35 @@ describe('applicationReducer', () => {
     expect(isComplete(s)).toBe(true)
   })
 
-  it('does not mutate the state it was given', () => {
-    const s = createApplication('app-1', profile)
-    const before = JSON.stringify(s)
-    applicationReducer(s, {
+  it('never mutates the state or its nested field objects', () => {
+    let seeded = createApplication('app-1', profile)
+    seeded = applicationReducer(seeded, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
-      source: 'user', at: AT,
+      source: 'ocr', at: AT, confidence: 0.9,
     })
-    expect(JSON.stringify(s)).toBe(before)
+    const originalField = seeded.fields.first_name
+    const originalProvenance = originalField?.provenance
+    const snapshot = JSON.stringify(seeded)
+
+    const actions: readonly Action[] = [
+      { type: 'CONFIRM', fieldId: 'first_name', at: AT, shownCopyHash: 'c1' },
+      { type: 'VERIFY', fieldId: 'first_name', at: AT },
+      { type: 'REJECT', fieldId: 'first_name', at: AT, reason: 'Too dark' },
+      { type: 'SUPERSEDE', fieldId: 'first_name', at: AT },
+      {
+        type: 'SET_VALUE', fieldId: 'first_name', value: 'Other',
+        source: 'user', at: AT,
+      },
+    ]
+
+    for (const action of actions) {
+      const next = applicationReducer(seeded, action)
+      expect(next).not.toBe(seeded)
+      expect(next.fields.first_name).not.toBe(originalField)
+      expect(JSON.stringify(seeded), action.type).toBe(snapshot)
+    }
+
+    // the nested provenance object must survive by reference too
+    expect(seeded.fields.first_name?.provenance).toBe(originalProvenance)
   })
 })
