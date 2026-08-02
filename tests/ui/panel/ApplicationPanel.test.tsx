@@ -5,6 +5,7 @@ import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import {
   applicationReducer, createApplication, outstandingFields,
 } from '@/domain/application/reducer'
+import { requiredFields } from '@/domain/requirements/engine'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -21,12 +22,20 @@ describe('ApplicationPanel', () => {
     expect(screen.getByText(new RegExp(`0 of ${total}`))).toBeInTheDocument()
   })
 
-  it('renders a row for every required field', () => {
-    const s = createApplication('app-1', profile)
+  it('renders a row for every required field, not just the outstanding ones', () => {
+    // On a fresh application, outstanding === required, so asserting against
+    // outstandingFields() couldn't distinguish "renders every required field"
+    // from a bug that rendered only the outstanding ones. Completing one
+    // field makes the two counts diverge — a satisfied field must still be
+    // visible and revisitable, not disappear from the panel.
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: AT,
+    })
+    expect(outstandingFields(s).length).toBeLessThan(requiredFields(s.profile).length)
     render(<ApplicationPanel state={s} />)
-    expect(screen.getAllByRole('group').length).toBe(
-      outstandingFields(s).length,
-    )
+    expect(screen.getAllByRole('group')).toHaveLength(requiredFields(s.profile).length)
   })
 
   it('never disables the submit button — it explains instead', () => {
@@ -94,14 +103,16 @@ describe('ApplicationPanel', () => {
     })
     render(<ApplicationPanel state={s} onConfirm={onConfirm} />)
 
-    // Anchored: "Driver's license number" (dl_number) also matches an
-    // unanchored /license number/i, which would silently inflate the count.
-    const rows = screen.getAllByRole('group', { name: /^license number$/i })
-    expect(rows).toHaveLength(2)
+    // Each instance gets a distinct, numbered accessible name (License
+    // number 1 / License number 2) — not a shared "License number" name,
+    // and not the unrelated "Driver's license number" (dl_number).
+    const firstRow = screen.getByRole('group', { name: /^license number 1$/i })
+    const secondRow = screen.getByRole('group', { name: /^license number 2$/i })
+    expect(firstRow).toBeInTheDocument()
+    expect(secondRow).toBeInTheDocument()
 
     // Click "Looks right" within the second licence row specifically, so a
     // bug that always confirms the first instance would be caught.
-    const secondRow = rows[1]!
     await userEvent.click(within(secondRow).getByRole('button', { name: /looks right/i }))
     expect(onConfirm).toHaveBeenCalledWith('license_number#1')
   })

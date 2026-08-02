@@ -27,7 +27,12 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
   // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
-  const def = fieldDef(parseReqKey(fieldId).fieldId)
+  const { fieldId: bareId, instance } = parseReqKey(fieldId)
+  const def = fieldDef(bareId)
+  // A repeated group (licences) renders one row per instance. Without a
+  // number, two "License number" rows are indistinguishable both on screen
+  // and to a screen reader. Instances are 0-based internally but read 1-based.
+  const displayLabel = instance === null ? def.label : `${def.label} ${instance + 1}`
   const status = state?.status ?? 'empty'
   const isDerived = status === 'derived'
   const rationaleId = `rationale-${fieldId}`
@@ -35,7 +40,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
   return (
     <div
       role="group"
-      aria-label={def.label}
+      aria-label={displayLabel}
       aria-describedby={rationaleId}
       style={{
         padding: '12px 14px',
@@ -51,7 +56,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <strong style={{ fontSize: 12, letterSpacing: '.04em', color: COLOR.textPrimary }}>
-          {def.label.toUpperCase()}
+          {displayLabel.toUpperCase()}
         </strong>
         {(status === 'confirmed' || status === 'verified') && (
           <span aria-label="confirmed" style={{ color: COLOR.success }}>✓</span>

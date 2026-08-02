@@ -88,16 +88,26 @@ describe('FieldRow', () => {
     // fieldDef is keyed by bare FieldId; `license_number#0` only resolves if
     // the lookup runs through parseReqKey. Without this test, simplifying it
     // to fieldDef(fieldId) passes the whole suite and throws at runtime.
+    // Instance 0 must read as "1" to the user — 0-based internally, 1-based
+    // on screen.
     render(
       <FieldRow
         fieldId="license_number#0"
         state={{ value: 'GA-DLR-44812', status: 'confirmed' }}
       />,
     )
-    expect(screen.getByRole('group', { name: /license number/i })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /^license number 1$/i })).toBeInTheDocument()
     expect(screen.getByText('GA-DLR-44812')).toBeInTheDocument()
     expect(screen.getByText(/verify this against your state dealer board/i))
       .toBeInTheDocument()
+  })
+
+  it('gives a non-instanced field its plain label, with no stray number', () => {
+    // Only repeated (licence) fields get a numeric suffix. A bug that always
+    // appends the instance number would corrupt every ordinary field's label.
+    render(<FieldRow fieldId="first_name" state={undefined} />)
+    expect(screen.getByRole('group', { name: /^first name$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /first name 1/i })).toBeNull()
   })
 
   it('keeps describedby ids unique across licence instances', () => {
@@ -113,6 +123,20 @@ describe('FieldRow', () => {
     expect(groups).toHaveLength(2)
     expect(groups[0]?.getAttribute('aria-describedby'))
       .not.toBe(groups[1]?.getAttribute('aria-describedby'))
+  })
+
+  it('gives each licence instance a distinct accessible name', () => {
+    // The bug this guards against: both rows sharing the bare "License
+    // number" label, which leaves a screen-reader user unable to tell the
+    // dealer licence row from the salvage licence row.
+    render(
+      <>
+        <FieldRow fieldId="license_number#0" state={{ value: 'A', status: 'confirmed' }} />
+        <FieldRow fieldId="license_number#1" state={{ value: 'B', status: 'confirmed' }} />
+      </>,
+    )
+    expect(screen.getByRole('group', { name: /^license number 1$/i })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /^license number 2$/i })).toBeInTheDocument()
   })
 
   it('passes the full instance-qualified key to onConfirm, not the bare FieldId', async () => {
