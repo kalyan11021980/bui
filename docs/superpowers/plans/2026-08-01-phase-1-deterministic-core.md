@@ -21,6 +21,7 @@
 - **Never disable the primary button** — keep it at full `#B82018` and show what is outstanding beside it (spec §9).
 - **Address, legal name and taxpayer ID are never bulk-confirmed** — each needs an individual confirmation (spec §10.4).
 - All domain code is pure: same input, same output, no `Date.now()` inside reducers — timestamps are passed in.
+- **Package manager is pnpm.** Use `pnpm install` / `pnpm vitest run` / `pnpm typecheck`. Do not create `package-lock.json`.
 
 ---
 
@@ -179,7 +180,7 @@ export default nextConfig
 import '@testing-library/jest-dom/vitest'
 ```
 
-Then run `npm install`.
+Then run `pnpm install`.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -264,7 +265,7 @@ describe('defineField', () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/field-def.test.ts`
+Run: `pnpm vitest run tests/domain/field-def.test.ts`
 Expected: FAIL — cannot resolve `@/domain/field-def`.
 
 - [ ] **Step 4: Write the implementation**
@@ -378,12 +379,12 @@ export function defineField<T>(def: FieldDef<T>): FieldDef<T> {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/field-def.test.ts`
+Run: `pnpm vitest run tests/domain/field-def.test.ts`
 Expected: PASS (4 tests)
 
 - [ ] **Step 6: Verify types compile**
 
-Run: `npm run typecheck`
+Run: `pnpm typecheck`
 Expected: no errors.
 
 - [ ] **Step 7: Commit**
@@ -454,7 +455,7 @@ describe('personal catalog', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/catalog/personal.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/personal.test.ts`
 Expected: FAIL — cannot resolve `@/domain/catalog/identity`.
 
 - [ ] **Step 3: Write the implementation**
@@ -631,7 +632,7 @@ export const CONTACT_FIELDS: readonly FieldDef[] = [
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/catalog/personal.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/personal.test.ts`
 Expected: PASS (5 tests)
 
 - [ ] **Step 5: Commit**
@@ -706,7 +707,7 @@ describe('catalog index', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/catalog/index.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/index.test.ts`
 Expected: FAIL — cannot resolve `@/domain/catalog`.
 
 - [ ] **Step 3: Write the implementation**
@@ -945,7 +946,7 @@ export {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/catalog/index.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/index.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -1066,7 +1067,7 @@ describe('requiredFields', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
 Expected: FAIL — cannot resolve `@/domain/requirements/engine`.
 
 - [ ] **Step 3: Write the implementation**
@@ -1150,7 +1151,7 @@ export function requiredFields(profile: ApplicantProfile): FieldId[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
 Expected: PASS (8 tests)
 
 - [ ] **Step 5: Commit**
@@ -1223,7 +1224,7 @@ describe('requirement keys', () => {
 
 - [ ] **Step 2: Run it and confirm it fails**
 
-Run: `npx vitest run tests/domain/requirements/key.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/key.test.ts`
 Expected: FAIL — cannot resolve `@/domain/requirements/key`.
 
 - [ ] **Step 3: Write the key helpers**
@@ -1265,7 +1266,7 @@ export function parseReqKey(
 
 - [ ] **Step 4: Run it and confirm it passes**
 
-Run: `npx vitest run tests/domain/requirements/key.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/key.test.ts`
 Expected: PASS (5 tests)
 
 - [ ] **Step 5: Extract the shared schemas**
@@ -1453,7 +1454,7 @@ describe('requiredFields', () => {
 
 - [ ] **Step 8: Run it and confirm it fails**
 
-Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
 Expected: FAIL — `licenses` is not a known property of `ApplicantProfile`.
 
 - [ ] **Step 9: Rewrite the rules**
@@ -1580,12 +1581,12 @@ constant tracks.
 
 - [ ] **Step 12: Run the whole suite**
 
-Run: `npx vitest run`
+Run: `pnpm vitest run`
 Expected: PASS. The engine test now has 13 tests, the key test 5.
 
 - [ ] **Step 13: Typecheck**
 
-Run: `npm run typecheck`
+Run: `pnpm typecheck`
 Expected: no errors.
 
 - [ ] **Step 14: Commit**
@@ -1745,7 +1746,7 @@ describe('applicationReducer', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/application/reducer.test.ts`
+Run: `pnpm vitest run tests/domain/application/reducer.test.ts`
 Expected: FAIL — cannot resolve `@/domain/application/reducer`.
 
 - [ ] **Step 3: Write the state types**
@@ -1926,7 +1927,7 @@ function withField(
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/application/reducer.test.ts`
+Run: `pnpm vitest run tests/domain/application/reducer.test.ts`
 Expected: PASS (10 tests)
 
 - [ ] **Step 6: Commit**
@@ -2027,7 +2028,7 @@ describe('applyCarry', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/application/carry.test.ts`
+Run: `pnpm vitest run tests/domain/application/carry.test.ts`
 Expected: FAIL — cannot resolve `@/domain/application/carry`.
 
 - [ ] **Step 3: Write the implementation**
@@ -2094,7 +2095,7 @@ export function carriedFrom(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/application/carry.test.ts`
+Run: `pnpm vitest run tests/domain/application/carry.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -2211,7 +2212,7 @@ describe('AuditLog', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/audit/log.test.ts`
+Run: `pnpm vitest run tests/domain/audit/log.test.ts`
 Expected: FAIL — cannot resolve `@/domain/audit/log`.
 
 - [ ] **Step 3: Write the event types**
@@ -2317,7 +2318,7 @@ export class AuditLog {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/audit/log.test.ts`
+Run: `pnpm vitest run tests/domain/audit/log.test.ts`
 Expected: PASS (8 tests)
 
 - [ ] **Step 6: Commit**
@@ -2381,7 +2382,7 @@ describe('theme tokens', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/theme/tokens.test.ts`
+Run: `pnpm vitest run tests/ui/theme/tokens.test.ts`
 Expected: FAIL — cannot resolve `@/ui/theme/tokens`.
 
 - [ ] **Step 3: Write the implementation**
@@ -2429,7 +2430,7 @@ export const STATUS_COLOR: Record<FieldStatus, string> = {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/theme/tokens.test.ts`
+Run: `pnpm vitest run tests/ui/theme/tokens.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -2530,11 +2531,11 @@ describe('FieldRow', () => {
 
 - [ ] **Step 2: Install the interaction testing library**
 
-Run: `npm install -D @testing-library/user-event@^14.5.2`
+Run: `pnpm add -D @testing-library/user-event@^14.5.2`
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/panel/FieldRow.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/FieldRow.test.tsx`
 Expected: FAIL — cannot resolve `@/ui/panel/FieldRow`.
 
 - [ ] **Step 4: Write Rationale**
@@ -2691,7 +2692,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/panel/FieldRow.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/FieldRow.test.tsx`
 Expected: PASS (8 tests)
 
 - [ ] **Step 7: Commit**
@@ -2798,7 +2799,7 @@ describe('ApplicationPanel', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/panel/ApplicationPanel.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/ApplicationPanel.test.tsx`
 Expected: FAIL — cannot resolve `@/ui/panel/ApplicationPanel`.
 
 - [ ] **Step 3: Write ProgressSummary**
@@ -2920,7 +2921,7 @@ export function ApplicationPanel({ state, onConfirm, onEdit, onSubmit }: Props) 
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/panel/ApplicationPanel.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/ApplicationPanel.test.tsx`
 Expected: PASS (6 tests)
 
 - [ ] **Step 6: Commit**
@@ -3027,7 +3028,7 @@ describe('a whole registration, panel only', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/integration/complete-registration.test.ts`
+Run: `pnpm vitest run tests/integration/complete-registration.test.ts`
 Expected: FAIL — cannot resolve `@/server/store`.
 
 - [ ] **Step 3: Write the store**
@@ -3161,12 +3162,12 @@ export default function Page() {
 
 - [ ] **Step 6: Run the whole suite**
 
-Run: `npx vitest run`
+Run: `pnpm vitest run`
 Expected: PASS — every test from Tasks 1–11.
 
 - [ ] **Step 7: Verify types and build**
 
-Run: `npm run typecheck && npm run build`
+Run: `pnpm typecheck && pnpm build`
 Expected: no type errors, successful Next.js build.
 
 - [ ] **Step 8: Commit**
@@ -3180,9 +3181,9 @@ git commit -m "feat: wire panel into Next.js with an end-to-end registration tes
 
 ## Definition of done for Phase 1
 
-- [ ] `npx vitest run` passes with no skipped tests
-- [ ] `npm run typecheck` reports no errors
-- [ ] `npm run build` succeeds
+- [ ] `pnpm vitest run` passes with no skipped tests
+- [ ] `pnpm typecheck` reports no errors
+- [ ] `pnpm build` succeeds
 - [ ] A field cannot be added without `purpose` and `authority` (Task 1 test proves it)
 - [ ] The audit log contains no raw sensitive values (Task 11 test proves it)
 - [ ] A registration can be completed through the panel with no LLM and no OCR
