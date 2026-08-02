@@ -2113,12 +2113,12 @@ Spec §10.1. The log must capture what the user was shown at the moment they
 confirmed, and must never store a raw value for a sensitive field.
 
 **Files:**
-- Create: `src/domain/audit/event.ts`, `src/domain/audit/log.ts`
+- Create: `src/domain/audit/event.ts`, `src/domain/audit/digest.ts`, `src/domain/audit/log.ts`
 - Test: `tests/domain/audit/log.test.ts`
 
 **Interfaces:**
-- Consumes: `Action`, `ApplicationState`, `FieldId`, `fieldDef`
-- Produces: `AuditEvent`, `digest(input: string): string`, `AuditLog` class with `append(action, state)`, `entries()`, `size()`
+- Consumes: `Action`, `ApplicationState`, `RequirementKey`, `parseReqKey`, `CATALOG`
+- Produces: `AuditEvent`, `Digester`, `createDigester(secret): Digester`, `AuditLog` class constructed as `new AuditLog(digester)` with `append(action)`, `entries()`, `size()`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2126,13 +2126,16 @@ confirmed, and must never store a raw value for a sensitive field.
 
 ```ts
 import { describe, it, expect } from 'vitest'
-import { AuditLog, digest } from '@/domain/audit/log'
+import { AuditLog } from '@/domain/audit/log'
+import { createDigester } from '@/domain/audit/digest'
 
 const AT = '2026-08-01T12:00:00.000Z'
+const TEST_SECRET = 'test-secret-at-least-32-characters-long'
+const digest = createDigester(TEST_SECRET)
 
 describe('AuditLog', () => {
   it('assigns sequential numbers starting at 1', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -2145,7 +2148,7 @@ describe('AuditLog', () => {
   })
 
   it('stores the plain value for a non-sensitive field', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -2155,19 +2158,19 @@ describe('AuditLog', () => {
   })
 
   it('stores only a digest for a sensitive field', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'tax_id', value: '123-45-6789',
       source: 'user', at: AT,
     })
     const e = log.entries()[0]
     expect(e?.value).toBeUndefined()
-    expect(e?.valueDigest).toBe(digest('123-45-6789'))
+    expect(e?.valueDigest).toBe(digest(JSON.stringify('123-45-6789')))
     expect(JSON.stringify(log.entries())).not.toContain('123-45-6789')
   })
 
   it('records the copy hash the user was shown when confirming', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'CONFIRM', fieldId: 'dob', at: AT, shownCopyHash: 'copy-v3',
     })
@@ -2176,7 +2179,7 @@ describe('AuditLog', () => {
   })
 
   it('refuses to mutate an entry once appended', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -2188,13 +2191,54 @@ describe('AuditLog', () => {
     expect(log.size()).toBe(1)
   })
 
+  it('hands out entries a caller cannot tamper with', () => {
+    const log = new AuditLog(digest)
+    log.append({
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: AT,
+    })
+    const first = log.entries()[0]
+    expect(Object.isFrozen(first)).toBe(true)
+    try {
+      ;(first as unknown as { value: unknown }).value = 'TAMPERED'
+    } catch {
+      // strict mode throws; non-strict silently no-ops. Either is fine.
+    }
+    expect(log.entries()[0]?.value).toBe('Kalyan')
+  })
+
+  it('digests a sensitive value reached through an instanced key', () => {
+    // CATALOG is keyed by bare FieldId, so `tax_id#0` only resolves if the
+    // lookup runs through parseReqKey. If that is ever skipped the raw
+    // taxpayer ID is written in the clear — this test fails loudly first.
+    const log = new AuditLog(digest)
+    log.append({
+      type: 'SET_VALUE', fieldId: 'tax_id#0', value: '98-7654321',
+      source: 'user', at: AT,
+    })
+    expect(log.entries()[0]?.value).toBeUndefined()
+    expect(log.entries()[0]?.valueDigest).toBeTruthy()
+    expect(JSON.stringify(log.entries())).not.toContain('98-7654321')
+  })
+
+  it('refuses a digest secret too short to be worth having', () => {
+    expect(() => createDigester('short')).toThrow(/32 characters/)
+  })
+
   it('produces a stable digest', () => {
     expect(digest('abc')).toBe(digest('abc'))
     expect(digest('abc')).not.toBe(digest('abd'))
   })
 
+  it('produces a digest that is not reversible by brute force', () => {
+    // A different secret must yield a different digest for the same input —
+    // that is what stops a rainbow table built against the raw value space.
+    const other = createDigester('a-completely-different-secret-32chars!')
+    expect(other('123-45-6789')).not.toBe(digest('123-45-6789'))
+  })
+
   it('logs a rejection with its reason', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'REJECT', fieldId: 'id_images', at: AT,
       reason: 'The photo was too dark',
@@ -2204,8 +2248,8 @@ describe('AuditLog', () => {
   })
 
   it('starts empty', () => {
-    expect(new AuditLog().size()).toBe(0)
-    expect(new AuditLog().entries()).toEqual([])
+    expect(new AuditLog(digest).size()).toBe(0)
+    expect(new AuditLog(digest).entries()).toEqual([])
   })
 })
 ```
@@ -2243,6 +2287,36 @@ export type AuditEvent = {
 }
 ```
 
+- [ ] **Step 3b: Write the keyed digester**
+
+An unkeyed hash of a 9-digit taxpayer ID or a date of birth is reversible by
+brute force in under a second — the value space is tiny and the hash is
+deterministic. Anyone who can read the audit store could recover exactly the
+values we declined to store. The digest must therefore be keyed.
+
+`src/domain/audit/digest.ts`:
+
+```ts
+import { createHmac } from 'node:crypto'
+
+/** Digests a value for the audit log without storing it. */
+export type Digester = (input: string) => string
+
+/**
+ * Keyed so a digest cannot be brute-forced back to its input. Low-entropy
+ * values — a 9-digit taxpayer ID, a date of birth — are otherwise trivially
+ * recoverable from an unkeyed hash by anyone who can read the audit store.
+ * The secret is injected rather than read from the environment, so the
+ * domain layer stays pure and testable.
+ */
+export function createDigester(secret: string): Digester {
+  if (secret.length < 32) {
+    throw new Error('Audit digest secret must be at least 32 characters')
+  }
+  return (input) => createHmac('sha256', secret).update(input).digest('hex')
+}
+```
+
 - [ ] **Step 4: Write the log**
 
 `src/domain/audit/log.ts`:
@@ -2251,21 +2325,9 @@ export type AuditEvent = {
 import type { Action } from '../application/state'
 import { CATALOG } from '../catalog'
 import { parseReqKey } from '../requirements/key'
+import type { Digester } from './digest'
 import type { AuditEvent, AuditKind } from './event'
 
-/**
- * Small, stable, non-cryptographic digest (FNV-1a). Enough to prove a value
- * did not change between events without storing the value itself. Swap for a
- * keyed hash if the audit log ever leaves our infrastructure.
- */
-export function digest(input: string): string {
-  let h = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h.toString(16).padStart(8, '0')
-}
 
 const KIND: Record<Action['type'], AuditKind> = {
   SET_VALUE: 'value_set',
@@ -2279,6 +2341,11 @@ const KIND: Record<Action['type'], AuditKind> = {
 /** Append-only. There is deliberately no delete, no edit, no undo. */
 export class AuditLog {
   #entries: AuditEvent[] = []
+  readonly #digest: Digester
+
+  constructor(digest: Digester) {
+    this.#digest = digest
+  }
 
   append(action: Action): AuditEvent {
     const base: AuditEvent = {
@@ -2293,7 +2360,7 @@ export class AuditLog {
       base.source = action.source
       const def = CATALOG.get(parseReqKey(action.fieldId).fieldId)
       if (def?.sensitive) {
-        base.valueDigest = digest(String(action.value))
+        base.valueDigest = this.#digest(JSON.stringify(action.value))
       } else {
         base.value = action.value
       }
@@ -2302,6 +2369,9 @@ export class AuditLog {
     if (action.type === 'CONFIRM') base.shownCopyHash = action.shownCopyHash
     if (action.type === 'REJECT') base.reason = action.reason
 
+    // Frozen at append time: an audit entry a caller can mutate is not a
+    // record of anything. Build fully, then freeze, then store.
+    Object.freeze(base)
     this.#entries.push(base)
     return base
   }
@@ -2974,6 +3044,7 @@ import {
 } from '@/domain/application/reducer'
 import { applyCarry } from '@/domain/application/carry'
 import { AuditLog } from '@/domain/audit/log'
+import { createDigester } from '@/domain/audit/digest'
 import { getApplication, putApplication, resetStore } from '@/server/store'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Action } from '@/domain/application/state'
@@ -2983,13 +3054,14 @@ const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
   wantsGsa: false, licenses: ['dealer'],
 }
+const digest = createDigester('integration-test-secret-32-chars-min!')
 
 beforeEach(() => resetStore())
 
 describe('a whole registration, panel only', () => {
   it('completes with no LLM and no OCR', () => {
     let s = createApplication('app-1', business)
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
 
     for (const id of outstandingFields(s)) {
       const action: Action = {
@@ -3004,7 +3076,7 @@ describe('a whole registration, panel only', () => {
   })
 
   it('never writes a raw taxpayer ID into the audit log', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'tax_id', value: '12-3456789',
       source: 'user', at: AT,
