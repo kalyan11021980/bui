@@ -151,6 +151,52 @@ describe('AuditLog', () => {
   })
 })
 
+describe('AuditLog — profile changes record WHAT changed', () => {
+  it('captures the patch, not just that a profile was updated', () => {
+    // The event used to be exactly {"seq":1,"kind":"profile_updated"} — which
+    // reconstructs nothing. The profile is the only input to the requirements
+    // engine, so these are the changes that move an applicant's obligations.
+    const log = new AuditLog(digester)
+    const e = log.append('app-1', {
+      type: 'UPDATE_PROFILE',
+      patch: { applicantType: 'business', state: 'OH', licenses: ['dealer'] },
+      at: AT,
+    })
+    expect(e.kind).toBe('profile_updated')
+    expect(e.patch).toEqual({
+      applicantType: 'business', state: 'OH', licenses: ['dealer'],
+    })
+  })
+
+  it('records only the keys that were actually sent', () => {
+    const log = new AuditLog(digester)
+    const e = log.append('app-1', { type: 'UPDATE_PROFILE', patch: { wantsGsa: true }, at: AT })
+    expect(Object.keys(e.patch ?? {})).toEqual(['wantsGsa'])
+  })
+
+  it('records a licence list being emptied, which removes requirements', () => {
+    const log = new AuditLog(digester)
+    const e = log.append('app-1', { type: 'UPDATE_PROFILE', patch: { licenses: [] }, at: AT })
+    expect(e.patch?.licenses).toEqual([])
+  })
+
+  it('copies the patch rather than holding the caller\'s object', () => {
+    const log = new AuditLog(digester)
+    const patch = { wantsGsa: true }
+    log.append('app-1', { type: 'UPDATE_PROFILE', patch, at: AT })
+    patch.wantsGsa = false
+    expect(log.entriesFor('app-1')[0]?.patch).toEqual({ wantsGsa: true })
+  })
+
+  it('leaves patch absent on every other kind of event', () => {
+    const log = new AuditLog(digester)
+    log.append('app-1', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada', source: 'user', at: AT,
+    })
+    expect(log.entriesFor('app-1')[0]?.patch).toBeUndefined()
+  })
+})
+
 describe('AuditLog — the sensitive-value boundary fails CLOSED', () => {
   it('refuses to append a SET_VALUE for a field id the catalog does not know', () => {
     // The bug: `CATALOG.get(...)` missed, `def?.sensitive` was falsy, and the

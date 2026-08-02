@@ -57,6 +57,11 @@ export class AuditLog {
 
     const confirmPart = action.type === 'CONFIRM' ? { shownCopyHash: action.shownCopyHash } : {}
     const rejectPart = action.type === 'REJECT' ? { reason: action.reason } : {}
+    // Copied, not referenced: the event is frozen, and a caller holding the
+    // original patch object must not be able to rewrite history through it.
+    const profilePart = action.type === 'UPDATE_PROFILE'
+      ? { patch: Object.freeze({ ...action.patch }) }
+      : {}
 
     // Build the event completely before freezing — assigning a property
     // after Object.freeze either silently no-ops or throws (strict mode),
@@ -71,6 +76,7 @@ export class AuditLog {
       ...valuePart,
       ...confirmPart,
       ...rejectPart,
+      ...profilePart,
     })
 
     trail.push(event)
