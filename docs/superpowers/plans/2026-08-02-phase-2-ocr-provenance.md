@@ -377,7 +377,7 @@ git commit -m "feat(ocr): map grounding coordinates back to the image they came 
 Task 2 supports both fit models. Only one is correct, and guessing puts every crop off by a letterbox band. This task measures it. **Requires a running OCR endpoint.**
 
 **Files:**
-- Create: `tools/ocr-gate/calibrate.ts`
+- Create: `tools/ocr-gate/calibrate.test.ts`
 - Create: `docs/superpowers/decisions/2026-08-02-ocr-fit-model.md`
 - Modify: `src/domain/ocr/geometry.ts` (export the settled default)
 - Test: `tests/domain/ocr/geometry.test.ts` (assert the default)
@@ -422,8 +422,12 @@ the problem is elsewhere and the non-square numbers mean nothing.
 
 - [ ] **Step 2: Write the calibration script**
 
+Written as a vitest file gated on the environment, following the existing
+`tools/ocr-gate/gate.test.ts`. No new dependency, and it stays runnable with `pnpm test`.
+
 ```ts
-// tools/ocr-gate/calibrate.ts
+// tools/ocr-gate/calibrate.test.ts
+import { describe, it } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { requestOcr } from '../../src/server/ocr/client'
 import { findValue } from '../../src/domain/ocr/grounding'
@@ -432,7 +436,6 @@ import { toPixels, type FitModel, type ImageSize } from '../../src/domain/ocr/ge
 
 const endpoint = process.env.OCR_ENDPOINT
 const model = process.env.OCR_MODEL
-if (!endpoint || !model) throw new Error('Set OCR_ENDPOINT and OCR_MODEL')
 
 type Truth = {
   readonly image: string
@@ -444,6 +447,9 @@ const truths: Truth[] = JSON.parse(
   readFileSync('sample/licenses/calibration/truth.json', 'utf8'),
 )
 
+// Skipped unless a server is configured, so `pnpm test` stays offline.
+describe.skipIf(!endpoint || !model)('fit model calibration', () => {
+ it('scores both fit models against markers at known positions', async () => {
 const observed: Record<string, Record<string, number[]>> = {}
 
 for (const truth of truths) {
@@ -477,11 +483,16 @@ writeFileSync(
   'sample/licenses/calibration/observed.json',
   JSON.stringify(observed, null, 2),
 )
+ })
+})
 ```
+
+The `requestOcr` calls need `endpoint!` and `model!` inside the block, or a narrowing
+guard at the top of the `it`.
 
 - [ ] **Step 3: Run it and read the result**
 
-Run: `OCR_ENDPOINT=... OCR_MODEL=... pnpm exec tsx tools/ocr-gate/calibrate.ts`
+Run: `OCR_ENDPOINT=... OCR_MODEL=... pnpm test calibrate`
 
 Expected: the two fit models score identically on the 1:1 card and differ on the non-square ones. The winner is whichever has the higher mean IoU on 16:10 and 3:4.
 
@@ -527,7 +538,7 @@ it('maps a measured marker back onto where it was actually printed', () => {
 })
 ```
 
-`calibrate.ts` writes `observed.json` — the raw normalised boxes it got back, keyed by
+`calibrate.test.ts` writes `observed.json` — the raw normalised boxes it got back, keyed by
 image and marker — alongside its console output. That file is what makes this test
 reproducible without a server.
 
@@ -535,7 +546,7 @@ reproducible without a server.
 
 ```bash
 pnpm test geometry && pnpm typecheck
-git add tools/ocr-gate/calibrate.ts tools/ocr-gate/render_cards.py \
+git add tools/ocr-gate/calibrate.test.ts tools/ocr-gate/render_cards.py \
         sample/licenses/calibration docs/superpowers/decisions/2026-08-02-ocr-fit-model.md \
         src/domain/ocr/geometry.ts tests/domain/ocr/geometry.test.ts
 git commit -m "fix(ocr): settle the fit model by measuring it, not assuming it"
@@ -550,7 +561,7 @@ Extractors need documents to be tested against, and four AAMVA cards do not cove
 **Files:**
 - Create: `sample/licenses/specimens/*` (new specimens)
 - Create: `sample/licenses/fixtures/*.json` (recorded responses)
-- Create: `tools/ocr-gate/record.ts`
+- Create: `tools/ocr-gate/record.test.ts`, `sample/licenses/manifest.json`
 - Modify: `sample/licenses/SOURCES.md`
 - Modify: `src/domain/catalog/address.ts` (conditionally — see Step 4)
 
@@ -576,37 +587,70 @@ Append to `sample/licenses/SOURCES.md` in the existing table format: file, title
 
 - [ ] **Step 3: Record OCR responses as fixtures**
 
+Driven by a manifest rather than argv, so recording the whole corpus is one run and the
+corpus itself is reviewable as a file.
+
+```json
+// sample/licenses/manifest.json
+[
+  {
+    "image": "sample/licenses/specimens/wa_enhanced.png",
+    "docType": "drivers_license",
+    "slug": "wa_enhanced",
+    "size": { "width": 1560, "height": 1006 }
+  }
+]
+```
+
 ```ts
-// tools/ocr-gate/record.ts
+// tools/ocr-gate/record.test.ts
+import { describe, it } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { requestOcr, PLAIN_PROMPT } from '../../src/server/ocr/client'
 
 const endpoint = process.env.OCR_ENDPOINT
 const model = process.env.OCR_MODEL
-if (!endpoint || !model) throw new Error('Set OCR_ENDPOINT and OCR_MODEL')
 
-const [file, docType, slug, width, height] = process.argv.slice(2)
-if (!file || !docType || !slug || !width || !height) {
-  throw new Error('Usage: record.ts <image> <docType> <slug> <width> <height>')
+type Entry = {
+  image: string; docType: string; slug: string
+  size: { width: number; height: number }
 }
 
-const imageBase64 = readFileSync(file).toString('base64')
-const grounded = await requestOcr({ endpoint, model, imageBase64 })
-const plain = await requestOcr({ endpoint, model, imageBase64, prompt: PLAIN_PROMPT })
+// Skipped unless a server is configured. Recording is a deliberate act, not
+// something a routine `pnpm test` should redo.
+describe.skipIf(!endpoint || !model)('fixture recording', () => {
+  it('records a grounded and plain read for every specimen in the manifest', async () => {
+    const manifest: Entry[] = JSON.parse(
+      readFileSync('sample/licenses/manifest.json', 'utf8'),
+    )
 
-writeFileSync(
-  `sample/licenses/fixtures/${slug}.json`,
-  JSON.stringify({
-    docType,
-    imageSize: { width: Number(width), height: Number(height) },
-    text: grounded.text,
-    detections: grounded.detections,
-    plainText: plain.text,
-  }, null, 2),
-)
+    for (const entry of manifest) {
+      const imageBase64 = readFileSync(entry.image).toString('base64')
+      const grounded = await requestOcr({ endpoint: endpoint!, model: model!, imageBase64 })
+      const plain = await requestOcr({
+        endpoint: endpoint!, model: model!, imageBase64, prompt: PLAIN_PROMPT,
+      })
+
+      writeFileSync(
+        `sample/licenses/fixtures/${entry.slug}.json`,
+        JSON.stringify({
+          docType: entry.docType,
+          imageSize: entry.size,
+          text: grounded.text,
+          detections: grounded.detections,
+          plainText: plain.text,
+        }, null, 2),
+      )
+    }
+  }, 120_000)
+})
 ```
 
-Record one fixture per specimen. These files are what every later extraction test reads, and they are why no test needs LM Studio.
+Run: `OCR_ENDPOINT=... OCR_MODEL=... pnpm test record`
+
+One fixture per specimen. These files are what every later extraction test reads, and they
+are why no test needs LM Studio. Commit them — a fixture that has to be regenerated to run
+the suite is not a fixture.
 
 - [ ] **Step 4: Settle the address derivation question**
 
@@ -650,7 +694,7 @@ describe('fixture corpus', () => {
 
 ```bash
 pnpm test fixtures && pnpm typecheck
-git add sample/licenses tools/ocr-gate/record.ts tests/domain/ocr/fixtures.test.ts \
+git add sample/licenses tools/ocr-gate/record.test.ts tests/domain/ocr/fixtures.test.ts \
         src/domain/catalog/address.ts
 git commit -m "test(ocr): record a fixture per specimen, so no test needs a server"
 ```
@@ -1434,10 +1478,21 @@ describe('labelled recall', () => {
   it('records what it managed to read, without pretending it read more', () => {
     for (const doc of docs) {
       const out = parseCandidates(extractLabelled(doc.detections, doc.text))
-      // Not an assertion of quality — a record of it. The number goes in the
-      // decision doc and decides whether this strategy survives as it is.
       console.log(`${doc.docType}: ${out.length} fields — ${out.map((c) => c.key).join(', ')}`)
-      expect(out.length).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('reads a licence number from every dealer licence in the corpus', () => {
+    // The floor the strategy has to clear. A dealer licence prints its number
+    // beside the word "License" — failing this is a broken strategy, not a
+    // weak one. Proof-of-residency documents get no floor: what a utility bill
+    // yields is the open question this task exists to answer.
+    const dealers = docs.filter((d) => d.docType === 'dealer_license')
+    expect(dealers.length).toBeGreaterThan(0)
+
+    for (const doc of dealers) {
+      const keys = parseCandidates(extractLabelled(doc.detections, doc.text)).map((c) => c.key)
+      expect(keys).toContain('license_number#0')
     }
   })
 })
