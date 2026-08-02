@@ -10,6 +10,8 @@ type Props = {
   state: ApplicationState
   onConfirm?: (id: RequirementKey) => void
   onEdit?: (id: RequirementKey) => void
+  /** Supplying this makes every row editable. Spec §15 / §11.1. */
+  onChange?: (id: RequirementKey, value: unknown) => void
   onSubmit?: () => void
 }
 
@@ -18,7 +20,9 @@ type Props = {
  * requirement, not a rival to the agent — if the model is down, registration
  * must not be. Spec §11.1.
  */
-export function ApplicationPanel({ state, onConfirm, onEdit, onSubmit }: Props) {
+export function ApplicationPanel({
+  state, onConfirm, onEdit, onChange, onSubmit,
+}: Props) {
   const required = requiredFields(state.profile)
   const outstanding = outstandingFields(state)
   const done = required.length - outstanding.length
@@ -45,6 +49,7 @@ export function ApplicationPanel({ state, onConfirm, onEdit, onSubmit }: Props) 
             state={state.fields[id]}
             {...(onConfirm && { onConfirm })}
             {...(onEdit && { onEdit })}
+            {...(onChange && { onChange })}
           />
         ))}
       </div>

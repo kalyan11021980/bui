@@ -2,6 +2,7 @@ import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
+import { FieldInput, fieldInputId } from './FieldInput'
 import { Rationale } from './Rationale'
 
 type Props = {
@@ -10,6 +11,8 @@ type Props = {
   state: FieldState | undefined
   onConfirm?: (id: RequirementKey) => void
   onEdit?: (id: RequirementKey) => void
+  /** Supplying this makes the field editable. Spec §15 / §11.1. */
+  onChange?: (id: RequirementKey, value: unknown) => void
 }
 
 /**
@@ -25,7 +28,7 @@ const SOURCE_LABEL: Record<string, string> = {
   user: 'entered by you',
 }
 
-export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
+export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props) {
   // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
   const { fieldId: bareId, instance } = parseReqKey(fieldId)
   const def = fieldDef(bareId)
@@ -55,18 +58,36 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-        <strong style={{ fontSize: 12, letterSpacing: '.04em', color: COLOR.textPrimary }}>
-          {displayLabel.toUpperCase()}
-        </strong>
+        {/* A real <label> pointing at the input, not decorative bold text —
+            otherwise the control a user must fill in has no accessible name.
+            Uppercasing is done in CSS rather than in JS so the accessible
+            name stays "License number 1" and not "LICENSE NUMBER 1". */}
+        <label
+          htmlFor={fieldInputId(fieldId)}
+          style={{
+            fontSize: 12, letterSpacing: '.04em', fontWeight: 700,
+            textTransform: 'uppercase', color: COLOR.textPrimary,
+          }}
+        >
+          {displayLabel}
+        </label>
         {(status === 'confirmed' || status === 'verified') && (
           <span aria-label="confirmed" style={{ color: COLOR.success }}>✓</span>
         )}
       </div>
 
-      {state?.value != null && (
+      {/* When the field is editable the input carries the value, so repeating
+          it above would be two sources of truth on one row. A file input is
+          the exception: the browser will not let us show what is already
+          selected, so the stored names are printed. */}
+      {state?.value != null && (!onChange || def.type === 'file') && (
         <div style={{ fontSize: 15, color: COLOR.textPrimary, margin: '4px 0' }}>
           {String(state.value)}
         </div>
+      )}
+
+      {onChange && (
+        <FieldInput fieldId={fieldId} def={def} state={state} onChange={onChange} />
       )}
 
       <Rationale field={def} id={rationaleId} />
