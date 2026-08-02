@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 process.env.AUDIT_DIGEST_SECRET = 'route-handler-test-secret-32-chars-min!'
 
 import { GET, POST } from '@/app/api/application/route'
-import { resetStore } from '@/server/store'
+import { __resetStoreForTests } from '@/server/store'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
 import type { ApplicationState } from '@/domain/application/state'
 
@@ -54,7 +54,7 @@ async function newBusiness(): Promise<string> {
 }
 
 beforeEach(() => {
-  resetStore()
+  __resetStoreForTests()
   __resetAuditLogForTests()
 })
 

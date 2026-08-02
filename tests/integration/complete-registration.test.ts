@@ -5,7 +5,7 @@ import {
 import { applyCarry } from '@/domain/application/carry'
 import { AuditLog } from '@/domain/audit/log'
 import { createDigester } from '@/domain/audit/digest'
-import { getApplication, putApplication, resetStore } from '@/server/store'
+import { getApplication, putApplication, __resetStoreForTests } from '@/server/store'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Action } from '@/domain/application/state'
 
@@ -16,7 +16,7 @@ const business: ApplicantProfile = {
 }
 const digest = createDigester('integration-test-secret-32-chars-min!')
 
-beforeEach(() => resetStore())
+beforeEach(() => __resetStoreForTests())
 
 describe('a whole registration, panel only', () => {
   it('completes with no LLM and no OCR', () => {

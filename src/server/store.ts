@@ -14,6 +14,13 @@ export function putApplication(state: ApplicationState): void {
   applications.set(state.id, state)
 }
 
-export function resetStore(): void {
+/**
+ * Test-only. Empties the in-memory store so cases cannot leak applications
+ * into one another. Named to match `__resetAuditLogForTests`: the two are the
+ * only test-only exports on the server, and a reader should not have to open
+ * both to discover that the plainly-named one was also test-only. Never call
+ * this from application code.
+ */
+export function __resetStoreForTests(): void {
   applications.clear()
 }
