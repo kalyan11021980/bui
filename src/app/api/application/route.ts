@@ -32,9 +32,11 @@ export async function POST(request: Request) {
   }
 
   const next = applicationReducer(current, body.action)
-  putApplication(next)
-  // The audit trail lives on the server, alongside the store it describes —
-  // never in client code, which cannot be trusted to hold the digest secret.
+  // Record the action before persisting the state it produces: an action we
+  // cannot audit is an action we should not apply. If the audit call throws,
+  // the store must be left untouched rather than silently holding a mutation
+  // with no corresponding trail entry.
   getAuditLog().append(body.action)
+  putApplication(next)
   return NextResponse.json(next)
 }
