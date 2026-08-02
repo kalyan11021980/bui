@@ -2,9 +2,13 @@ import { AuditLog } from '@/domain/audit/log'
 import { createDigester } from '@/domain/audit/digest'
 
 /**
- * Server-only. AuditLog and createDigester both reach into node:crypto, so
- * this module must never be imported from a 'use client' file — only from
- * route handlers and other server code.
+ * Server-only. `createDigester` reaches into node:crypto, and this module
+ * reads a secret out of the environment, so it must never be imported from a
+ * 'use client' file — only from route handlers and other server code.
+ *
+ * (AuditLog itself does NOT touch node:crypto, an earlier version of this
+ * comment notwithstanding: it imports `Digester` as a type only, which is
+ * erased at compile time. The digester is handed to it.)
  *
  * The digest secret comes from AUDIT_DIGEST_SECRET. If it is missing we
  * refuse to start rather than silently digesting sensitive fields with a
