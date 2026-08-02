@@ -21,6 +21,7 @@
 - **Never disable the primary button** — keep it at full `#B82018` and show what is outstanding beside it (spec §9).
 - **Address, legal name and taxpayer ID are never bulk-confirmed** — each needs an individual confirmation (spec §10.4).
 - All domain code is pure: same input, same output, no `Date.now()` inside reducers — timestamps are passed in.
+- **Package manager is pnpm.** Use `pnpm install` / `pnpm vitest run` / `pnpm typecheck`. Do not create `package-lock.json`.
 
 ---
 
@@ -179,7 +180,7 @@ export default nextConfig
 import '@testing-library/jest-dom/vitest'
 ```
 
-Then run `npm install`.
+Then run `pnpm install`.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -221,6 +222,8 @@ describe('defineField', () => {
 
   it('rejects a sensitive field that is also orchestrator-visible', () => {
     expect(() =>
+      // @ts-expect-error sensitive fields can never be orchestrator-visible.
+      // The error anchors to this call, not to the offending property.
       defineField({
         id: 'tax_id',
         label: 'Taxpayer ID',
@@ -229,10 +232,27 @@ describe('defineField', () => {
         authority: 'IRS',
         validation: z.string(),
         sensitive: true,
-        // @ts-expect-error compile-time exclusivity is the primary guard
         orchestratorVisible: true,
       }),
     ).toThrow(/orchestratorVisible/)
+  })
+
+  it('blocks the conflict even when the object is built indirectly', () => {
+    // A direct object literal is caught by excess-property checking. This
+    // case — a variable, a spread, a deserialised config — is only caught
+    // because `orchestratorVisible?: never` closes the sensitive branch.
+    const built = {
+      id: 'tax_id' as const,
+      label: 'Taxpayer ID',
+      type: 'taxid' as const,
+      purpose: 'So we can pay you when your vehicle sells',
+      authority: 'IRS' as const,
+      validation: z.string(),
+      sensitive: true as const,
+      orchestratorVisible: true as const,
+    }
+    // @ts-expect-error the conflict must not survive indirection
+    expect(() => defineField(built)).toThrow(/orchestratorVisible/)
   })
 
   it('has a display label for every authority', () => {
@@ -245,7 +265,7 @@ describe('defineField', () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/field-def.test.ts`
+Run: `pnpm vitest run tests/domain/field-def.test.ts`
 Expected: FAIL — cannot resolve `@/domain/field-def`.
 
 - [ ] **Step 4: Write the implementation**
@@ -359,12 +379,12 @@ export function defineField<T>(def: FieldDef<T>): FieldDef<T> {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/field-def.test.ts`
+Run: `pnpm vitest run tests/domain/field-def.test.ts`
 Expected: PASS (4 tests)
 
 - [ ] **Step 6: Verify types compile**
 
-Run: `npm run typecheck`
+Run: `pnpm typecheck`
 Expected: no errors.
 
 - [ ] **Step 7: Commit**
@@ -435,7 +455,7 @@ describe('personal catalog', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/catalog/personal.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/personal.test.ts`
 Expected: FAIL — cannot resolve `@/domain/catalog/identity`.
 
 - [ ] **Step 3: Write the implementation**
@@ -612,7 +632,7 @@ export const CONTACT_FIELDS: readonly FieldDef[] = [
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/catalog/personal.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/personal.test.ts`
 Expected: PASS (5 tests)
 
 - [ ] **Step 5: Commit**
@@ -687,7 +707,7 @@ describe('catalog index', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/catalog/index.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/index.test.ts`
 Expected: FAIL — cannot resolve `@/domain/catalog`.
 
 - [ ] **Step 3: Write the implementation**
@@ -926,7 +946,7 @@ export {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/catalog/index.test.ts`
+Run: `pnpm vitest run tests/domain/catalog/index.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -941,6 +961,12 @@ git commit -m "feat: complete field catalog with business, license, tax and GSA"
 ### Task 4: Requirements engine
 
 The compliance surface. This gets the heaviest test coverage in the codebase.
+
+> **Superseded by Task 4b.** Task 4 shipped as written (commit `3f4bd13`) and its
+> review found two defects baked into this text: the engine accepted `state` and
+> never read it, and `licenseCount: number` could not express more than one
+> licence. Task 4b fixes both. Read Task 4b, not this section, for the current
+> shape of `ApplicantProfile` and `requiredFields`.
 
 **Files:**
 - Create: `src/domain/requirements/version.ts`, `src/domain/requirements/rules.ts`, `src/domain/requirements/engine.ts`
@@ -1041,7 +1067,7 @@ describe('requiredFields', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
 Expected: FAIL — cannot resolve `@/domain/requirements/engine`.
 
 - [ ] **Step 3: Write the implementation**
@@ -1125,7 +1151,7 @@ export function requiredFields(profile: ApplicantProfile): FieldId[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
 Expected: PASS (8 tests)
 
 - [ ] **Step 5: Commit**
@@ -1133,6 +1159,441 @@ Expected: PASS (8 tests)
 ```bash
 git add src/domain/requirements tests/domain/requirements
 git commit -m "feat: add deterministic requirements engine"
+```
+
+---
+
+### Task 4b: State-specific rules, honest licence modelling, shared schemas
+
+Task 4's review found the engine accepted `state` and never read it, while the
+spec (§15) and the catalog copy both promise per-state requirements. It also
+found `licenseCount: number` could not express more than one licence, despite
+the source UI having an "Add Additional License" control. Both are fixed here,
+along with the minor findings from Tasks 2–4.
+
+**Files:**
+- Modify: `src/domain/field-id.ts` (add one id)
+- Create: `src/domain/catalog/schemas.ts`, `src/domain/catalog/state-forms.ts`
+- Modify: `src/domain/catalog/identity.ts`, `src/domain/catalog/license.ts`, `src/domain/catalog/address.ts`, `src/domain/catalog/contact.ts`, `src/domain/catalog/business.ts`, `src/domain/catalog/index.ts`
+- Create: `src/domain/requirements/key.ts`
+- Modify: `src/domain/requirements/rules.ts`, `src/domain/requirements/engine.ts`, `src/domain/requirements/version.ts`
+- Test: `tests/domain/requirements/key.test.ts`, `tests/domain/requirements/engine.test.ts` (replace)
+
+**Interfaces:**
+- Consumes: everything from Tasks 1–4
+- Produces: `RequirementKey`, `reqKey(id, instance?)`, `parseReqKey(key)`, `LicenseType`, `STATE_RULES`, revised `ApplicantProfile` (with `licenses: readonly LicenseType[]` replacing `licenseCount`), `requiredFields(profile): RequirementKey[]`
+
+- [ ] **Step 1: Write the failing key test**
+
+`tests/domain/requirements/key.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { reqKey, parseReqKey } from '@/domain/requirements/key'
+
+describe('requirement keys', () => {
+  it('leaves a non-repeated field id unqualified', () => {
+    expect(reqKey('first_name')).toBe('first_name')
+    expect(parseReqKey('first_name')).toEqual({
+      fieldId: 'first_name', instance: null,
+    })
+  })
+
+  it('qualifies a repeated field with its instance', () => {
+    expect(reqKey('license_number', 0)).toBe('license_number#0')
+    expect(reqKey('license_number', 1)).toBe('license_number#1')
+  })
+
+  it('round-trips an instance key', () => {
+    expect(parseReqKey(reqKey('license_number', 2))).toEqual({
+      fieldId: 'license_number', instance: 2,
+    })
+  })
+
+  it('rejects a negative or non-integer instance', () => {
+    expect(() => reqKey('license_number', -1)).toThrow(/instance/i)
+    expect(() => reqKey('license_number', 1.5)).toThrow(/instance/i)
+  })
+
+  it('rejects a malformed key', () => {
+    expect(() => parseReqKey('license_number#')).toThrow(/malformed/i)
+    expect(() => parseReqKey('license_number#x')).toThrow(/malformed/i)
+  })
+})
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `pnpm vitest run tests/domain/requirements/key.test.ts`
+Expected: FAIL — cannot resolve `@/domain/requirements/key`.
+
+- [ ] **Step 3: Write the key helpers**
+
+`src/domain/requirements/key.ts`:
+
+```ts
+import type { FieldId } from '../field-id'
+
+/**
+ * Identifies one required answer. For most fields this is just the FieldId.
+ * Fields inside a repeatable group (licences) are qualified by instance:
+ * `license_number#0`, `license_number#1`.
+ */
+export type RequirementKey = string
+
+export function reqKey(id: FieldId, instance?: number): RequirementKey {
+  if (instance === undefined) return id
+  if (!Number.isInteger(instance) || instance < 0) {
+    throw new Error(`Invalid instance ${instance}: must be a non-negative integer`)
+  }
+  return `${id}#${instance}`
+}
+
+export function parseReqKey(
+  key: RequirementKey,
+): { fieldId: FieldId; instance: number | null } {
+  const hash = key.indexOf('#')
+  if (hash === -1) return { fieldId: key as FieldId, instance: null }
+
+  const idPart = key.slice(0, hash)
+  const instancePart = key.slice(hash + 1)
+  if (idPart === '' || !/^\d+$/.test(instancePart)) {
+    throw new Error(`Malformed requirement key: ${key}`)
+  }
+  return { fieldId: idPart as FieldId, instance: Number(instancePart) }
+}
+```
+
+- [ ] **Step 4: Run it and confirm it passes**
+
+Run: `pnpm vitest run tests/domain/requirements/key.test.ts`
+Expected: PASS (5 tests)
+
+- [ ] **Step 5: Extract the shared schemas**
+
+Create `src/domain/catalog/schemas.ts`:
+
+```ts
+import { z } from 'zod'
+
+/** Format only. Calendar validity is checked where dates are compared. */
+export const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+
+export const zipSchema = z
+  .string()
+  .regex(/^\d{5}(-\d{4})?$/, 'Enter a 5-digit ZIP code')
+
+export const phoneSchema = z
+  .string()
+  .regex(/^\+?1?\d{10}$/, 'Enter a 10-digit phone number')
+```
+
+Then in `identity.ts` and `license.ts`, delete the local `const isoDate = ...`
+and import it: `import { isoDate } from './schemas'`.
+In `address.ts`, delete the local `zipSchema` definition and re-export it:
+`export { zipSchema } from './schemas'`.
+In `contact.ts`, do the same for `phoneSchema`:
+`export { phoneSchema } from './schemas'`.
+`business.ts` keeps importing `zipSchema` from `./address` and `phoneSchema`
+from `./contact` — those re-exports keep it working unchanged.
+
+- [ ] **Step 6: Add the Ohio out-of-state buyer form**
+
+In `src/domain/field-id.ts`, add `| 'oh_foreign_buyer_form'` to the `FieldId`
+union (put it in a new `// state-specific forms` group at the end).
+
+Create `src/domain/catalog/state-forms.ts`:
+
+```ts
+import { z } from 'zod'
+import { defineField, type FieldDef } from '../field-def'
+
+/**
+ * Forms required by one state and not others. Adding an entry here is not
+ * enough — it must also be referenced from STATE_RULES in requirements/rules.ts.
+ */
+export const STATE_FORM_FIELDS: readonly FieldDef[] = [
+  defineField({
+    id: 'oh_foreign_buyer_form',
+    label: 'Ohio out-of-state buyer form',
+    type: 'file',
+    purpose: 'Ohio requires this before an out-of-state dealer can bid there',
+    authority: 'STATE_DEALER_BOARD',
+    consequence: 'Without it your bids on Ohio lots will be rejected.',
+    validation: z.array(z.string().min(1)).min(1, 'Upload the completed form'),
+  }),
+]
+```
+
+In `src/domain/catalog/index.ts`, import `STATE_FORM_FIELDS`, add it to the
+`ALL_FIELDS` spread, and add it to the re-export list.
+
+- [ ] **Step 7: Write the failing engine test**
+
+Replace `tests/domain/requirements/engine.test.ts` entirely:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { requiredFields } from '@/domain/requirements/engine'
+import { CATALOG } from '@/domain/catalog'
+import { parseReqKey } from '@/domain/requirements/key'
+import type { ApplicantProfile } from '@/domain/requirements/rules'
+
+const base: ApplicantProfile = {
+  applicantType: 'individual',
+  country: 'US',
+  state: 'GA',
+  wantsGsa: false,
+  licenses: [],
+}
+
+describe('requiredFields', () => {
+  it('asks an individual for identity, address and mobile', () => {
+    const k = requiredFields(base)
+    expect(k).toContain('first_name')
+    expect(k).toContain('dob')
+    expect(k).toContain('addr_line1')
+    expect(k).toContain('phone_mobile')
+  })
+
+  it('never asks an individual for business or licence fields', () => {
+    const k = requiredFields(base)
+    expect(k).not.toContain('biz_legal_name')
+    expect(k).not.toContain('license_number#0')
+  })
+
+  it('asks a business for business fields and a taxpayer ID', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).toContain('biz_name')
+    expect(k).toContain('biz_legal_name')
+    expect(k).toContain('tax_id')
+  })
+
+  it('asks for no licence fields when a business holds none', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k.some((x) => x.startsWith('license_'))).toBe(false)
+  })
+
+  it('asks for one licence group per licence held', () => {
+    const k = requiredFields({
+      ...base, applicantType: 'business', licenses: ['dealer', 'salvage'],
+    })
+    expect(k).toContain('license_number#0')
+    expect(k).toContain('license_number#1')
+    expect(k).not.toContain('license_number#2')
+    expect(k).toContain('license_expiry#0')
+    expect(k).toContain('license_expiry#1')
+  })
+
+  it('adds GSA fields only when the applicant wants GSA', () => {
+    expect(requiredFields(base)).not.toContain('gsa_bidder_number')
+    expect(requiredFields({ ...base, wantsGsa: true }))
+      .toContain('gsa_bidder_number')
+  })
+
+  it('adds the Ohio form for an Ohio applicant and not a Georgia one', () => {
+    expect(requiredFields({ ...base, state: 'OH' }))
+      .toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'GA' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('handles an unknown or absent state without inventing requirements', () => {
+    expect(requiredFields({ ...base, state: null }))
+      .not.toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'ZZ' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('is case-insensitive about the state code', () => {
+    expect(requiredFields({ ...base, state: 'oh' }))
+      .toContain('oh_foreign_buyer_form')
+  })
+
+  it('omits optional fields — line 2 is never required', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).not.toContain('addr_line2')
+    expect(k).not.toContain('biz_addr_line2')
+  })
+
+  it('returns no duplicates', () => {
+    const k = requiredFields({
+      ...base, applicantType: 'business', wantsGsa: true,
+      licenses: ['dealer', 'salvage'], state: 'OH',
+    })
+    expect(new Set(k).size).toBe(k.length)
+  })
+
+  it('returns the exact expected set for an individual in Georgia', () => {
+    expect([...requiredFields(base)].sort()).toEqual([
+      'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'dl_expiry', 'dl_number', 'dob', 'first_name',
+      'id_form', 'id_images', 'last_name', 'phone_mobile',
+    ])
+  })
+
+  it('resolves every key it returns to a real catalog field', () => {
+    const profiles: ApplicantProfile[] = [
+      base,
+      { ...base, applicantType: 'business', licenses: ['dealer'] },
+      { ...base, wantsGsa: true },
+      { ...base, state: null },
+      { ...base, state: 'OH', applicantType: 'business', licenses: ['dealer', 'salvage'] },
+    ]
+    for (const p of profiles) {
+      for (const key of requiredFields(p)) {
+        const { fieldId } = parseReqKey(key)
+        expect(CATALOG.has(fieldId), `catalog is missing ${fieldId}`).toBe(true)
+      }
+    }
+  })
+})
+```
+
+- [ ] **Step 8: Run it and confirm it fails**
+
+Run: `pnpm vitest run tests/domain/requirements/engine.test.ts`
+Expected: FAIL — `licenses` is not a known property of `ApplicantProfile`.
+
+- [ ] **Step 9: Rewrite the rules**
+
+Replace `src/domain/requirements/rules.ts`:
+
+```ts
+import type { FieldId } from '../field-id'
+
+export type LicenseType = 'dealer' | 'dismantler' | 'exporter' | 'salvage'
+
+export type ApplicantProfile = {
+  applicantType: 'business' | 'individual'
+  country: string
+  /** Two-letter code, or null before the applicant has told us. */
+  state: string | null
+  wantsGsa: boolean
+  /** One entry per licence held. Empty means none. */
+  licenses: readonly LicenseType[]
+}
+
+export const CORE_IDENTITY: readonly FieldId[] = [
+  'first_name', 'last_name', 'id_form', 'dl_number', 'dl_expiry',
+  'dob', 'id_images',
+]
+
+export const CORE_ADDRESS: readonly FieldId[] = [
+  'addr_line1', 'addr_city', 'addr_state', 'addr_zip',
+]
+
+export const CORE_CONTACT: readonly FieldId[] = ['phone_mobile']
+
+export const BUSINESS_CORE: readonly FieldId[] = [
+  'biz_name', 'biz_legal_name',
+  'biz_addr_line1', 'biz_addr_city', 'biz_addr_state', 'biz_addr_zip',
+  'biz_phone',
+]
+
+/** Repeated once per licence held. Emitted as instance-qualified keys. */
+export const LICENSE_GROUP: readonly FieldId[] = [
+  'license_type', 'license_number', 'license_effective',
+  'license_expiry', 'license_image',
+]
+
+export const GSA_CORE: readonly FieldId[] = ['gsa_bidder_number', 'gsa_email']
+
+export type StateRule = {
+  /** Fields this state requires on top of the national baseline. */
+  additional: readonly FieldId[]
+  /** Why, in terms a compliance reviewer can check. */
+  note: string
+  /**
+   * False until a compliance owner has confirmed this rule against the
+   * state's current requirements. See spec §10.3 — encoding state licensing
+   * rules is not a developer judgement call.
+   */
+  signedOff: boolean
+}
+
+/**
+ * Per-state requirements. A state absent from this table gets the national
+ * baseline only. Keys are upper-case two-letter codes.
+ */
+export const STATE_RULES: Readonly<Record<string, StateRule>> = {
+  GA: {
+    additional: [],
+    note: 'Georgia requires no additional forms beyond the national baseline.',
+    signedOff: false,
+  },
+  OH: {
+    additional: ['oh_foreign_buyer_form'],
+    note: 'Ohio requires the Foreign and Qualifying Out of State Buyer Form '
+      + 'before an out-of-state dealer may bid.',
+    signedOff: false,
+  },
+}
+```
+
+- [ ] **Step 10: Rewrite the engine**
+
+Replace `src/domain/requirements/engine.ts`:
+
+```ts
+import {
+  BUSINESS_CORE, CORE_ADDRESS, CORE_CONTACT, CORE_IDENTITY,
+  GSA_CORE, LICENSE_GROUP, STATE_RULES, type ApplicantProfile,
+} from './rules'
+import { reqKey, type RequirementKey } from './key'
+
+/**
+ * The single authority on what an applicant owes. Pure: same profile in,
+ * same key list out. No LLM, no I/O. See spec §8.
+ */
+export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
+  const out: RequirementKey[] = [
+    ...CORE_IDENTITY, ...CORE_ADDRESS, ...CORE_CONTACT,
+  ].map((id) => reqKey(id))
+
+  if (profile.applicantType === 'business') {
+    for (const id of BUSINESS_CORE) out.push(reqKey(id))
+    out.push(reqKey('tax_id'))
+
+    profile.licenses.forEach((_licence, index) => {
+      for (const id of LICENSE_GROUP) out.push(reqKey(id, index))
+    })
+  }
+
+  if (profile.wantsGsa) for (const id of GSA_CORE) out.push(reqKey(id))
+
+  const rule = profile.state
+    ? STATE_RULES[profile.state.toUpperCase()]
+    : undefined
+  if (rule) for (const id of rule.additional) out.push(reqKey(id))
+
+  return [...new Set(out)]
+}
+```
+
+- [ ] **Step 11: Bump the rules version**
+
+In `src/domain/requirements/version.ts`, change `RULES_VERSION` to `2` — the
+requirement set an applicant owes has changed, which is exactly what this
+constant tracks.
+
+- [ ] **Step 12: Run the whole suite**
+
+Run: `pnpm vitest run`
+Expected: PASS. The engine test now has 13 tests, the key test 5.
+
+- [ ] **Step 13: Typecheck**
+
+Run: `pnpm typecheck`
+Expected: no errors.
+
+- [ ] **Step 14: Commit**
+
+```bash
+git add src/domain tests/domain
+git commit -m "feat: per-state requirements, multi-licence support, shared schemas"
 ```
 
 ---
@@ -1163,7 +1624,7 @@ const profile: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 0,
+  licenses: [],
 }
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -1285,7 +1746,7 @@ describe('applicationReducer', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/application/reducer.test.ts`
+Run: `pnpm vitest run tests/domain/application/reducer.test.ts`
 Expected: FAIL — cannot resolve `@/domain/application/reducer`.
 
 - [ ] **Step 3: Write the state types**
@@ -1293,7 +1754,7 @@ Expected: FAIL — cannot resolve `@/domain/application/reducer`.
 `src/domain/application/state.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import type { ApplicantProfile } from '../requirements/rules'
 
 export type FieldStatus =
@@ -1321,26 +1782,27 @@ export type ApplicationState = {
   id: string
   rulesVersion: number
   profile: ApplicantProfile
-  fields: Partial<Record<FieldId, FieldState>>
+  /** Keyed by RequirementKey — plain FieldId, or `id#n` for licences. */
+  fields: Partial<Record<RequirementKey, FieldState>>
   submittedAt: string | null
 }
 
 export type Action =
   | {
       type: 'SET_VALUE'
-      fieldId: FieldId
+      fieldId: RequirementKey
       value: unknown
       source: ProvenanceSource
       at: string
       documentId?: string
       box?: readonly [number, number, number, number]
       confidence?: number
-      fromFieldId?: FieldId
+      fromFieldId?: RequirementKey
     }
-  | { type: 'CONFIRM'; fieldId: FieldId; at: string; shownCopyHash: string }
-  | { type: 'VERIFY'; fieldId: FieldId; at: string }
-  | { type: 'REJECT'; fieldId: FieldId; at: string; reason: string }
-  | { type: 'SUPERSEDE'; fieldId: FieldId; at: string }
+  | { type: 'CONFIRM'; fieldId: RequirementKey; at: string; shownCopyHash: string }
+  | { type: 'VERIFY'; fieldId: RequirementKey; at: string }
+  | { type: 'REJECT'; fieldId: RequirementKey; at: string; reason: string }
+  | { type: 'SUPERSEDE'; fieldId: RequirementKey; at: string }
   | { type: 'UPDATE_PROFILE'; patch: Partial<ApplicantProfile>; at: string }
 ```
 
@@ -1349,7 +1811,7 @@ export type Action =
 `src/domain/application/reducer.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import { requiredFields } from '../requirements/engine'
 import type { ApplicantProfile } from '../requirements/rules'
 import { RULES_VERSION } from '../requirements/version'
@@ -1371,7 +1833,7 @@ export function createApplication(
 /** Statuses that satisfy a requirement. */
 const SATISFIED: ReadonlySet<string> = new Set(['confirmed', 'verified'])
 
-export function outstandingFields(state: ApplicationState): FieldId[] {
+export function outstandingFields(state: ApplicationState): RequirementKey[] {
   return requiredFields(state.profile).filter((id) => {
     const f = state.fields[id]
     return !f || !SATISFIED.has(f.status)
@@ -1446,7 +1908,7 @@ export function applicationReducer(
 
 function requireField(
   state: ApplicationState,
-  id: FieldId,
+  id: RequirementKey,
   verb: string,
 ): FieldState {
   const f = state.fields[id]
@@ -1456,7 +1918,7 @@ function requireField(
 
 function withField(
   state: ApplicationState,
-  id: FieldId,
+  id: RequirementKey,
   field: FieldState,
 ): ApplicationState {
   return { ...state, fields: { ...state.fields, [id]: field } }
@@ -1465,7 +1927,7 @@ function withField(
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/application/reducer.test.ts`
+Run: `pnpm vitest run tests/domain/application/reducer.test.ts`
 Expected: PASS (10 tests)
 
 - [ ] **Step 6: Commit**
@@ -1503,7 +1965,7 @@ const business: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 1,
+  licenses: ['dealer'],
 }
 
 function withAddress() {
@@ -1566,7 +2028,7 @@ describe('applyCarry', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/application/carry.test.ts`
+Run: `pnpm vitest run tests/domain/application/carry.test.ts`
 Expected: FAIL — cannot resolve `@/domain/application/carry`.
 
 - [ ] **Step 3: Write the implementation**
@@ -1574,7 +2036,7 @@ Expected: FAIL — cannot resolve `@/domain/application/carry`.
 `src/domain/application/carry.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import { applicationReducer } from './reducer'
 import type { ApplicationState } from './state'
 
@@ -1583,7 +2045,7 @@ import type { ApplicationState } from './state'
  * The current design asks for an address up to three times; these rules
  * are the fix.
  */
-export const CARRY_RULES: readonly { from: FieldId; to: FieldId }[] = [
+export const CARRY_RULES: readonly { from: RequirementKey; to: RequirementKey }[] = [
   { from: 'addr_line1', to: 'biz_addr_line1' },
   { from: 'addr_line2', to: 'biz_addr_line2' },
   { from: 'addr_city', to: 'biz_addr_city' },
@@ -1623,8 +2085,8 @@ export function applyCarry(
 
 export function carriedFrom(
   state: ApplicationState,
-  id: FieldId,
-): FieldId | null {
+  id: RequirementKey,
+): RequirementKey | null {
   const f = state.fields[id]
   if (!f?.provenance || f.provenance.source !== 'carried') return null
   return f.provenance.fromFieldId ?? null
@@ -1633,7 +2095,7 @@ export function carriedFrom(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/application/carry.test.ts`
+Run: `pnpm vitest run tests/domain/application/carry.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -1651,12 +2113,12 @@ Spec §10.1. The log must capture what the user was shown at the moment they
 confirmed, and must never store a raw value for a sensitive field.
 
 **Files:**
-- Create: `src/domain/audit/event.ts`, `src/domain/audit/log.ts`
+- Create: `src/domain/audit/event.ts`, `src/domain/audit/digest.ts`, `src/domain/audit/log.ts`
 - Test: `tests/domain/audit/log.test.ts`
 
 **Interfaces:**
-- Consumes: `Action`, `ApplicationState`, `FieldId`, `fieldDef`
-- Produces: `AuditEvent`, `digest(input: string): string`, `AuditLog` class with `append(action, state)`, `entries()`, `size()`
+- Consumes: `Action`, `ApplicationState`, `RequirementKey`, `parseReqKey`, `CATALOG`
+- Produces: `AuditEvent`, `Digester`, `createDigester(secret): Digester`, `AuditLog` class constructed as `new AuditLog(digester)` with `append(action)`, `entries()`, `size()`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1664,19 +2126,16 @@ confirmed, and must never store a raw value for a sensitive field.
 
 ```ts
 import { describe, it, expect } from 'vitest'
-import { AuditLog, digest } from '@/domain/audit/log'
-import { createApplication } from '@/domain/application/reducer'
-import type { ApplicantProfile } from '@/domain/requirements/rules'
+import { AuditLog } from '@/domain/audit/log'
+import { createDigester } from '@/domain/audit/digest'
 
 const AT = '2026-08-01T12:00:00.000Z'
-const profile: ApplicantProfile = {
-  applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 1,
-}
+const TEST_SECRET = 'test-secret-at-least-32-characters-long'
+const digest = createDigester(TEST_SECRET)
 
 describe('AuditLog', () => {
   it('assigns sequential numbers starting at 1', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -1689,7 +2148,7 @@ describe('AuditLog', () => {
   })
 
   it('stores the plain value for a non-sensitive field', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -1699,19 +2158,19 @@ describe('AuditLog', () => {
   })
 
   it('stores only a digest for a sensitive field', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'tax_id', value: '123-45-6789',
       source: 'user', at: AT,
     })
     const e = log.entries()[0]
     expect(e?.value).toBeUndefined()
-    expect(e?.valueDigest).toBe(digest('123-45-6789'))
+    expect(e?.valueDigest).toBe(digest(JSON.stringify('123-45-6789')))
     expect(JSON.stringify(log.entries())).not.toContain('123-45-6789')
   })
 
   it('records the copy hash the user was shown when confirming', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'CONFIRM', fieldId: 'dob', at: AT, shownCopyHash: 'copy-v3',
     })
@@ -1720,7 +2179,7 @@ describe('AuditLog', () => {
   })
 
   it('refuses to mutate an entry once appended', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -1732,13 +2191,54 @@ describe('AuditLog', () => {
     expect(log.size()).toBe(1)
   })
 
+  it('hands out entries a caller cannot tamper with', () => {
+    const log = new AuditLog(digest)
+    log.append({
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: AT,
+    })
+    const first = log.entries()[0]
+    expect(Object.isFrozen(first)).toBe(true)
+    try {
+      ;(first as unknown as { value: unknown }).value = 'TAMPERED'
+    } catch {
+      // strict mode throws; non-strict silently no-ops. Either is fine.
+    }
+    expect(log.entries()[0]?.value).toBe('Kalyan')
+  })
+
+  it('digests a sensitive value reached through an instanced key', () => {
+    // CATALOG is keyed by bare FieldId, so `tax_id#0` only resolves if the
+    // lookup runs through parseReqKey. If that is ever skipped the raw
+    // taxpayer ID is written in the clear — this test fails loudly first.
+    const log = new AuditLog(digest)
+    log.append({
+      type: 'SET_VALUE', fieldId: 'tax_id#0', value: '98-7654321',
+      source: 'user', at: AT,
+    })
+    expect(log.entries()[0]?.value).toBeUndefined()
+    expect(log.entries()[0]?.valueDigest).toBeTruthy()
+    expect(JSON.stringify(log.entries())).not.toContain('98-7654321')
+  })
+
+  it('refuses a digest secret too short to be worth having', () => {
+    expect(() => createDigester('short')).toThrow(/32 characters/)
+  })
+
   it('produces a stable digest', () => {
     expect(digest('abc')).toBe(digest('abc'))
     expect(digest('abc')).not.toBe(digest('abd'))
   })
 
+  it('produces a digest that is not reversible by brute force', () => {
+    // A different secret must yield a different digest for the same input —
+    // that is what stops a rainbow table built against the raw value space.
+    const other = createDigester('a-completely-different-secret-32chars!')
+    expect(other('123-45-6789')).not.toBe(digest('123-45-6789'))
+  })
+
   it('logs a rejection with its reason', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'REJECT', fieldId: 'id_images', at: AT,
       reason: 'The photo was too dark',
@@ -1747,16 +2247,16 @@ describe('AuditLog', () => {
     expect(log.entries()[0]?.reason).toMatch(/too dark/)
   })
 
-  it('starts empty for a fresh application', () => {
-    createApplication('app-1', profile)
-    expect(new AuditLog().size()).toBe(0)
+  it('starts empty', () => {
+    expect(new AuditLog(digest).size()).toBe(0)
+    expect(new AuditLog(digest).entries()).toEqual([])
   })
 })
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/domain/audit/log.test.ts`
+Run: `pnpm vitest run tests/domain/audit/log.test.ts`
 Expected: FAIL — cannot resolve `@/domain/audit/log`.
 
 - [ ] **Step 3: Write the event types**
@@ -1764,7 +2264,7 @@ Expected: FAIL — cannot resolve `@/domain/audit/log`.
 `src/domain/audit/event.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import type { ProvenanceSource } from '../application/state'
 
 export type AuditKind =
@@ -1775,7 +2275,7 @@ export type AuditEvent = {
   seq: number
   at: string
   kind: AuditKind
-  fieldId?: FieldId
+  fieldId?: RequirementKey
   source?: ProvenanceSource
   /** Present only for non-sensitive fields. */
   value?: unknown
@@ -1787,6 +2287,36 @@ export type AuditEvent = {
 }
 ```
 
+- [ ] **Step 3b: Write the keyed digester**
+
+An unkeyed hash of a 9-digit taxpayer ID or a date of birth is reversible by
+brute force in under a second — the value space is tiny and the hash is
+deterministic. Anyone who can read the audit store could recover exactly the
+values we declined to store. The digest must therefore be keyed.
+
+`src/domain/audit/digest.ts`:
+
+```ts
+import { createHmac } from 'node:crypto'
+
+/** Digests a value for the audit log without storing it. */
+export type Digester = (input: string) => string
+
+/**
+ * Keyed so a digest cannot be brute-forced back to its input. Low-entropy
+ * values — a 9-digit taxpayer ID, a date of birth — are otherwise trivially
+ * recoverable from an unkeyed hash by anyone who can read the audit store.
+ * The secret is injected rather than read from the environment, so the
+ * domain layer stays pure and testable.
+ */
+export function createDigester(secret: string): Digester {
+  if (secret.length < 32) {
+    throw new Error('Audit digest secret must be at least 32 characters')
+  }
+  return (input) => createHmac('sha256', secret).update(input).digest('hex')
+}
+```
+
 - [ ] **Step 4: Write the log**
 
 `src/domain/audit/log.ts`:
@@ -1794,21 +2324,10 @@ export type AuditEvent = {
 ```ts
 import type { Action } from '../application/state'
 import { CATALOG } from '../catalog'
+import { parseReqKey } from '../requirements/key'
+import type { Digester } from './digest'
 import type { AuditEvent, AuditKind } from './event'
 
-/**
- * Small, stable, non-cryptographic digest (FNV-1a). Enough to prove a value
- * did not change between events without storing the value itself. Swap for a
- * keyed hash if the audit log ever leaves our infrastructure.
- */
-export function digest(input: string): string {
-  let h = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h.toString(16).padStart(8, '0')
-}
 
 const KIND: Record<Action['type'], AuditKind> = {
   SET_VALUE: 'value_set',
@@ -1822,6 +2341,11 @@ const KIND: Record<Action['type'], AuditKind> = {
 /** Append-only. There is deliberately no delete, no edit, no undo. */
 export class AuditLog {
   #entries: AuditEvent[] = []
+  readonly #digest: Digester
+
+  constructor(digest: Digester) {
+    this.#digest = digest
+  }
 
   append(action: Action): AuditEvent {
     const base: AuditEvent = {
@@ -1834,9 +2358,9 @@ export class AuditLog {
 
     if (action.type === 'SET_VALUE') {
       base.source = action.source
-      const def = CATALOG.get(action.fieldId)
+      const def = CATALOG.get(parseReqKey(action.fieldId).fieldId)
       if (def?.sensitive) {
-        base.valueDigest = digest(String(action.value))
+        base.valueDigest = this.#digest(JSON.stringify(action.value))
       } else {
         base.value = action.value
       }
@@ -1845,6 +2369,9 @@ export class AuditLog {
     if (action.type === 'CONFIRM') base.shownCopyHash = action.shownCopyHash
     if (action.type === 'REJECT') base.reason = action.reason
 
+    // Frozen at append time: an audit entry a caller can mutate is not a
+    // record of anything. Build fully, then freeze, then store.
+    Object.freeze(base)
     this.#entries.push(base)
     return base
   }
@@ -1861,7 +2388,7 @@ export class AuditLog {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/domain/audit/log.test.ts`
+Run: `pnpm vitest run tests/domain/audit/log.test.ts`
 Expected: PASS (8 tests)
 
 - [ ] **Step 6: Commit**
@@ -1925,7 +2452,7 @@ describe('theme tokens', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/theme/tokens.test.ts`
+Run: `pnpm vitest run tests/ui/theme/tokens.test.ts`
 Expected: FAIL — cannot resolve `@/ui/theme/tokens`.
 
 - [ ] **Step 3: Write the implementation**
@@ -1973,7 +2500,7 @@ export const STATUS_COLOR: Record<FieldStatus, string> = {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/theme/tokens.test.ts`
+Run: `pnpm vitest run tests/ui/theme/tokens.test.ts`
 Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
@@ -2040,6 +2567,20 @@ describe('FieldRow', () => {
     expect(screen.getByText(/from your document/i)).toBeInTheDocument()
   })
 
+  it('asks the user to check a carried value rather than stating it as fact', () => {
+    render(
+      <FieldRow
+        fieldId="biz_addr_line1"
+        state={{
+          value: '2345 Anywhere St',
+          status: 'derived',
+          provenance: { source: 'carried', fromFieldId: 'addr_line1' },
+        }}
+      />,
+    )
+    expect(screen.getByText(/check it belongs here/i)).toBeInTheDocument()
+  })
+
   it('does not offer confirm once the value is confirmed', () => {
     render(
       <FieldRow fieldId="dob" state={{ ...derived, status: 'confirmed' }} />,
@@ -2074,11 +2615,11 @@ describe('FieldRow', () => {
 
 - [ ] **Step 2: Install the interaction testing library**
 
-Run: `npm install -D @testing-library/user-event@^14.5.2`
+Run: `pnpm add -D @testing-library/user-event@^14.5.2`
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/panel/FieldRow.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/FieldRow.test.tsx`
 Expected: FAIL — cannot resolve `@/ui/panel/FieldRow`.
 
 - [ ] **Step 4: Write Rationale**
@@ -2124,26 +2665,34 @@ export function Rationale({ field, id }: { field: FieldDef; id?: string }) {
 ```tsx
 import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
-import type { FieldId } from '@/domain/field-id'
+import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { Rationale } from './Rationale'
 
 type Props = {
-  fieldId: FieldId
+  /** A RequirementKey: a plain FieldId, or `license_number#0` for licences. */
+  fieldId: RequirementKey
   state: FieldState | undefined
-  onConfirm?: (id: FieldId) => void
-  onEdit?: (id: FieldId) => void
+  onConfirm?: (id: RequirementKey) => void
+  onEdit?: (id: RequirementKey) => void
 }
 
+/**
+ * A carried value is a guess, not a fact: a sole trader's business address is
+ * usually their home address, but a dealer licence may be registered elsewhere.
+ * The copy must invite a check rather than read like settled data, because a
+ * plausible pre-filled value is exactly what gets rubber-stamped. Spec §10.4.
+ */
 const SOURCE_LABEL: Record<string, string> = {
   ocr: 'from your document',
-  carried: 'same as the address you already gave',
+  carried: 'copied from what you already told us — check it belongs here',
   lookup: 'looked up for you',
   user: 'entered by you',
 }
 
 export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
-  const def = fieldDef(fieldId)
+  // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
+  const def = fieldDef(parseReqKey(fieldId).fieldId)
   const status = state?.status ?? 'empty'
   const isDerived = status === 'derived'
   const rationaleId = `rationale-${fieldId}`
@@ -2233,7 +2782,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/panel/FieldRow.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/FieldRow.test.tsx`
 Expected: PASS (8 tests)
 
 - [ ] **Step 7: Commit**
@@ -2272,7 +2821,7 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const AT = '2026-08-01T12:00:00.000Z'
 const profile: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 0,
+  wantsGsa: false, licenses: [],
 }
 
 describe('ApplicationPanel', () => {
@@ -2340,7 +2889,7 @@ describe('ApplicationPanel', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/ui/panel/ApplicationPanel.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/ApplicationPanel.test.tsx`
 Expected: FAIL — cannot resolve `@/ui/panel/ApplicationPanel`.
 
 - [ ] **Step 3: Write ProgressSummary**
@@ -2401,7 +2950,7 @@ export function ProgressSummary({ done, total, onSubmit }: Props) {
 ```tsx
 import { outstandingFields } from '@/domain/application/reducer'
 import type { ApplicationState } from '@/domain/application/state'
-import type { FieldId } from '@/domain/field-id'
+import type { RequirementKey } from '@/domain/requirements/key'
 import { requiredFields } from '@/domain/requirements/engine'
 import { COLOR } from '@/ui/theme/tokens'
 import { FieldRow } from './FieldRow'
@@ -2409,8 +2958,8 @@ import { ProgressSummary } from './ProgressSummary'
 
 type Props = {
   state: ApplicationState
-  onConfirm?: (id: FieldId) => void
-  onEdit?: (id: FieldId) => void
+  onConfirm?: (id: RequirementKey) => void
+  onEdit?: (id: RequirementKey) => void
   onSubmit?: () => void
 }
 
@@ -2462,7 +3011,7 @@ export function ApplicationPanel({ state, onConfirm, onEdit, onSubmit }: Props) 
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run tests/ui/panel/ApplicationPanel.test.tsx`
+Run: `pnpm vitest run tests/ui/panel/ApplicationPanel.test.tsx`
 Expected: PASS (6 tests)
 
 - [ ] **Step 6: Commit**
@@ -2495,6 +3044,7 @@ import {
 } from '@/domain/application/reducer'
 import { applyCarry } from '@/domain/application/carry'
 import { AuditLog } from '@/domain/audit/log'
+import { createDigester } from '@/domain/audit/digest'
 import { getApplication, putApplication, resetStore } from '@/server/store'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Action } from '@/domain/application/state'
@@ -2502,15 +3052,16 @@ import type { Action } from '@/domain/application/state'
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 1,
+  wantsGsa: false, licenses: ['dealer'],
 }
+const digest = createDigester('integration-test-secret-32-chars-min!')
 
 beforeEach(() => resetStore())
 
 describe('a whole registration, panel only', () => {
   it('completes with no LLM and no OCR', () => {
     let s = createApplication('app-1', business)
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
 
     for (const id of outstandingFields(s)) {
       const action: Action = {
@@ -2525,7 +3076,7 @@ describe('a whole registration, panel only', () => {
   })
 
   it('never writes a raw taxpayer ID into the audit log', () => {
-    const log = new AuditLog()
+    const log = new AuditLog(digest)
     log.append({
       type: 'SET_VALUE', fieldId: 'tax_id', value: '12-3456789',
       source: 'user', at: AT,
@@ -2545,11 +3096,17 @@ describe('a whole registration, panel only', () => {
         type: 'SET_VALUE', fieldId: id, value: v, source: 'user', at: AT,
       })
     }
-    const before = outstandingFields(s).length
+    expect(s.fields.biz_addr_line1).toBeUndefined()
+
     s = applyCarry(s, AT)
-    // carried fields hold values, so only confirmation remains
+
+    // The business address is now populated without the user typing it again,
+    // but still needs confirmation — carrying saves typing, not attention.
     expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
-    expect(before).toBeGreaterThan(0)
+    expect(s.fields.biz_addr_city?.value).toBe('Atlanta')
+    expect(s.fields.biz_addr_zip?.value).toBe('30301')
+    expect(s.fields.biz_addr_line1?.status).toBe('derived')
+    expect(outstandingFields(s)).toContain('biz_addr_line1')
   })
 
   it('round-trips through the store', () => {
@@ -2563,7 +3120,7 @@ describe('a whole registration, panel only', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/integration/complete-registration.test.ts`
+Run: `pnpm vitest run tests/integration/complete-registration.test.ts`
 Expected: FAIL — cannot resolve `@/server/store`.
 
 - [ ] **Step 3: Write the store**
@@ -2615,7 +3172,7 @@ export async function GET(request: Request) {
     country: 'US',
     state: null,
     wantsGsa: false,
-    licenseCount: 0,
+    licenses: [],
   }
   const created = createApplication(id, profile)
   putApplication(created)
@@ -2663,7 +3220,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 import { useState } from 'react'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
-import type { FieldId } from '@/domain/field-id'
+import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const profile: ApplicantProfile = {
@@ -2671,13 +3228,13 @@ const profile: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 1,
+  licenses: ['dealer'],
 }
 
 export default function Page() {
   const [state, setState] = useState(() => createApplication('demo', profile))
 
-  const confirm = (id: FieldId) =>
+  const confirm = (id: RequirementKey) =>
     setState((s) =>
       applicationReducer(s, {
         type: 'CONFIRM',
@@ -2697,12 +3254,12 @@ export default function Page() {
 
 - [ ] **Step 6: Run the whole suite**
 
-Run: `npx vitest run`
+Run: `pnpm vitest run`
 Expected: PASS — every test from Tasks 1–11.
 
 - [ ] **Step 7: Verify types and build**
 
-Run: `npm run typecheck && npm run build`
+Run: `pnpm typecheck && pnpm build`
 Expected: no type errors, successful Next.js build.
 
 - [ ] **Step 8: Commit**
@@ -2716,9 +3273,9 @@ git commit -m "feat: wire panel into Next.js with an end-to-end registration tes
 
 ## Definition of done for Phase 1
 
-- [ ] `npx vitest run` passes with no skipped tests
-- [ ] `npm run typecheck` reports no errors
-- [ ] `npm run build` succeeds
+- [ ] `pnpm vitest run` passes with no skipped tests
+- [ ] `pnpm typecheck` reports no errors
+- [ ] `pnpm build` succeeds
 - [ ] A field cannot be added without `purpose` and `authority` (Task 1 test proves it)
 - [ ] The audit log contains no raw sensitive values (Task 11 test proves it)
 - [ ] A registration can be completed through the panel with no LLM and no OCR

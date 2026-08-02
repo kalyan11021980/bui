@@ -1,0 +1,61 @@
+import type { ZodType } from 'zod'
+import type { Authority } from './authority'
+import type { DocType, FieldId } from './field-id'
+import type { Section } from './section'
+
+export type FieldType =
+  | 'text' | 'date' | 'select' | 'phone' | 'address' | 'file' | 'taxid'
+
+type FieldDefBase<T> = {
+  id: FieldId
+  label: string
+  type: FieldType
+  /** What this is FOR, in the user's terms. Required. */
+  purpose: string
+  /** WHO requires it. Required. */
+  authority: Authority
+  section: Section
+  /** Vetted, legally reviewed. Never model-generated. */
+  consequence?: string
+  /** Privacy answer, shown by default on sensitive fields. */
+  handling?: string
+  /** Where the value lands, e.g. "W-9, line 1". */
+  destination?: string
+  validation: ZodType<T>
+  derivableFrom?: readonly DocType[]
+}
+
+/**
+ * `sensitive` and `orchestratorVisible` are mutually exclusive: a value the
+ * orchestrator may see is by definition not sensitive.
+ *
+ * The sensitive branch types `orchestratorVisible` as `?: never` rather than
+ * omitting it, so the guarantee survives indirect construction — omitting it
+ * would only trip the excess-property check, which fires for fresh object
+ * literals alone. Consequence: TypeScript anchors the error to the
+ * `defineField(` call, so `@ts-expect-error` must sit above the call, not
+ * above the property.
+ */
+export type FieldDef<T = unknown> =
+  | (FieldDefBase<T> & { sensitive: true; orchestratorVisible?: never })
+  | (FieldDefBase<T> & { sensitive?: false; orchestratorVisible?: boolean })
+
+export function defineField<T>(def: FieldDef<T>): FieldDef<T> {
+  if (def.purpose.trim() === '') {
+    throw new Error(`Field "${def.id}": purpose must not be empty`)
+  }
+  if (def.label.trim() === '') {
+    throw new Error(`Field "${def.id}": label must not be empty`)
+  }
+  // Read through a cast: checking `def.orchestratorVisible` directly would
+  // narrow `def` to `never` (the union says the combination is impossible)
+  // and break the `def.id` access below. The runtime check still has to exist
+  // for objects built indirectly.
+  const orchestratorVisible = (def as { orchestratorVisible?: boolean }).orchestratorVisible
+  if (def.sensitive === true && orchestratorVisible === true) {
+    throw new Error(
+      `Field "${def.id}": sensitive fields cannot set orchestratorVisible`,
+    )
+  }
+  return def
+}

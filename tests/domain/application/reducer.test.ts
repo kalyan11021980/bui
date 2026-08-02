@@ -1,0 +1,460 @@
+import { describe, it, expect } from 'vitest'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { ApplicationSubmittedError } from '@/domain/application/guards'
+import { isComplete, outstandingFields } from '@/domain/application/queries'
+import type { Action } from '@/domain/application/state'
+import type { ApplicantProfile } from '@/domain/requirements/rules'
+
+const profile: ApplicantProfile = {
+  applicantType: 'individual',
+  country: 'US',
+  state: 'GA',
+  wantsGsa: false,
+  licenses: [],
+  addressDiffersFromId: false,
+}
+
+const AT = '2026-08-01T12:00:00.000Z'
+
+describe('applicationReducer', () => {
+  it('starts with every required field outstanding', () => {
+    const s = createApplication('app-1', profile)
+    expect(outstandingFields(s).length).toBeGreaterThan(0)
+    expect(isComplete(s)).toBe(false)
+  })
+
+  it('records a value with its provenance', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'ocr', at: AT, confidence: 0.97, documentId: 'doc-1',
+    })
+    expect(s.fields.first_name?.value).toBe('Kalyan')
+    expect(s.fields.first_name?.status).toBe('derived')
+    expect(s.fields.first_name?.provenance?.source).toBe('ocr')
+    expect(s.fields.first_name?.provenance?.confidence).toBe(0.97)
+  })
+
+  it('marks a user-entered value confirmed immediately', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: AT,
+    })
+    expect(s.fields.first_name?.status).toBe('confirmed')
+  })
+
+  it('moves a derived field to confirmed when the user confirms it', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31',
+      source: 'ocr', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'CONFIRM', fieldId: 'dob', at: AT, shownCopyHash: 'abc123',
+    })
+    expect(s.fields.dob?.status).toBe('confirmed')
+  })
+
+  it('refuses to confirm a field that has no value', () => {
+    const s = createApplication('app-1', profile)
+    expect(() =>
+      applicationReducer(s, {
+        type: 'CONFIRM', fieldId: 'dob', at: AT, shownCopyHash: 'abc',
+      }),
+    ).toThrow(/no value/i)
+  })
+
+  it('rejects a field with a human-readable reason', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'id_images', value: ['img-1'],
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'REJECT', fieldId: 'id_images', at: AT,
+      reason: 'The photo was too dark to read your license number',
+    })
+    expect(s.fields.id_images?.status).toBe('rejected')
+    expect(s.fields.id_images?.rejection?.reason).toMatch(/too dark/)
+  })
+
+  it('leaves other verified fields untouched when one is rejected', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, { type: 'VERIFY', fieldId: 'first_name', at: AT })
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'id_images', value: ['img-1'],
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'REJECT', fieldId: 'id_images', at: AT, reason: 'Too dark',
+    })
+    expect(s.fields.first_name?.status).toBe('verified')
+  })
+
+  it('counts a rejected field as outstanding again', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'id_images', value: ['img-1'],
+      source: 'user', at: AT,
+    })
+    expect(outstandingFields(s)).not.toContain('id_images')
+    s = applicationReducer(s, {
+      type: 'REJECT', fieldId: 'id_images', at: AT, reason: 'Too dark',
+    })
+    expect(outstandingFields(s)).toContain('id_images')
+  })
+
+  it('is complete only when every required field is confirmed or verified', () => {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    expect(isComplete(s)).toBe(true)
+  })
+
+  it('refuses to record a carried value with no origin', () => {
+    const s = createApplication('app-1', profile)
+    expect(() =>
+      applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: 'x',
+        source: 'carried', at: AT,
+      }),
+    ).toThrow(/where it came from/i)
+  })
+
+  it('never mutates the state or its nested field objects', () => {
+    let seeded = createApplication('app-1', profile)
+    seeded = applicationReducer(seeded, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'ocr', at: AT, confidence: 0.9,
+    })
+    const originalField = seeded.fields.first_name
+    const originalProvenance = originalField?.provenance
+    const snapshot = JSON.stringify(seeded)
+
+    const actions: readonly Action[] = [
+      { type: 'CONFIRM', fieldId: 'first_name', at: AT, shownCopyHash: 'c1' },
+      { type: 'VERIFY', fieldId: 'first_name', at: AT },
+      { type: 'REJECT', fieldId: 'first_name', at: AT, reason: 'Too dark' },
+      { type: 'SUPERSEDE', fieldId: 'first_name', at: AT },
+      {
+        type: 'SET_VALUE', fieldId: 'first_name', value: 'Other',
+        source: 'user', at: AT,
+      },
+    ]
+
+    for (const action of actions) {
+      const next = applicationReducer(seeded, action)
+      expect(next).not.toBe(seeded)
+      expect(next.fields.first_name).not.toBe(originalField)
+      expect(JSON.stringify(seeded), action.type).toBe(snapshot)
+    }
+
+    // the nested provenance object must survive by reference too
+    expect(seeded.fields.first_name?.provenance).toBe(originalProvenance)
+  })
+})
+
+describe('SUBMIT', () => {
+  function completed() {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    return s
+  }
+
+  it('stamps submittedAt, which was declared and never written', () => {
+    // submittedAt was initialised to null and no action ever set it; there
+    // was no SUBMIT action at all, so "Submit for review" had nothing to do.
+    const s = applicationReducer(completed(), { type: 'SUBMIT', at: AT })
+    expect(s.submittedAt).toBe(AT)
+  })
+
+  it('refuses to submit while requirements remain, and names them', () => {
+    // Spec §8.2: reject any completion attempt while requirements remain.
+    // Refusing is not the same as disabling the button — the attempt is
+    // always allowed, and the answer says what is missing.
+    const s = createApplication('app-1', profile)
+    expect(() => applicationReducer(s, { type: 'SUBMIT', at: AT }))
+      .toThrow(/cannot submit.*outstanding.*first_name/is)
+  })
+
+  it('refuses a second submission', () => {
+    // Still refused, but now by the same guard that refuses every other
+    // mutation once submittedAt is set (F2) rather than by a rule of SUBMIT's
+    // own — hence the reworded message.
+    const submitted = applicationReducer(completed(), { type: 'SUBMIT', at: AT })
+    expect(() => applicationReducer(submitted, { type: 'SUBMIT', at: AT }))
+      .toThrow(/sent for review/i)
+  })
+
+  it('leaves the previous state untouched when it refuses', () => {
+    const s = createApplication('app-1', profile)
+    const snapshot = JSON.stringify(s)
+    expect(() => applicationReducer(s, { type: 'SUBMIT', at: AT })).toThrow()
+    expect(JSON.stringify(s)).toBe(snapshot)
+  })
+
+  it('does not mutate the state it submits', () => {
+    const before = completed()
+    const snapshot = JSON.stringify(before)
+    const after = applicationReducer(before, { type: 'SUBMIT', at: AT })
+    expect(after).not.toBe(before)
+    expect(JSON.stringify(before)).toBe(snapshot)
+    expect(isComplete(after)).toBe(true)
+  })
+})
+
+describe('a submitted application is closed to further change', () => {
+  function submitted() {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    return applicationReducer(s, { type: 'SUBMIT', at: AT })
+  }
+
+  const LATER = '2026-08-02T09:00:00.000Z'
+
+  const mutations: Action[] = [
+    {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+      source: 'user', at: LATER,
+    },
+    { type: 'CONFIRM', fieldId: 'first_name', at: LATER, shownCopyHash: 'catalog-v1' },
+    { type: 'VERIFY', fieldId: 'first_name', at: LATER },
+    { type: 'REJECT', fieldId: 'first_name', at: LATER, reason: 'no' },
+    { type: 'SUPERSEDE', fieldId: 'first_name', at: LATER },
+    { type: 'UPDATE_PROFILE', patch: { applicantType: 'business' }, at: LATER },
+    { type: 'SUBMIT', at: LATER },
+  ]
+
+  it.each(mutations.map((a) => [a.type, a] as const))(
+    'refuses %s once the application has been sent for review',
+    (_type, action) => {
+      const s = submitted()
+      const snapshot = JSON.stringify(s)
+
+      expect(() => applicationReducer(s, action)).toThrow(ApplicationSubmittedError)
+      // The value the reviewer is looking at must be the value that is stored.
+      // A refusal that still mutated would be the same bug wearing a message.
+      expect(JSON.stringify(s)).toBe(snapshot)
+    },
+  )
+
+  it('rewrites nothing when the applicant tries to change a name after review', () => {
+    // The probe from the re-review, exactly: complete, SUBMIT, then set
+    // first_name to 'Mallory'. It used to be accepted, and the reviewer's
+    // copy silently diverged from the record.
+    const s = submitted()
+    expect(() =>
+      applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+        source: 'user', at: LATER,
+      }),
+    ).toThrow(/sent for review/i)
+    expect(s.fields.first_name?.value).toBe('x')
+  })
+
+  it('names when it was submitted, so the message is actionable', () => {
+    try {
+      applicationReducer(submitted(), { type: 'SUBMIT', at: LATER })
+      expect.unreachable('a second submission must be refused')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApplicationSubmittedError)
+      expect((error as Error).message).toContain(AT)
+      expect((error as Error).message).toMatch(/buyer services/i)
+    }
+  })
+
+  it('still accepts every one of those actions before submission', () => {
+    // Guards the guard: a rule that refused everything unconditionally would
+    // pass every assertion above.
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'ocr', at: AT,
+    })
+    expect(() =>
+      applicationReducer(s, {
+        type: 'CONFIRM', fieldId: 'first_name', at: AT, shownCopyHash: 'catalog-v1',
+      }),
+    ).not.toThrow()
+  })
+})
+
+describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)', () => {
+  const twoLicences: ApplicantProfile = {
+    applicantType: 'business', country: 'US', state: 'GA',
+    wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
+  }
+
+  function withTwoLicenceNumbers() {
+    let s = createApplication('app-1', twoLicences)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'license_number#0', value: 'GA-DLR-1',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'license_number#1', value: 'GA-SLV-2',
+      source: 'user', at: AT,
+    })
+    return s
+  }
+
+  it('supersedes a licence field orphaned by dropping a licence', () => {
+    // license_number#1 used to stay in state.fields: invisible to the panel
+    // and to outstandingFields, but still persisted and still logged — a
+    // licence number the applicant believes they removed.
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+    expect(s.fields['license_number#0']?.status).toBe('confirmed')
+  })
+
+  it('keeps the superseded value rather than deleting it', () => {
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.value).toBe('GA-SLV-2')
+  })
+
+  it('leaves a superseded field out of the outstanding set and out of completion', () => {
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(outstandingFields(s)).not.toContain('license_number#1')
+  })
+
+  it('supersedes business fields when a business becomes an individual', () => {
+    let s = createApplication('app-1', twoLicences)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'tax_id', value: '12-3456789',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { applicantType: 'individual', licenses: [] }, at: AT,
+    })
+    expect(s.fields.tax_id?.status).toBe('superseded')
+  })
+
+  it('revives a superseded field to derived when it is required again', () => {
+    // Otherwise adding the licence back leaves a required field stuck in a
+    // status that no longer describes it.
+    let s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer', 'salvage'] }, at: AT,
+    })
+    // `derived`, not `confirmed`: we still have the value, and the applicant
+    // gets to look at it again rather than have it silently count as answered.
+    expect(s.fields['license_number#1']?.status).toBe('derived')
+    expect(s.fields['license_number#1']?.value).toBe('GA-SLV-2')
+    expect(outstandingFields(s)).toContain('license_number#1')
+  })
+
+  it('leaves still-required fields alone', () => {
+    const before = withTwoLicenceNumbers()
+    const s = applicationReducer(before, {
+      type: 'UPDATE_PROFILE', patch: { state: 'OH' }, at: AT,
+    })
+    expect(s.fields['license_number#0']?.status).toBe('confirmed')
+    expect(s.fields['license_number#1']?.status).toBe('confirmed')
+  })
+
+  it('does not mutate the state it resyncs', () => {
+    const before = withTwoLicenceNumbers()
+    const snapshot = JSON.stringify(before)
+    applicationReducer(before, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('does not let an orphaned licence number block completion', () => {
+    let s = withTwoLicenceNumbers()
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    expect(isComplete(s)).toBe(true)
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+  })
+})
+
+describe('CLEAR_VALUE — the record must not outlive what is on screen', () => {
+  it('returns a field to outstanding and holds no value', () => {
+    let s = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    expect(outstandingFields(s)).not.toContain('first_name')
+
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT })
+
+    expect(s.fields.first_name?.value).toBeNull()
+    expect(s.fields.first_name?.status).toBe('empty')
+    expect(outstandingFields(s)).toContain('first_name')
+  })
+
+  it('drops the provenance along with the value', () => {
+    // "Read from your license, high confidence" describing a value that is
+    // gone is a lie about the record, and provenance is what a reviewer reads
+    // to decide how hard to look.
+    let s = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31',
+      source: 'ocr', at: AT, confidence: 0.96, documentId: 'doc-1',
+    })
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'dob', at: AT })
+    expect(s.fields.dob?.provenance).toBeUndefined()
+  })
+
+  it('is a no-op on a field that holds nothing, rather than an error', () => {
+    const s = createApplication('app-1', profile)
+    expect(applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'dob', at: AT }))
+      .toBe(s)
+  })
+
+  it('does not mutate the state it clears from', () => {
+    const before = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    const snapshot = JSON.stringify(before)
+    applicationReducer(before, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT })
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('is refused once the application has been sent for review', () => {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    s = applicationReducer(s, { type: 'SUBMIT', at: AT })
+    expect(() =>
+      applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT }),
+    ).toThrow(ApplicationSubmittedError)
+  })
+})
