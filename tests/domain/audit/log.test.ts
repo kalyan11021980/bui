@@ -129,6 +129,12 @@ describe('AuditLog', () => {
     expect(() => createDigester('too-short')).toThrow()
   })
 
+  it('two different secrets produce different digests for the same input', () => {
+    const a = createDigester('secret-one-at-least-32-characters-long')
+    const b = createDigester('secret-two-at-least-32-characters-long')
+    expect(a('123-45-6789')).not.toBe(b('123-45-6789'))
+  })
+
   it('logs a rejection with its reason', () => {
     const log = new AuditLog(digester)
     log.append({
