@@ -1,9 +1,8 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
+import { zipSchema } from './schemas'
 
-export const zipSchema = z
-  .string()
-  .regex(/^\d{5}(-\d{4})?$/, 'Enter a 5-digit ZIP code')
+export { zipSchema } from './schemas'
 
 export const ADDRESS_FIELDS: readonly FieldDef[] = [
   defineField({

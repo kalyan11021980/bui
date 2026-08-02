@@ -20,6 +20,8 @@ export type FieldId =
   | 'tax_id'
   // gsa
   | 'gsa_bidder_number' | 'gsa_email'
+  // state-specific forms
+  | 'oh_foreign_buyer_form'
 
 export type DocType =
   | 'drivers_license'

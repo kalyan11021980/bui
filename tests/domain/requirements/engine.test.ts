@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { requiredFields } from '@/domain/requirements/engine'
 import { CATALOG } from '@/domain/catalog'
+import { parseReqKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const base: ApplicantProfile = {
@@ -8,40 +9,45 @@ const base: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 0,
+  licenses: [],
 }
 
 describe('requiredFields', () => {
   it('asks an individual for identity, address and mobile', () => {
-    const ids = requiredFields(base)
-    expect(ids).toContain('first_name')
-    expect(ids).toContain('dob')
-    expect(ids).toContain('addr_line1')
-    expect(ids).toContain('phone_mobile')
+    const k = requiredFields(base)
+    expect(k).toContain('first_name')
+    expect(k).toContain('dob')
+    expect(k).toContain('addr_line1')
+    expect(k).toContain('phone_mobile')
   })
 
-  it('never asks an individual for business or license fields', () => {
-    const ids = requiredFields(base)
-    expect(ids).not.toContain('biz_legal_name')
-    expect(ids).not.toContain('license_number')
+  it('never asks an individual for business or licence fields', () => {
+    const k = requiredFields(base)
+    expect(k).not.toContain('biz_legal_name')
+    expect(k).not.toContain('license_number#0')
   })
 
-  it('asks a business for business and license fields', () => {
-    const ids = requiredFields({
-      ...base,
-      applicantType: 'business',
-      licenseCount: 1,
+  it('asks a business for business fields and a taxpayer ID', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).toContain('biz_name')
+    expect(k).toContain('biz_legal_name')
+    expect(k).toContain('tax_id')
+  })
+
+  it('asks for no licence fields when a business holds none', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k.some((x) => x.startsWith('license_'))).toBe(false)
+  })
+
+  it('asks for one licence group per licence held', () => {
+    const k = requiredFields({
+      ...base, applicantType: 'business', licenses: ['dealer', 'salvage'],
     })
-    expect(ids).toContain('biz_name')
-    expect(ids).toContain('biz_legal_name')
-    expect(ids).toContain('license_number')
-    expect(ids).toContain('license_expiry')
-  })
-
-  it('asks a business for a taxpayer ID and an individual not', () => {
-    expect(requiredFields({ ...base, applicantType: 'business' }))
-      .toContain('tax_id')
-    expect(requiredFields(base)).not.toContain('tax_id')
+    expect(k).toContain('license_number#0')
+    expect(k).toContain('license_number#1')
+    expect(k).not.toContain('license_number#2')
+    expect(k).toContain('license_expiry#0')
+    expect(k).toContain('license_expiry#1')
   })
 
   it('adds GSA fields only when the applicant wants GSA', () => {
@@ -50,32 +56,59 @@ describe('requiredFields', () => {
       .toContain('gsa_bidder_number')
   })
 
+  it('adds the Ohio form for an Ohio applicant and not a Georgia one', () => {
+    expect(requiredFields({ ...base, state: 'OH' }))
+      .toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'GA' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('handles an unknown or absent state without inventing requirements', () => {
+    expect(requiredFields({ ...base, state: null }))
+      .not.toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'ZZ' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('is case-insensitive about the state code', () => {
+    expect(requiredFields({ ...base, state: 'oh' }))
+      .toContain('oh_foreign_buyer_form')
+  })
+
   it('omits optional fields — line 2 is never required', () => {
-    const ids = requiredFields({ ...base, applicantType: 'business' })
-    expect(ids).not.toContain('addr_line2')
-    expect(ids).not.toContain('biz_addr_line2')
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).not.toContain('addr_line2')
+    expect(k).not.toContain('biz_addr_line2')
   })
 
   it('returns no duplicates', () => {
-    const ids = requiredFields({
-      ...base,
-      applicantType: 'business',
-      wantsGsa: true,
-      licenseCount: 2,
+    const k = requiredFields({
+      ...base, applicantType: 'business', wantsGsa: true,
+      licenses: ['dealer', 'salvage'], state: 'OH',
     })
-    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(k).size).toBe(k.length)
   })
 
-  it('returns only ids that exist in the catalog', () => {
+  it('returns the exact expected set for an individual in Georgia', () => {
+    expect([...requiredFields(base)].sort()).toEqual([
+      'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'dl_expiry', 'dl_number', 'dob', 'first_name',
+      'id_form', 'id_images', 'last_name', 'phone_mobile',
+    ])
+  })
+
+  it('resolves every key it returns to a real catalog field', () => {
     const profiles: ApplicantProfile[] = [
       base,
-      { ...base, applicantType: 'business', licenseCount: 1 },
+      { ...base, applicantType: 'business', licenses: ['dealer'] },
       { ...base, wantsGsa: true },
       { ...base, state: null },
+      { ...base, state: 'OH', applicantType: 'business', licenses: ['dealer', 'salvage'] },
     ]
     for (const p of profiles) {
-      for (const id of requiredFields(p)) {
-        expect(CATALOG.has(id), `catalog is missing ${id}`).toBe(true)
+      for (const key of requiredFields(p)) {
+        const { fieldId } = parseReqKey(key)
+        expect(CATALOG.has(fieldId), `catalog is missing ${fieldId}`).toBe(true)
       }
     }
   })

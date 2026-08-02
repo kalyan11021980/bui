@@ -1,26 +1,33 @@
-import type { FieldId } from '../field-id'
 import {
   BUSINESS_CORE, CORE_ADDRESS, CORE_CONTACT, CORE_IDENTITY,
-  GSA_CORE, LICENSE_CORE, type ApplicantProfile,
+  GSA_CORE, LICENSE_GROUP, STATE_RULES, type ApplicantProfile,
 } from './rules'
+import { reqKey, type RequirementKey } from './key'
 
 /**
  * The single authority on what an applicant owes. Pure: same profile in,
- * same field list out. No LLM, no I/O. See spec §8.
+ * same key list out. No LLM, no I/O. See spec §8.
  */
-export function requiredFields(profile: ApplicantProfile): FieldId[] {
-  const out: FieldId[] = [
-    ...CORE_IDENTITY,
-    ...CORE_ADDRESS,
-    ...CORE_CONTACT,
-  ]
+export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
+  const out: RequirementKey[] = [
+    ...CORE_IDENTITY, ...CORE_ADDRESS, ...CORE_CONTACT,
+  ].map((id) => reqKey(id))
 
   if (profile.applicantType === 'business') {
-    out.push(...BUSINESS_CORE, 'tax_id')
-    if (profile.licenseCount > 0) out.push(...LICENSE_CORE)
+    for (const id of BUSINESS_CORE) out.push(reqKey(id))
+    out.push(reqKey('tax_id'))
+
+    profile.licenses.forEach((_licence, index) => {
+      for (const id of LICENSE_GROUP) out.push(reqKey(id, index))
+    })
   }
 
-  if (profile.wantsGsa) out.push(...GSA_CORE)
+  if (profile.wantsGsa) for (const id of GSA_CORE) out.push(reqKey(id))
+
+  const rule = profile.state
+    ? STATE_RULES[profile.state.toUpperCase()]
+    : undefined
+  if (rule) for (const id of rule.additional) out.push(reqKey(id))
 
   return [...new Set(out)]
 }

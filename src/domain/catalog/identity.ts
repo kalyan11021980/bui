@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
-
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+import { isoDate } from './schemas'
 
 export const IDENTITY_FIELDS: readonly FieldDef[] = [
   defineField({

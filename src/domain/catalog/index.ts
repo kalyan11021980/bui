@@ -7,6 +7,7 @@ import { BUSINESS_FIELDS } from './business'
 import { LICENSE_FIELDS } from './license'
 import { TAX_FIELDS } from './tax'
 import { GSA_FIELDS } from './gsa'
+import { STATE_FORM_FIELDS } from './state-forms'
 
 export const ALL_FIELDS: readonly FieldDef[] = [
   ...IDENTITY_FIELDS,
@@ -16,6 +17,7 @@ export const ALL_FIELDS: readonly FieldDef[] = [
   ...LICENSE_FIELDS,
   ...TAX_FIELDS,
   ...GSA_FIELDS,
+  ...STATE_FORM_FIELDS,
 ]
 
 export const CATALOG: ReadonlyMap<FieldId, FieldDef> = new Map(
@@ -31,4 +33,5 @@ export function fieldDef(id: FieldId): FieldDef {
 export {
   IDENTITY_FIELDS, ADDRESS_FIELDS, CONTACT_FIELDS,
   BUSINESS_FIELDS, LICENSE_FIELDS, TAX_FIELDS, GSA_FIELDS,
+  STATE_FORM_FIELDS,
 }

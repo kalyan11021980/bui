@@ -1,9 +1,8 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
+import { phoneSchema } from './schemas'
 
-export const phoneSchema = z
-  .string()
-  .regex(/^\+?1?\d{10}$/, 'Enter a 10-digit phone number')
+export { phoneSchema } from './schemas'
 
 export const CONTACT_FIELDS: readonly FieldDef[] = [
   defineField({
