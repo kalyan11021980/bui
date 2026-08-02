@@ -11,6 +11,7 @@ const KIND: Record<Action['type'], AuditKind> = {
   REJECT: 'rejected',
   SUPERSEDE: 'superseded',
   UPDATE_PROFILE: 'profile_updated',
+  SUBMIT: 'submitted',
 }
 
 /**

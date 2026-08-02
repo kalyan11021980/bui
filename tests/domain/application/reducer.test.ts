@@ -160,3 +160,53 @@ describe('applicationReducer', () => {
     expect(seeded.fields.first_name?.provenance).toBe(originalProvenance)
   })
 })
+
+describe('SUBMIT', () => {
+  function completed() {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    return s
+  }
+
+  it('stamps submittedAt, which was declared and never written', () => {
+    // submittedAt was initialised to null and no action ever set it; there
+    // was no SUBMIT action at all, so "Submit for review" had nothing to do.
+    const s = applicationReducer(completed(), { type: 'SUBMIT', at: AT })
+    expect(s.submittedAt).toBe(AT)
+  })
+
+  it('refuses to submit while requirements remain, and names them', () => {
+    // Spec §8.2: reject any completion attempt while requirements remain.
+    // Refusing is not the same as disabling the button — the attempt is
+    // always allowed, and the answer says what is missing.
+    const s = createApplication('app-1', profile)
+    expect(() => applicationReducer(s, { type: 'SUBMIT', at: AT }))
+      .toThrow(/cannot submit.*outstanding.*first_name/is)
+  })
+
+  it('refuses a second submission', () => {
+    const submitted = applicationReducer(completed(), { type: 'SUBMIT', at: AT })
+    expect(() => applicationReducer(submitted, { type: 'SUBMIT', at: AT }))
+      .toThrow(/already submitted/i)
+  })
+
+  it('leaves the previous state untouched when it refuses', () => {
+    const s = createApplication('app-1', profile)
+    const snapshot = JSON.stringify(s)
+    expect(() => applicationReducer(s, { type: 'SUBMIT', at: AT })).toThrow()
+    expect(JSON.stringify(s)).toBe(snapshot)
+  })
+
+  it('does not mutate the state it submits', () => {
+    const before = completed()
+    const snapshot = JSON.stringify(before)
+    const after = applicationReducer(before, { type: 'SUBMIT', at: AT })
+    expect(after).not.toBe(before)
+    expect(JSON.stringify(before)).toBe(snapshot)
+    expect(isComplete(after)).toBe(true)
+  })
+})

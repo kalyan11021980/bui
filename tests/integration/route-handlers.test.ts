@@ -333,6 +333,41 @@ describe('POST /api/application — §8.2 enforcement', () => {
     expect(await res.json()).toMatchObject({ error: expect.stringMatching(/ZIP/i) })
   })
 
+  it('422s a submission while requirements remain, naming what is missing', async () => {
+    const id = await newApp()
+    const res = await post(id, { type: 'SUBMIT', at: AT })
+    expect(res.status).toBe(422)
+    expect(await res.json())
+      .toMatchObject({ error: expect.stringMatching(/cannot submit.*outstanding/is) })
+    expect((await stateOf(id)).submittedAt).toBeNull()
+  })
+
+  it('accepts a submission once nothing is outstanding, and audits it', async () => {
+    const id = await newApp()
+    const answers: Array<[string, unknown]> = [
+      ['first_name', 'Ada'], ['last_name', 'Lovelace'],
+      ['id_form', 'drivers_license'], ['dl_number', 'D1234567'],
+      ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'],
+      ['id_images', ['front.png']],
+      ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
+      ['addr_state', 'GA'], ['addr_zip', '30301'],
+      ['phone_mobile', '4045551234'],
+    ]
+    for (const [fieldId, value] of answers) {
+      const res = await post(id, {
+        type: 'SET_VALUE', fieldId, value, source: 'user', at: AT,
+      })
+      expect(res.status, `${fieldId} should have been accepted`).toBe(200)
+    }
+
+    const res = await post(id, { type: 'SUBMIT', at: '2026-08-01T13:00:00.000Z' })
+    expect(res.status).toBe(200)
+    expect((await stateOf(id)).submittedAt).toBe('2026-08-01T13:00:00.000Z')
+
+    const trail = getAuditLog().entriesFor(id)
+    expect(trail.at(-1)?.kind).toBe('submitted')
+  })
+
   it('refuses an impossible calendar date, not just a badly-shaped one', async () => {
     const id = await newApp()
     for (const bad of ['1982-13-45', '2026-02-30', '31-08-1982']) {

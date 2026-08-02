@@ -4,7 +4,7 @@ import type { ApplicantProfile } from '../requirements/rules'
 
 export type AuditKind =
   | 'value_set' | 'confirmed' | 'verified'
-  | 'rejected' | 'superseded' | 'profile_updated'
+  | 'rejected' | 'superseded' | 'profile_updated' | 'submitted'
 
 export type AuditEvent = {
   /**

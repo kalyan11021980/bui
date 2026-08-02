@@ -90,6 +90,22 @@ export function applicationReducer(
 
     case 'UPDATE_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.patch } }
+
+    case 'SUBMIT': {
+      if (state.submittedAt !== null) {
+        throw new Error(`Application "${state.id}" was already submitted at ${state.submittedAt}`)
+      }
+      const outstanding = outstandingFields(state)
+      if (outstanding.length > 0) {
+        // §8.2: reject any completion attempt while requirements remain. The
+        // message names them, because "cannot submit" with no reason is the
+        // greyed-out button in a different costume.
+        throw new Error(
+          `Cannot submit: ${outstanding.length} still outstanding — ${outstanding.join(', ')}`,
+        )
+      }
+      return { ...state, submittedAt: action.at }
+    }
   }
 }
 

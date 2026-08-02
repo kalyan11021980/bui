@@ -49,3 +49,9 @@ export type Action =
   | { type: 'REJECT'; fieldId: RequirementKey; at: string; reason: string }
   | { type: 'SUPERSEDE'; fieldId: RequirementKey; at: string }
   | { type: 'UPDATE_PROFILE'; patch: Partial<ApplicantProfile>; at: string }
+  /**
+   * Hands the application to review. Refused while anything is outstanding
+   * (spec §8.2), which is not the same as disabling the button: the panel
+   * always lets the attempt happen and answers with what is still missing.
+   */
+  | { type: 'SUBMIT'; at: string }

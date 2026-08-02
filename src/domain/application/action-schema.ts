@@ -89,8 +89,12 @@ const updateProfile = z
   })
   .strict()
 
+const submit = z
+  .object({ type: z.literal('SUBMIT'), at: timestamp })
+  .strict()
+
 export const actionSchema = z.discriminatedUnion('type', [
-  setValue, confirm, verify, reject, supersede, updateProfile,
+  setValue, confirm, verify, reject, supersede, updateProfile, submit,
 ])
 
 export const requestBodySchema = z
@@ -136,6 +140,8 @@ export function toAction(parsed: ParsedAction): Action {
       }
     case 'SUPERSEDE':
       return { type: 'SUPERSEDE', fieldId: parsed.fieldId, at: parsed.at }
+    case 'SUBMIT':
+      return { type: 'SUBMIT', at: parsed.at }
     case 'UPDATE_PROFILE': {
       const p = parsed.patch
       return {
