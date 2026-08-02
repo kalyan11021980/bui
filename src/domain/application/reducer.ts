@@ -37,6 +37,11 @@ export function applicationReducer(
 ): ApplicationState {
   switch (action.type) {
     case 'SET_VALUE': {
+      if (action.source === 'carried' && action.fromFieldId === undefined) {
+        throw new Error(
+          `Cannot carry into "${action.fieldId}": a carried value must record where it came from`,
+        )
+      }
       const next: FieldState = {
         value: action.value,
         // A value the user typed is confirmed by the act of typing it.

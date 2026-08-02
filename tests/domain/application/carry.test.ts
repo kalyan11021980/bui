@@ -67,4 +67,15 @@ describe('applyCarry', () => {
     const s = withAddress()
     expect(carriedFrom(s, 'addr_line1')).toBeNull()
   })
+
+  it('does not overwrite a destination that OCR already filled', () => {
+    let s = withAddress()
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'biz_addr_city', value: 'Macon',
+      source: 'ocr', at: AT, confidence: 0.94,
+    })
+    s = applyCarry(s, AT)
+    expect(s.fields.biz_addr_city?.value).toBe('Macon')
+    expect(s.fields.biz_addr_city?.provenance?.source).toBe('ocr')
+  })
 })

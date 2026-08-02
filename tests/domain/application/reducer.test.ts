@@ -118,6 +118,16 @@ describe('applicationReducer', () => {
     expect(isComplete(s)).toBe(true)
   })
 
+  it('refuses to record a carried value with no origin', () => {
+    const s = createApplication('app-1', profile)
+    expect(() =>
+      applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: 'x',
+        source: 'carried', at: AT,
+      }),
+    ).toThrow(/where it came from/i)
+  })
+
   it('never mutates the state or its nested field objects', () => {
     let seeded = createApplication('app-1', profile)
     seeded = applicationReducer(seeded, {
