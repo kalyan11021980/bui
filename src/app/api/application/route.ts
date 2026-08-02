@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import { applyCarry } from '@/domain/application/carry'
@@ -16,12 +17,34 @@ function fail(status: number, error: string) {
   return NextResponse.json({ error }, { status })
 }
 
+/**
+ * With no `id`, creates a new application and returns it. With an `id`,
+ * returns that application, or 404.
+ *
+ * The id is generated HERE, not taken from the query string. Previously any
+ * id the caller supplied would be created on demand, so `?id=1` and `?id=2`
+ * both worked and the response carries `tax_id.value` — the one place on this
+ * branch where a raw taxpayer ID crosses a wire. A UUID is not authorisation,
+ * but it stops the ids being enumerable, and this is the response shape
+ * phases 2-4 extend.
+ *
+ * TODO(phase-2): ownership check. Nothing here establishes WHO is asking.
+ * Knowing an application id is currently sufficient to read every value in
+ * it, including the taxpayer ID and date of birth. What is missing is an
+ * authenticated session, an owner recorded on the application at creation,
+ * and a comparison of the two before this handler returns anything —
+ * plus a decision about whether values should be masked in the response at
+ * all, per §8.1. Phase 1 is demo-scoped and in-memory; this must not ship to
+ * real applicants as it stands.
+ */
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get('id')
-  if (!id) return fail(400, 'id required')
 
-  const existing = getApplication(id)
-  if (existing) return NextResponse.json(existing)
+  if (id) {
+    const existing = getApplication(id)
+    if (!existing) return fail(404, 'unknown application')
+    return NextResponse.json(existing)
+  }
 
   const profile: ApplicantProfile = {
     applicantType: 'individual',
@@ -30,7 +53,7 @@ export async function GET(request: Request) {
     wantsGsa: false,
     licenses: [],
   }
-  const created = createApplication(id, profile)
+  const created = createApplication(randomUUID(), profile)
   putApplication(created)
   return NextResponse.json(created)
 }
