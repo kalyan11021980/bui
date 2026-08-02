@@ -96,4 +96,24 @@ describe('POST /api/application', () => {
     expect(log.size()).toBe(before + 1)
     expect(JSON.stringify(log.entries())).not.toContain('12-3456789')
   })
+
+  it('files each application\'s events under its own id, not one shared stream', async () => {
+    await GET(req('http://localhost/api/application?id=app-a'))
+    await GET(req('http://localhost/api/application?id=app-b'))
+
+    await POST(req('http://localhost/api/application', postBody('app-a', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })))
+    await POST(req('http://localhost/api/application', postBody('app-b', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Bob',
+      source: 'user', at: '2026-08-01T12:00:01.000Z',
+    })))
+
+    const log = getAuditLog()
+    expect(log.entriesFor('app-a').map((e) => e.value)).toEqual(['Ada'])
+    expect(log.entriesFor('app-b').map((e) => e.value)).toEqual(['Bob'])
+    expect(log.entriesFor('app-a')[0]?.seq).toBe(1)
+    expect(log.entriesFor('app-b')[0]?.seq).toBe(1)
+  })
 })

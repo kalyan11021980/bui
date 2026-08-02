@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   // cannot audit is an action we should not apply. If the audit call throws,
   // the store must be left untouched rather than silently holding a mutation
   // with no corresponding trail entry.
-  getAuditLog().append(body.action)
+  getAuditLog().append(current.id, body.action)
   putApplication(next)
   return NextResponse.json(next)
 }

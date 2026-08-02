@@ -28,7 +28,7 @@ describe('a whole registration, panel only', () => {
         type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
       }
       s = applicationReducer(s, action)
-      log.append(action)
+      log.append(s.id, action)
     }
 
     expect(isComplete(s)).toBe(true)
@@ -37,7 +37,7 @@ describe('a whole registration, panel only', () => {
 
   it('never writes a raw taxpayer ID into the audit log', () => {
     const log = new AuditLog(digest)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'tax_id', value: '12-3456789',
       source: 'user', at: AT,
     })

@@ -13,16 +13,29 @@ const KIND: Record<Action['type'], AuditKind> = {
   UPDATE_PROFILE: 'profile_updated',
 }
 
-/** Append-only. There is deliberately no delete, no edit, no undo. */
+/**
+ * Append-only. There is deliberately no delete, no edit, no undo.
+ *
+ * Events are partitioned by application id: `seq` counts within one
+ * application, so two concurrent applicants cannot interleave into a single
+ * unreadable stream (spec §10.1). The global insertion order is kept
+ * alongside purely so `entries()` can expose it.
+ */
 export class AuditLog {
-  #entries: AuditEvent[] = []
+  /** Per-application trails, each in its own append order. */
+  #byApplication = new Map<string, AuditEvent[]>()
+  /** Every event, in the order it was appended across all applications. */
+  #all: AuditEvent[] = []
   #digest: Digester
 
   constructor(digester: Digester) {
     this.#digest = digester
   }
 
-  append(action: Action): AuditEvent {
+  append(applicationId: string, action: Action): AuditEvent {
+    if (applicationId === '') {
+      throw new Error('Audit events must name the application they belong to')
+    }
     const fieldIdPart = 'fieldId' in action ? { fieldId: action.fieldId } : {}
 
     let valuePart: { source?: ProvenanceSource; value?: unknown; valueDigest?: string } = {}
@@ -39,8 +52,10 @@ export class AuditLog {
     // Build the event completely before freezing — assigning a property
     // after Object.freeze either silently no-ops or throws (strict mode),
     // so every field must be known up front, not patched on afterward.
+    const trail = this.#byApplication.get(applicationId) ?? []
     const event: AuditEvent = Object.freeze({
-      seq: this.#entries.length + 1,
+      applicationId,
+      seq: trail.length + 1,
       at: action.at,
       kind: KIND[action.type],
       ...fieldIdPart,
@@ -49,15 +64,38 @@ export class AuditLog {
       ...rejectPart,
     })
 
-    this.#entries.push(event)
+    trail.push(event)
+    this.#byApplication.set(applicationId, trail)
+    this.#all.push(event)
     return event
   }
 
-  entries(): readonly AuditEvent[] {
-    return Object.freeze([...this.#entries])
+  /**
+   * The trail for one application, in append order, `seq` running 1..n.
+   * This is the compliance-facing read: it is what gets handed over when
+   * someone asks how a single applicant's record came to say what it says.
+   */
+  entriesFor(applicationId: string): readonly AuditEvent[] {
+    return Object.freeze([...(this.#byApplication.get(applicationId) ?? [])])
   }
 
+  /**
+   * EVERY event in this log, across EVERY application, in global insertion
+   * order. Deliberately not the compliance read — `seq` values repeat across
+   * applications here. Useful for tests and for whole-process inspection;
+   * use `entriesFor` for anything applicant-facing.
+   */
+  entries(): readonly AuditEvent[] {
+    return Object.freeze([...this.#all])
+  }
+
+  /** Total events across all applications. */
   size(): number {
-    return this.#entries.length
+    return this.#all.length
+  }
+
+  /** Events recorded for one application. */
+  sizeFor(applicationId: string): number {
+    return this.#byApplication.get(applicationId)?.length ?? 0
   }
 }

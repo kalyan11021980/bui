@@ -9,11 +9,11 @@ const digester = createDigester(TEST_SECRET)
 describe('AuditLog', () => {
   it('assigns sequential numbers starting at 1', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
     })
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'last_name', value: 'Chatterjee',
       source: 'user', at: AT,
     })
@@ -22,7 +22,7 @@ describe('AuditLog', () => {
 
   it('stores the plain value for a non-sensitive field', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
     })
@@ -32,7 +32,7 @@ describe('AuditLog', () => {
 
   it('stores only a digest for a sensitive field', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'tax_id', value: '123-45-6789',
       source: 'user', at: AT,
     })
@@ -47,7 +47,7 @@ describe('AuditLog', () => {
     // would then be called with the raw `tax_id#0` key, miss, and def?.sensitive
     // would be falsy — silently storing the raw taxpayer ID in the clear.
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'tax_id#0', value: '999-99-9999',
       source: 'user', at: AT,
     })
@@ -67,7 +67,7 @@ describe('AuditLog', () => {
     ]
     for (const { fieldId, value } of cases) {
       const log = new AuditLog(digester)
-      log.append({
+      log.append('app-1', {
         type: 'SET_VALUE', fieldId, value, source: 'user', at: AT,
       })
       const e = log.entries()[0]
@@ -82,7 +82,7 @@ describe('AuditLog', () => {
 
   it('records the copy hash the user was shown when confirming', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'CONFIRM', fieldId: 'dob', at: AT, shownCopyHash: 'copy-v3',
     })
     expect(log.entries()[0]?.shownCopyHash).toBe('copy-v3')
@@ -91,7 +91,7 @@ describe('AuditLog', () => {
 
   it('refuses to mutate the entries array once appended', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
     })
@@ -104,7 +104,7 @@ describe('AuditLog', () => {
 
   it('refuses to mutate a single entry once appended', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
     })
@@ -137,7 +137,7 @@ describe('AuditLog', () => {
 
   it('logs a rejection with its reason', () => {
     const log = new AuditLog(digester)
-    log.append({
+    log.append('app-1', {
       type: 'REJECT', fieldId: 'id_images', at: AT,
       reason: 'The photo was too dark',
     })
@@ -148,5 +148,76 @@ describe('AuditLog', () => {
   it('starts empty', () => {
     expect(new AuditLog(digester).size()).toBe(0)
     expect(new AuditLog(digester).entries()).toEqual([])
+  })
+})
+
+describe('AuditLog — per-application trails (spec §10.1)', () => {
+  it('stamps every event with the application it belongs to', () => {
+    const log = new AuditLog(digester)
+    const e = log.append('app-7', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    expect(e.applicationId).toBe('app-7')
+  })
+
+  it('keeps two applications apart instead of interleaving one shared sequence', () => {
+    // The exact failure this guards: two applications, one event each,
+    // producing seq 1 and seq 2 in a single undiscriminated stream that
+    // cannot be split back apart.
+    const log = new AuditLog(digester)
+    log.append('app-a', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'user', at: AT,
+    })
+    log.append('app-b', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Bob',
+      source: 'user', at: AT,
+    })
+
+    const a = log.entriesFor('app-a')
+    const b = log.entriesFor('app-b')
+    expect(a).toHaveLength(1)
+    expect(b).toHaveLength(1)
+    expect(a[0]?.seq).toBe(1)
+    expect(b[0]?.seq).toBe(1)
+    expect(a[0]?.value).toBe('Ada')
+    expect(b[0]?.value).toBe('Bob')
+    // Nothing from B may appear in A's trail — this is what a compliance
+    // reviewer is handed.
+    expect(JSON.stringify(a)).not.toContain('Bob')
+  })
+
+  it('numbers seq per application, 1..n', () => {
+    const log = new AuditLog(digester)
+    for (const name of ['Ada', 'Grace', 'Alan']) {
+      log.append('app-a', {
+        type: 'SET_VALUE', fieldId: 'first_name', value: name,
+        source: 'user', at: AT,
+      })
+    }
+    log.append('app-b', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Bob',
+      source: 'user', at: AT,
+    })
+    expect(log.entriesFor('app-a').map((e) => e.seq)).toEqual([1, 2, 3])
+    expect(log.entriesFor('app-b').map((e) => e.seq)).toEqual([1])
+    expect(log.sizeFor('app-a')).toBe(3)
+    expect(log.size()).toBe(4)
+  })
+
+  it('returns an empty trail for an application with no events', () => {
+    expect(new AuditLog(digester).entriesFor('never-seen')).toEqual([])
+    expect(new AuditLog(digester).sizeFor('never-seen')).toBe(0)
+  })
+
+  it('refuses an event that names no application', () => {
+    const log = new AuditLog(digester)
+    expect(() =>
+      log.append('', {
+        type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+        source: 'user', at: AT,
+      }),
+    ).toThrow(/name the application/i)
   })
 })
