@@ -1665,14 +1665,8 @@ confirmed, and must never store a raw value for a sensitive field.
 ```ts
 import { describe, it, expect } from 'vitest'
 import { AuditLog, digest } from '@/domain/audit/log'
-import { createApplication } from '@/domain/application/reducer'
-import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const AT = '2026-08-01T12:00:00.000Z'
-const profile: ApplicantProfile = {
-  applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 1,
-}
 
 describe('AuditLog', () => {
   it('assigns sequential numbers starting at 1', () => {
@@ -1747,9 +1741,9 @@ describe('AuditLog', () => {
     expect(log.entries()[0]?.reason).toMatch(/too dark/)
   })
 
-  it('starts empty for a fresh application', () => {
-    createApplication('app-1', profile)
+  it('starts empty', () => {
     expect(new AuditLog().size()).toBe(0)
+    expect(new AuditLog().entries()).toEqual([])
   })
 })
 ```
@@ -2545,11 +2539,17 @@ describe('a whole registration, panel only', () => {
         type: 'SET_VALUE', fieldId: id, value: v, source: 'user', at: AT,
       })
     }
-    const before = outstandingFields(s).length
+    expect(s.fields.biz_addr_line1).toBeUndefined()
+
     s = applyCarry(s, AT)
-    // carried fields hold values, so only confirmation remains
+
+    // The business address is now populated without the user typing it again,
+    // but still needs confirmation — carrying saves typing, not attention.
     expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
-    expect(before).toBeGreaterThan(0)
+    expect(s.fields.biz_addr_city?.value).toBe('Atlanta')
+    expect(s.fields.biz_addr_zip?.value).toBe('30301')
+    expect(s.fields.biz_addr_line1?.status).toBe('derived')
+    expect(outstandingFields(s)).toContain('biz_addr_line1')
   })
 
   it('round-trips through the store', () => {
