@@ -1,0 +1,76 @@
+import { z } from 'zod'
+import { defineField, type FieldDef } from '../field-def'
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+
+export const IDENTITY_FIELDS: readonly FieldDef[] = [
+  defineField({
+    id: 'first_name',
+    label: 'First name',
+    type: 'text',
+    purpose: 'Your account has to match the name on your ID',
+    authority: 'FEDERAL_KYC',
+    validation: z.string().min(1, 'Enter your first name'),
+    derivableFrom: ['drivers_license', 'state_id', 'passport'],
+    orchestratorVisible: true,
+  }),
+  defineField({
+    id: 'last_name',
+    label: 'Last name',
+    type: 'text',
+    purpose: 'Your account has to match the name on your ID',
+    authority: 'FEDERAL_KYC',
+    validation: z.string().min(1, 'Enter your last name'),
+    derivableFrom: ['drivers_license', 'state_id', 'passport'],
+  }),
+  defineField({
+    id: 'id_form',
+    label: 'Form of identification',
+    type: 'select',
+    purpose: 'Tells us which document to check your details against',
+    authority: 'FEDERAL_KYC',
+    validation: z.enum(['drivers_license', 'state_id', 'passport']),
+  }),
+  defineField({
+    id: 'dl_number',
+    label: "Driver's license number",
+    type: 'text',
+    purpose: 'Confirms the ID you uploaded belongs to you',
+    authority: 'STATE_DMV',
+    handling: 'Encrypted at rest. Never shown to other bidders.',
+    validation: z.string().min(4, 'Enter the number shown on your license'),
+    derivableFrom: ['drivers_license'],
+    sensitive: true,
+  }),
+  defineField({
+    id: 'dl_expiry',
+    label: 'ID expiration date',
+    type: 'date',
+    purpose: 'We cannot accept an expired ID',
+    authority: 'FEDERAL_KYC',
+    consequence: 'An expired ID will be rejected during review.',
+    validation: isoDate,
+    derivableFrom: ['drivers_license', 'state_id', 'passport'],
+  }),
+  defineField({
+    id: 'dob',
+    label: 'Date of birth',
+    type: 'date',
+    purpose: 'Confirms you are old enough to bid',
+    authority: 'FEDERAL_KYC',
+    validation: isoDate,
+    derivableFrom: ['drivers_license', 'state_id', 'passport'],
+    sensitive: true,
+    handling: 'Used only to verify your age and identity.',
+  }),
+  defineField({
+    id: 'id_images',
+    label: 'Photos of your ID',
+    type: 'file',
+    purpose: 'A person on our team compares these to what you entered',
+    authority: 'FEDERAL_KYC',
+    handling: 'Stored encrypted and visible only to Buyer Services.',
+    validation: z.array(z.string().min(1)).min(1, 'Upload at least one image'),
+    sensitive: true,
+  }),
+]
