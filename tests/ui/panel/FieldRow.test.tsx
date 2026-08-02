@@ -83,4 +83,51 @@ describe('FieldRow', () => {
     const row = screen.getByRole('group', { name: /date of birth/i })
     expect(row).toHaveAttribute('aria-describedby')
   })
+
+  it('renders a field addressed by an instance-qualified key', () => {
+    // fieldDef is keyed by bare FieldId; `license_number#0` only resolves if
+    // the lookup runs through parseReqKey. Without this test, simplifying it
+    // to fieldDef(fieldId) passes the whole suite and throws at runtime.
+    render(
+      <FieldRow
+        fieldId="license_number#0"
+        state={{ value: 'GA-DLR-44812', status: 'confirmed' }}
+      />,
+    )
+    expect(screen.getByRole('group', { name: /license number/i })).toBeInTheDocument()
+    expect(screen.getByText('GA-DLR-44812')).toBeInTheDocument()
+    expect(screen.getByText(/verify this against your state dealer board/i))
+      .toBeInTheDocument()
+  })
+
+  it('keeps describedby ids unique across licence instances', () => {
+    render(
+      <>
+        <FieldRow fieldId="license_number#0" state={{ value: 'A', status: 'confirmed' }} />
+        <FieldRow fieldId="license_number#1" state={{ value: 'B', status: 'confirmed' }} />
+      </>,
+    )
+    const ids = [...document.querySelectorAll('[id]')].map((el) => el.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    const groups = screen.getAllByRole('group', { name: /license number/i })
+    expect(groups).toHaveLength(2)
+    expect(groups[0]?.getAttribute('aria-describedby'))
+      .not.toBe(groups[1]?.getAttribute('aria-describedby'))
+  })
+
+  it('passes the full instance-qualified key to onConfirm, not the bare FieldId', async () => {
+    // Task 10 dispatches a reducer action keyed by whatever onConfirm
+    // receives. A truncated key (`license_number` instead of
+    // `license_number#0`) would silently confirm the wrong licence instance.
+    const onConfirm = vi.fn()
+    render(
+      <FieldRow
+        fieldId="license_number#0"
+        state={{ value: 'GA-DLR-44812', status: 'derived', provenance: { source: 'ocr' } }}
+        onConfirm={onConfirm}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: /looks right/i }))
+    expect(onConfirm).toHaveBeenCalledWith('license_number#0')
+  })
 })
