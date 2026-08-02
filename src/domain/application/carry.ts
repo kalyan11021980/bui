@@ -7,14 +7,30 @@ import type { Action, ApplicationState } from './state'
  * Values the applicant should never have to type twice. Spec §9.
  * The current design asks for an address up to three times; these rules
  * are the fix.
+ *
+ * Every `from` must be a key the requirements engine actually emits for some
+ * profile, and so must every `to` — a rule whose source is never asked for
+ * can never fire, and reads like working redundancy-removal while doing
+ * nothing. Two rules were in exactly that state:
+ *
+ * - `addr_line2 -> biz_addr_line2`: neither side is ever required (both are
+ *   optional apartment/suite lines), so the rule was unreachable from both
+ *   ends. Dropped deliberately rather than making line 2 mandatory, which
+ *   would be a worse answer to a smaller problem.
+ * - `phone_primary -> biz_phone`: CORE_CONTACT is `['phone_mobile']` only,
+ *   so the source was never collected — while `biz_phone` IS required of
+ *   every business. The phone redundancy the spec names was untouched.
+ *   Re-pointed at `phone_mobile`, which is the carry that actually helps.
+ *
+ * `tests/domain/application/carry.test.ts` asserts this property, so the
+ * drift cannot come back silently.
  */
 export const CARRY_RULES: readonly { from: RequirementKey; to: RequirementKey }[] = [
   { from: 'addr_line1', to: 'biz_addr_line1' },
-  { from: 'addr_line2', to: 'biz_addr_line2' },
   { from: 'addr_city', to: 'biz_addr_city' },
   { from: 'addr_state', to: 'biz_addr_state' },
   { from: 'addr_zip', to: 'biz_addr_zip' },
-  { from: 'phone_primary', to: 'biz_phone' },
+  { from: 'phone_mobile', to: 'biz_phone' },
 ]
 
 export type CarryResult = {

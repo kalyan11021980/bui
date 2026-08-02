@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
-import { applyCarry, carriedFrom } from '@/domain/application/carry'
-import type { ApplicantProfile } from '@/domain/requirements/rules'
+import { applyCarry, carriedFrom, CARRY_RULES } from '@/domain/application/carry'
+import { requiredFields } from '@/domain/requirements/engine'
+import type { ApplicantProfile, LicenseType } from '@/domain/requirements/rules'
 
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
@@ -112,5 +113,73 @@ describe('applyCarry', () => {
     s = applyCarry(s, AT).state
     expect(s.fields.biz_addr_city?.value).toBe('Macon')
     expect(s.fields.biz_addr_city?.provenance?.source).toBe('ocr')
+  })
+})
+
+/**
+ * Every key the requirements engine can emit, for any profile it can be
+ * given. A carry rule naming anything outside this set is dead: it reads
+ * like working redundancy-removal and does nothing.
+ */
+function everyEmittableKey(): Set<string> {
+  const licenceSets: readonly (readonly LicenseType[])[] = [
+    [], ['dealer'], ['dealer', 'salvage'], ['dismantler', 'exporter', 'salvage'],
+  ]
+  const keys = new Set<string>()
+  for (const applicantType of ['individual', 'business'] as const) {
+    for (const wantsGsa of [false, true]) {
+      for (const state of [null, 'GA', 'OH', 'ZZ']) {
+        for (const licenses of licenceSets) {
+          const profile: ApplicantProfile = {
+            applicantType, country: 'US', state, wantsGsa, licenses,
+          }
+          for (const key of requiredFields(profile)) keys.add(key)
+        }
+      }
+    }
+  }
+  return keys
+}
+
+describe('CARRY_RULES agree with the requirements engine', () => {
+  it('names only sources the engine can actually emit for some profile', () => {
+    // This is the test that would have caught the drift. Two of six rules
+    // pointed at keys no profile ever produces: `addr_line2` (optional, so
+    // never required) and `phone_primary` (CORE_CONTACT is phone_mobile
+    // only). Neither could ever fire.
+    const emittable = everyEmittableKey()
+    for (const rule of CARRY_RULES) {
+      expect(emittable.has(rule.from), `no profile ever asks for ${rule.from}`).toBe(true)
+    }
+  })
+
+  it('names only destinations the engine can actually emit for some profile', () => {
+    const emittable = everyEmittableKey()
+    for (const rule of CARRY_RULES) {
+      expect(emittable.has(rule.to), `no profile ever asks for ${rule.to}`).toBe(true)
+    }
+  })
+
+  it('never carries a value into the field it came from', () => {
+    for (const rule of CARRY_RULES) expect(rule.from).not.toBe(rule.to)
+  })
+
+  it('gives each destination exactly one source', () => {
+    const destinations = CARRY_RULES.map((r) => r.to)
+    expect(new Set(destinations).size).toBe(destinations.length)
+  })
+
+  it('carries the mobile phone into the business phone — the redundancy the spec names', () => {
+    // biz_phone is required of every business and had no working carry: the
+    // rule pointed at phone_primary, which is never collected.
+    let s = createApplication('app-1', business)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'phone_mobile', value: '4045551234',
+      source: 'user', at: AT,
+    })
+    const { state, applied } = applyCarry(s, AT)
+    expect(state.fields.biz_phone?.value).toBe('4045551234')
+    expect(state.fields.biz_phone?.provenance?.fromFieldId).toBe('phone_mobile')
+    expect(applied.some((a) => 'fieldId' in a && a.fieldId === 'biz_phone')).toBe(true)
   })
 })
