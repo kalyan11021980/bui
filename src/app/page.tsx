@@ -6,7 +6,8 @@ import { fieldInputId } from '@/ui/panel/FieldInput'
 import {
   applicationReducer, createApplication, isComplete, outstandingFields,
 } from '@/domain/application/reducer'
-import { applyCarry } from '@/domain/application/carry'
+import { applyCarry, carryNotice, type CarryNotice } from '@/domain/application/carry'
+import { revealField } from '@/ui/panel/reveal'
 import { COLOR } from '@/ui/theme/tokens'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
@@ -22,6 +23,7 @@ const profile: ApplicantProfile = {
 export default function Page() {
   const [state, setState] = useState(() => createApplication('demo', profile))
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [carry, setCarry] = useState<CarryNotice | null>(null)
 
   const confirm = (id: RequirementKey) =>
     setState((s) =>
@@ -33,25 +35,30 @@ export default function Page() {
       }),
     )
 
-  const change = (id: RequirementKey, value: unknown) =>
-    setState((s) => {
-      const at = new Date().toISOString()
-      // Carry runs on every edit, so filling in a home address populates the
-      // business address as it is typed rather than at some later checkpoint
-      // the applicant has to go and find. Spec §9.
-      return applyCarry(
-        applicationReducer(s, {
-          type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
-        }),
-        at,
-      ).state
-    })
+  const change = (id: RequirementKey, value: unknown) => {
+    const at = new Date().toISOString()
+    // Carry runs on every edit, so filling in a home address populates the
+    // business address as it is typed rather than at some later checkpoint
+    // the applicant has to go and find. Spec §9.
+    const result = applyCarry(
+      applicationReducer(state, {
+        type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
+      }),
+      at,
+    )
+    setState(result.state)
+    // Replaced on every edit, including with null: the acknowledgement belongs
+    // to the LAST edit that actually saved the applicant something, and one
+    // left behind on a row they have moved on from is a claim about the wrong
+    // keystroke. Computed outside the state updater because updaters must stay
+    // pure — React is entitled to run them twice.
+    setCarry(carryNotice(id, result.applied))
+  }
 
   // "Fix this" moves the caret to the field rather than mutating anything:
   // the value is already editable in place, so an edit action would add a
   // state transition with nothing to show for it.
-  const edit = (id: RequirementKey) =>
-    document.getElementById(fieldInputId(id))?.focus()
+  const edit = (id: RequirementKey) => revealField(id)
 
   const outstanding = outstandingFields(state)
   const complete = isComplete(state)
@@ -73,6 +80,7 @@ export default function Page() {
         onEdit={edit}
         onChange={change}
         onSubmit={submit}
+        {...(carry && { carry })}
       />
 
       {/* Submitting while incomplete is allowed to be ATTEMPTED — the button

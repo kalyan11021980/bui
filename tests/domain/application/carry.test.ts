@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
-import { applyCarry, carriedFrom, CARRY_RULES } from '@/domain/application/carry'
+import {
+  applyCarry, carriedFrom, carryNotice, CARRY_RULES,
+} from '@/domain/application/carry'
 import { requiredFields } from '@/domain/requirements/engine'
 import type { ApplicantProfile, LicenseType } from '@/domain/requirements/rules'
 
@@ -258,5 +260,30 @@ describe('a carried value tracks its source until the applicant owns it', () => 
     s = applyCarry(s, AT).state
     expect(s.fields.biz_addr_line1?.value).toBe('Macon Rd')
     expect(s.fields.biz_addr_line1?.provenance?.source).toBe('ocr')
+  })
+})
+
+describe('carryNotice', () => {
+  it('names what the edit filled in elsewhere', () => {
+    const result = applyCarry(withAddress(), AT)
+    const notice = carryNotice('addr_line1', result.applied)
+
+    expect(notice?.from).toBe('addr_line1')
+    // Every destination carry actually wrote, so the row the applicant typed
+    // into can say so where their eyes already are — not 600px below the fold.
+    expect(notice?.filled).toEqual([
+      'biz_addr_line1', 'biz_addr_city', 'biz_addr_state', 'biz_addr_zip',
+    ])
+  })
+
+  it('says nothing when the edit saved the applicant nothing', () => {
+    // An acknowledgement on every keystroke regardless is noise, and noise is
+    // what people learn to stop reading.
+    expect(carryNotice('first_name', [])).toBeNull()
+  })
+
+  it('says nothing on a re-run that carried nothing new', () => {
+    const settled = applyCarry(withAddress(), AT).state
+    expect(carryNotice('addr_line1', applyCarry(settled, AT).applied)).toBeNull()
   })
 })

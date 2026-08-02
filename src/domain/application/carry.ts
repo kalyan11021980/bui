@@ -115,6 +115,39 @@ function isCarryable(dest: FieldState | undefined, from: RequirementKey): boolea
   )
 }
 
+/**
+ * What to tell the applicant, right where they are looking, about what their
+ * last edit filled in elsewhere.
+ *
+ * Carry is one of the four mechanisms §5 credits with the whole effort
+ * reduction, and its value is entirely in the applicant NOTICING they were
+ * saved work. Before this, typing a home address filled the business address
+ * in correctly — in another section, below the fold, where nobody saw it. A
+ * saving nobody sees is worth approximately nothing.
+ *
+ * Derived here rather than in the panel because `applied` is the domain's own
+ * record of what happened, and phase 3's orchestrator will need the same
+ * summary to say the same thing out loud.
+ */
+export type CarryNotice = {
+  /** The field the applicant edited. The acknowledgement is anchored to it. */
+  from: RequirementKey
+  /** What carry filled in as a result, in the order it was applied. */
+  filled: readonly RequirementKey[]
+}
+
+/** Null when the edit saved the applicant nothing — there is then nothing to say. */
+export function carryNotice(
+  from: RequirementKey,
+  applied: readonly Action[],
+): CarryNotice | null {
+  const filled = applied.flatMap((a) =>
+    a.type === 'SET_VALUE' ? [a.fieldId] : [],
+  )
+  if (filled.length === 0) return null
+  return { from, filled }
+}
+
 export function carriedFrom(
   state: ApplicationState,
   id: RequirementKey,

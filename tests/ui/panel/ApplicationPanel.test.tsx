@@ -53,7 +53,11 @@ describe('ApplicationPanel', () => {
       source: 'user', at: AT,
     })
     render(<ApplicationPanel state={s} />)
-    expect(screen.getByText(/^1 of /)).toBeInTheDocument()
+    // Anchored on "done": since F1 the panel also prints a per-section count
+    // ("1 of 4"), so a bare /^1 of / no longer names the overall summary
+    // uniquely. The assertion is stronger, not weaker — it now says WHICH
+    // count it means.
+    expect(screen.getByText(/^1 of \d+ done$/)).toBeInTheDocument()
   })
 
   it('passes a confirm through to the caller', async () => {
@@ -81,6 +85,56 @@ describe('ApplicationPanel', () => {
     render(<ApplicationPanel state={s} onSubmit={onSubmit} />)
     await userEvent.click(screen.getByRole('button', { name: /submit/i }))
     expect(onSubmit).toHaveBeenCalled()
+  })
+
+  it('chunks the rows under headings instead of one 25-field column', () => {
+    // The whole of F1: an undifferentiated column is what pushed the carried
+    // business address ~600px below the fold, so the applicant reported a
+    // working feature as broken. Headings are what make "it landed over
+    // there" a sentence the screen can finish.
+    const s = createApplication('app-1', profile)
+    render(<ApplicationPanel state={s} />)
+
+    expect(screen.getByRole('heading', { name: /^identification$/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^address$/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^contact$/i })).toBeInTheDocument()
+
+    // Each row sits under the heading its own catalog entry names.
+    const address = screen.getByRole('region', { name: /^address$/i })
+    expect(within(address).getByRole('group', { name: /^zip code$/i })).toBeInTheDocument()
+    expect(within(address).queryByRole('group', { name: /^first name$/i })).toBeNull()
+  })
+
+  it('shows how far along each section is, not just the whole application', () => {
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'addr_city', value: 'Atlanta',
+      source: 'user', at: AT,
+    })
+    render(<ApplicationPanel state={s} />)
+
+    // CORE_ADDRESS is four fields; one of them is now answered.
+    const address = screen.getByRole('region', { name: /^address$/i })
+    expect(within(address).getByText('1 of 4')).toBeInTheDocument()
+    // Identification is untouched, so the two counts must differ — a bug that
+    // rendered the OVERALL count in every heading would pass otherwise.
+    const identification = screen.getByRole('region', { name: /^identification$/i })
+    expect(within(identification).getByText('0 of 7')).toBeInTheDocument()
+  })
+
+  it('reads two licences as two numbered sections', () => {
+    const bizProfile: ApplicantProfile = {
+      applicantType: 'business', country: 'US', state: 'GA',
+      wantsGsa: false, licenses: ['dealer', 'salvage'],
+    }
+    const s = createApplication('app-2', bizProfile)
+    render(<ApplicationPanel state={s} />)
+
+    const first = screen.getByRole('region', { name: /^license 1$/i })
+    const second = screen.getByRole('region', { name: /^license 2$/i })
+    expect(within(first).getByRole('group', { name: /^license number 1$/i })).toBeInTheDocument()
+    expect(within(second).getByRole('group', { name: /^license number 2$/i })).toBeInTheDocument()
+    expect(within(first).queryByRole('group', { name: /^license number 2$/i })).toBeNull()
   })
 
   it('renders a distinct row per licence instance and confirms the right one', async () => {

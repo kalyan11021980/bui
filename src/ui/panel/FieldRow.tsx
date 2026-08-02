@@ -2,8 +2,10 @@ import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
+import { CarryAck } from './CarryAck'
 import { FieldInput, fieldInputId } from './FieldInput'
 import { formatValue } from './format'
+import { displayLabel } from './label'
 import { Rationale } from './Rationale'
 
 type Props = {
@@ -14,6 +16,12 @@ type Props = {
   onEdit?: (id: RequirementKey) => void
   /** Supplying this makes the field editable. Spec §15 / §11.1. */
   onChange?: (id: RequirementKey, value: unknown) => void
+  /**
+   * Fields the applicant's last edit to THIS row carried a value into. Shown
+   * here, at the point of typing, because the destinations are in other
+   * sections and often below the fold.
+   */
+  carriedInto?: readonly RequirementKey[]
 }
 
 /**
@@ -29,14 +37,13 @@ const SOURCE_LABEL: Record<string, string> = {
   user: 'entered by you',
 }
 
-export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props) {
+export function FieldRow({
+  fieldId, state, onConfirm, onEdit, onChange, carriedInto,
+}: Props) {
   // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
-  const { fieldId: bareId, instance } = parseReqKey(fieldId)
+  const { fieldId: bareId } = parseReqKey(fieldId)
   const def = fieldDef(bareId)
-  // A repeated group (licences) renders one row per instance. Without a
-  // number, two "License number" rows are indistinguishable both on screen
-  // and to a screen reader. Instances are 0-based internally but read 1-based.
-  const displayLabel = instance === null ? def.label : `${def.label} ${instance + 1}`
+  const label = displayLabel(fieldId)
   const status = state?.status ?? 'empty'
   const isDerived = status === 'derived'
   const rationaleId = `rationale-${fieldId}`
@@ -44,7 +51,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props)
   return (
     <div
       role="group"
-      aria-label={displayLabel}
+      aria-label={label}
       aria-describedby={rationaleId}
       style={{
         padding: '12px 14px',
@@ -70,7 +77,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props)
             textTransform: 'uppercase', color: COLOR.textPrimary,
           }}
         >
-          {displayLabel}
+          {label}
         </label>
         {(status === 'confirmed' || status === 'verified') && (
           <span aria-label="confirmed" style={{ color: COLOR.success }}>✓</span>
@@ -90,6 +97,10 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props)
       {onChange && (
         <FieldInput fieldId={fieldId} def={def} state={state} onChange={onChange} />
       )}
+
+      {/* Directly under the control, above the rationale: the acknowledgement
+          has to be inside the same eyeline as the caret that caused it. */}
+      {carriedInto && carriedInto.length > 0 && <CarryAck filled={carriedInto} />}
 
       <Rationale field={def} id={rationaleId} />
 

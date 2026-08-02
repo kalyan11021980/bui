@@ -6,6 +6,8 @@ import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import {
   applicationReducer, createApplication, isComplete, outstandingFields,
 } from '@/domain/application/reducer'
+import { applyCarry, carryNotice, type CarryNotice } from '@/domain/application/carry'
+import { fieldInputId } from '@/ui/panel/FieldInput'
 import type { ApplicationState } from '@/domain/application/state'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
@@ -13,6 +15,11 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [],
+}
+
+const business: ApplicantProfile = {
+  applicantType: 'business', country: 'US', state: 'GA',
+  wantsGsa: false, licenses: ['dealer'],
 }
 
 /** Scoped to the form element — the row wrapper carries an aria-label too. */
@@ -33,18 +40,29 @@ function Harness({
   onState?: (s: ApplicationState) => void
 }) {
   const [state, setState] = useState(() => createApplication('app-1', profile))
+  const [carry, setCarry] = useState<CarryNotice | null>(null)
 
-  const change = (id: RequirementKey, value: unknown) =>
-    setState((s) => {
-      const next = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value, source: 'user',
-        at: '2026-08-01T12:00:00.000Z',
-      })
-      onState?.(next)
-      return next
-    })
+  const change = (id: RequirementKey, value: unknown) => {
+    const at = '2026-08-01T12:00:00.000Z'
+    const result = applyCarry(
+      applicationReducer(state, {
+        type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
+      }),
+      at,
+    )
+    setState(result.state)
+    setCarry(carryNotice(id, result.applied))
+    onState?.(result.state)
+  }
 
-  return <ApplicationPanel state={state} onChange={change} onSubmit={() => undefined} />
+  return (
+    <ApplicationPanel
+      state={state}
+      onChange={change}
+      onSubmit={() => undefined}
+      {...(carry && { carry })}
+    />
+  )
 }
 
 describe('completing an application through the panel', () => {
@@ -107,9 +125,47 @@ describe('completing an application through the panel', () => {
 
   it('counts a typed field towards progress', async () => {
     render(<Harness />)
-    expect(screen.getByText(/^0 of /)).toBeInTheDocument()
+    // Anchored on "done": the panel also prints per-section counts since F1,
+    // so a bare /^0 of / no longer names the overall summary uniquely.
+    expect(screen.getByText(/^0 of \d+ done$/)).toBeInTheDocument()
     await userEvent.type(control(/first name/i), 'Ada')
-    expect(screen.getByText(/^1 of /)).toBeInTheDocument()
+    expect(screen.getByText(/^1 of \d+ done$/)).toBeInTheDocument()
+  })
+
+  it('says what it just filled in for you, next to the field you typed into', async () => {
+    // The bug this closes: carry WORKED and nobody could tell. The business
+    // address is in a different section, below the fold, so the only place
+    // the saving can be reported is where the applicant's eyes already are.
+    render(<Harness profile={business} />)
+
+    await userEvent.type(control(/^address$/i), '2345 Anywhere St')
+
+    const ack = screen.getByText(/also filled in/i)
+    expect(ack).toHaveTextContent(/business address/i)
+    // Anchored to the SOURCE row, not floated as a toast that has vanished by
+    // the time they look up.
+    expect(
+      screen.getByRole('group', { name: /^address$/i }).contains(ack),
+    ).toBe(true)
+  })
+
+  it('takes you to what it filled in when you ask', async () => {
+    render(<Harness profile={business} />)
+    await userEvent.type(control(/^address$/i), '2345 Anywhere St')
+
+    await userEvent.click(screen.getByRole('button', { name: /go to business address/i }))
+
+    expect(document.activeElement).toBe(
+      document.getElementById(fieldInputId('biz_addr_line1')),
+    )
+  })
+
+  it('says nothing when an edit saved you nothing', async () => {
+    // An acknowledgement that appears on every keystroke regardless is noise,
+    // and noise is what people learn to stop reading.
+    render(<Harness profile={business} />)
+    await userEvent.type(control(/first name/i), 'Ada')
+    expect(screen.queryByText(/also filled in/i)).toBeNull()
   })
 
   it('keeps a rejected value out of state and out of the count', async () => {
@@ -119,7 +175,7 @@ describe('completing an application through the panel', () => {
     await userEvent.type(control(/zip code/i), 'not-a-zip')
 
     expect(latest?.fields.addr_zip).toBeUndefined()
-    expect(screen.getByText(/^0 of /)).toBeInTheDocument()
+    expect(screen.getByText(/^0 of \d+ done$/)).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent(/ZIP/i)
   })
 })
