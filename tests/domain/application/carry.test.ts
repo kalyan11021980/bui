@@ -183,3 +183,80 @@ describe('CARRY_RULES agree with the requirements engine', () => {
     expect(applied.some((a) => 'fieldId' in a && a.fieldId === 'biz_phone')).toBe(true)
   })
 })
+
+describe('a carried value tracks its source until the applicant owns it', () => {
+  function setAddress(s: ReturnType<typeof createApplication>, value: string) {
+    return applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'addr_line1', value, source: 'user', at: AT,
+    })
+  }
+
+  it('refreshes an unconfirmed carried value when the source changes', () => {
+    // Found by driving the real UI: typing an address a character at a time
+    // carried the first keystroke and never refreshed, leaving the applicant
+    // with a business address reading "2".
+    let s = setAddress(createApplication('app-1', business), '2')
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('2')
+
+    s = setAddress(s, '2345 Anywhere St')
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+  })
+
+  it('leaves a stale carried value nowhere for a correction to hide', () => {
+    // The quieter version of the same bug over the API: correcting a home
+    // address left the old one mirrored into the business address, and a
+    // plausible stale value is exactly what gets rubber-stamped (§10.4).
+    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    s = applyCarry(s, AT).state
+    s = setAddress(s, '99 Other Rd')
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('99 Other Rd')
+  })
+
+  it('stops refreshing once the applicant has confirmed the carried value', () => {
+    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    s = applyCarry(s, AT).state
+    s = applicationReducer(s, {
+      type: 'CONFIRM', fieldId: 'biz_addr_line1', at: AT, shownCopyHash: 'c1',
+    })
+
+    s = setAddress(s, '99 Other Rd')
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+    expect(s.fields.biz_addr_line1?.status).toBe('confirmed')
+  })
+
+  it('stops refreshing once the applicant has typed their own value', () => {
+    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    s = applyCarry(s, AT).state
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: '1 Dealership Way',
+      source: 'user', at: AT,
+    })
+
+    s = setAddress(s, '99 Other Rd')
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('1 Dealership Way')
+  })
+
+  it('does nothing when the source has not changed', () => {
+    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    s = applyCarry(s, AT).state
+    const second = applyCarry(s, AT)
+    expect(second.applied).toEqual([])
+    expect(second.state).toBe(s)
+  })
+
+  it('still refuses to overwrite a value OCR supplied', () => {
+    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: 'Macon Rd',
+      source: 'ocr', at: AT, confidence: 0.94,
+    })
+    s = applyCarry(s, AT).state
+    expect(s.fields.biz_addr_line1?.value).toBe('Macon Rd')
+    expect(s.fields.biz_addr_line1?.provenance?.source).toBe('ocr')
+  })
+})

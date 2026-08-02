@@ -1,7 +1,7 @@
 import { requiredFields } from '../requirements/engine'
 import type { RequirementKey } from '../requirements/key'
 import { applicationReducer } from './reducer'
-import type { Action, ApplicationState } from './state'
+import type { Action, ApplicationState, FieldState } from './state'
 
 /**
  * Values the applicant should never have to type twice. Spec §9.
@@ -69,7 +69,8 @@ export function applyCarry(state: ApplicationState, at: string): CarryResult {
     if (!source || source.value === null || source.value === undefined) continue
 
     const dest = next.fields[rule.to]
-    if (dest && dest.value !== null && dest.value !== undefined) continue
+    if (!isCarryable(dest, rule.from)) continue
+    if (dest && dest.value === source.value) continue
 
     const action: Action = {
       type: 'SET_VALUE',
@@ -84,6 +85,34 @@ export function applyCarry(state: ApplicationState, at: string): CarryResult {
   }
 
   return { state: next, applied }
+}
+
+/**
+ * May carry write here?
+ *
+ * Yes when the destination is empty, and yes when it still holds nothing but
+ * an unconfirmed mirror of this same source. No in every other case.
+ *
+ * The second clause is the one that matters. "Empty destinations only" looks
+ * right until the source changes: typing an address one character at a time
+ * carries the first keystroke and then never refreshes, so the applicant ends
+ * up with a business address reading "2". Over the API it is worse but
+ * quieter — correcting a home address leaves a STALE carried business address
+ * behind, and a plausible stale value is exactly what gets rubber-stamped
+ * (§10.4).
+ *
+ * The moment the value stops being a mirror it becomes the applicant's:
+ * confirmed, verified, rejected, edited by hand, or filled by OCR, and carry
+ * must never touch it again. A carried value that came from a DIFFERENT
+ * source field is equally off limits.
+ */
+function isCarryable(dest: FieldState | undefined, from: RequirementKey): boolean {
+  if (!dest || dest.value === null || dest.value === undefined) return true
+  return (
+    dest.status === 'derived' &&
+    dest.provenance?.source === 'carried' &&
+    dest.provenance.fromFieldId === from
+  )
 }
 
 export function carriedFrom(
