@@ -221,6 +221,8 @@ describe('defineField', () => {
 
   it('rejects a sensitive field that is also orchestrator-visible', () => {
     expect(() =>
+      // @ts-expect-error sensitive fields can never be orchestrator-visible.
+      // The error anchors to this call, not to the offending property.
       defineField({
         id: 'tax_id',
         label: 'Taxpayer ID',
@@ -229,10 +231,27 @@ describe('defineField', () => {
         authority: 'IRS',
         validation: z.string(),
         sensitive: true,
-        // @ts-expect-error compile-time exclusivity is the primary guard
         orchestratorVisible: true,
       }),
     ).toThrow(/orchestratorVisible/)
+  })
+
+  it('blocks the conflict even when the object is built indirectly', () => {
+    // A direct object literal is caught by excess-property checking. This
+    // case — a variable, a spread, a deserialised config — is only caught
+    // because `orchestratorVisible?: never` closes the sensitive branch.
+    const built = {
+      id: 'tax_id' as const,
+      label: 'Taxpayer ID',
+      type: 'taxid' as const,
+      purpose: 'So we can pay you when your vehicle sells',
+      authority: 'IRS' as const,
+      validation: z.string(),
+      sensitive: true as const,
+      orchestratorVisible: true as const,
+    }
+    // @ts-expect-error the conflict must not survive indirection
+    expect(() => defineField(built)).toThrow(/orchestratorVisible/)
   })
 
   it('has a display label for every authority', () => {
