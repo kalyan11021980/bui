@@ -2497,6 +2497,20 @@ describe('FieldRow', () => {
     expect(screen.getByText(/from your document/i)).toBeInTheDocument()
   })
 
+  it('asks the user to check a carried value rather than stating it as fact', () => {
+    render(
+      <FieldRow
+        fieldId="biz_addr_line1"
+        state={{
+          value: '2345 Anywhere St',
+          status: 'derived',
+          provenance: { source: 'carried', fromFieldId: 'addr_line1' },
+        }}
+      />,
+    )
+    expect(screen.getByText(/check it belongs here/i)).toBeInTheDocument()
+  })
+
   it('does not offer confirm once the value is confirmed', () => {
     render(
       <FieldRow fieldId="dob" state={{ ...derived, status: 'confirmed' }} />,
@@ -2593,9 +2607,15 @@ type Props = {
   onEdit?: (id: RequirementKey) => void
 }
 
+/**
+ * A carried value is a guess, not a fact: a sole trader's business address is
+ * usually their home address, but a dealer licence may be registered elsewhere.
+ * The copy must invite a check rather than read like settled data, because a
+ * plausible pre-filled value is exactly what gets rubber-stamped. Spec §10.4.
+ */
 const SOURCE_LABEL: Record<string, string> = {
   ocr: 'from your document',
-  carried: 'same as the address you already gave',
+  carried: 'copied from what you already told us — check it belongs here',
   lookup: 'looked up for you',
   user: 'entered by you',
 }
