@@ -1,7 +1,7 @@
 'use client'
 
 import type { RequirementKey } from '@/domain/requirements/key'
-import { fieldInputId } from './FieldInput'
+import { fieldInputId } from './FieldControl'
 
 /**
  * Brings one field into view and puts the caret in it. `scrollIntoView` is

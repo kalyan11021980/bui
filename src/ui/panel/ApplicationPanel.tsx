@@ -1,4 +1,4 @@
-import { outstandingFields } from '@/domain/application/reducer'
+import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { CarryNotice } from '@/domain/application/carry'
 import type { RequirementKey } from '@/domain/requirements/key'

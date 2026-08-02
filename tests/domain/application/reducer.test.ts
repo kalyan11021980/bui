@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import {
-  applicationReducer, ApplicationSubmittedError, createApplication,
-  isComplete, outstandingFields,
-} from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { ApplicationSubmittedError } from '@/domain/application/guards'
+import { isComplete, outstandingFields } from '@/domain/application/queries'
 import type { Action } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 

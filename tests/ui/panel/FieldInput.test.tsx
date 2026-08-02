@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldRow } from '@/ui/panel/FieldRow'
-import { fieldInputId } from '@/ui/panel/FieldInput'
+import { fieldInputId } from '@/ui/panel/FieldControl'
 import { COLOR } from '@/ui/theme/tokens'
 import type { FieldState } from '@/domain/application/state'
 

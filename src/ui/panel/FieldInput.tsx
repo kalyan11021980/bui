@@ -1,11 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ZodEnum } from 'zod'
 import type { FieldState } from '@/domain/application/state'
 import type { FieldDef } from '@/domain/field-def'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { COLOR } from '@/ui/theme/tokens'
+import { FieldControl, fieldErrorId } from './FieldControl'
 
 type Props = {
   /** The full RequirementKey — `license_number#0`, not `license_number`. */
@@ -18,34 +18,6 @@ type Props = {
    * unrecord it is how the record ends up disagreeing with the screen.
    */
   onClear: (id: RequirementKey) => void
-}
-
-/**
- * Derived from the full RequirementKey, so two licences get two separately
- * labelled "License number" inputs. `#` is replaced because it is legal in an
- * HTML id but must be escaped in every CSS selector that touches it.
- */
-export function fieldInputId(fieldId: RequirementKey): string {
-  return `field-${fieldId.replace('#', '--')}`
-}
-
-function errorId(fieldId: RequirementKey): string {
-  return `${fieldInputId(fieldId)}-error`
-}
-
-function inputTypeFor(type: FieldDef['type']): string {
-  switch (type) {
-    case 'date': return 'date'
-    case 'phone': return 'tel'
-    case 'file': return 'file'
-    // `taxid` is deliberately NOT type="password": hiding what you typed from
-    // yourself is how a mistyped SSN gets submitted.
-    case 'text': case 'taxid': case 'address': case 'select': default: return 'text'
-  }
-}
-
-function optionsFor(def: FieldDef): readonly string[] | null {
-  return def.validation instanceof ZodEnum ? def.validation.options : null
 }
 
 function toInputValue(value: unknown): string {
@@ -78,9 +50,7 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
     clearedFrom.current = null
   }
 
-  const options = optionsFor(def)
   const isFile = def.type === 'file'
-
   const result = def.validation.safeParse(isFile ? state?.value ?? [] : draft)
   // An untouched field is outstanding, not wrong.
   const error = draft !== '' && !result.success
@@ -107,53 +77,25 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
     }
   }
 
-  const shared = {
-    id: fieldInputId(fieldId),
-    name: fieldId,
-    'aria-invalid': error !== null,
-    ...(error !== null && { 'aria-describedby': errorId(fieldId) }),
-    style: {
-      width: '100%', boxSizing: 'border-box' as const, padding: '8px 10px',
-      fontSize: 15, color: COLOR.textPrimary, background: COLOR.surface,
-      // Warning orange, never the brand red: red means "IAA", not "wrong".
-      border: `1px solid ${error !== null ? COLOR.error : COLOR.border}`,
-    },
-  }
-
   return (
     <div style={{ margin: '6px 0' }}>
-      {isFile ? (
-        <input
-          {...shared}
-          type="file"
-          multiple
-          onChange={(e) => {
-            // TODO(phase-2): real upload and a document id. Only file NAMES
-            // are stored for now; the array-of-strings shape is chosen so the
-            // swap does not change the state model.
-            const names = [...(e.target.files ?? [])].map((f) => f.name)
-            if (names.length > 0) onChange(fieldId, names)
-          }}
-        />
-      ) : options ? (
-        <select {...shared} value={draft} onChange={(e) => report(e.target.value)}>
-          <option value="">Choose one</option>
-          {options.map((o) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-      ) : (
-        <input
-          {...shared}
-          type={inputTypeFor(def.type)}
-          value={draft}
-          onChange={(e) => report(e.target.value)}
-        />
-      )}
+      <FieldControl
+        fieldId={fieldId}
+        def={def}
+        draft={draft}
+        error={error}
+        onText={report}
+        onFiles={(names) => {
+          // TODO(phase-2): real upload and a document id. Only file NAMES are
+          // stored for now; the array-of-strings shape is chosen so the swap
+          // does not change the state model.
+          if (names.length > 0) onChange(fieldId, names)
+        }}
+      />
 
       {error && (
         <p
-          id={errorId(fieldId)}
+          id={fieldErrorId(fieldId)}
           role="alert"
           style={{
             fontSize: 13, margin: '4px 0 0', padding: '4px 8px',

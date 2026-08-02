@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FieldRow } from '@/ui/panel/FieldRow'
-import { fieldInputId } from '@/ui/panel/FieldInput'
+import { fieldInputId } from '@/ui/panel/FieldControl'
 import { revealField } from '@/ui/panel/reveal'
 
 /**

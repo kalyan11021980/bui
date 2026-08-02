@@ -3,10 +3,13 @@ import { fieldDef } from '@/domain/catalog'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { CarryAck } from './CarryAck'
-import { FieldInput, fieldInputId } from './FieldInput'
+import { fieldInputId } from './FieldControl'
+import { FieldInput } from './FieldInput'
 import { formatValue } from './format'
 import { displayLabel } from './label'
+import { Provenance } from './Provenance'
 import { Rationale } from './Rationale'
+import { RejectionBanner } from './RejectionBanner'
 
 /**
  * A pair, at compile time: a row that can record a value and cannot unrecord
@@ -31,18 +34,6 @@ type Props = EditHandlers & {
    */
   carriedInto?: readonly RequirementKey[]
   carriedOut?: readonly RequirementKey[]
-}
-
-/**
- * A carried value is a guess, not a fact — a dealer licence may be registered
- * somewhere other than home — so the copy invites a check rather than reading
- * like settled data.
- */
-const SOURCE_LABEL: Record<string, string> = {
-  ocr: 'from your document',
-  carried: 'copied from what you already told us — check it belongs here',
-  lookup: 'looked up for you',
-  user: 'entered by you',
 }
 
 export function FieldRow(props: Props) {
@@ -118,22 +109,9 @@ export function FieldRow(props: Props) {
 
       <Rationale field={def} id={rationaleId} />
 
-      {state?.provenance && (
-        <p style={{ fontSize: 12, color: COLOR.textMuted, margin: '4px 0 0' }}>
-          {SOURCE_LABEL[state.provenance.source] ?? state.provenance.source}
-        </p>
-      )}
+      {state?.provenance && <Provenance provenance={state.provenance} />}
 
-      {state?.rejection && (
-        <p
-          style={{
-            fontSize: 13, margin: '6px 0 0', padding: '6px 8px',
-            background: COLOR.errorSurface, color: COLOR.textPrimary,
-          }}
-        >
-          {state.rejection.reason}
-        </p>
-      )}
+      {state?.rejection && <RejectionBanner reason={state.rejection.reason} />}
 
       {isDerived && onConfirm && (
         <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>

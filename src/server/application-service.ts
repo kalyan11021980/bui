@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { applyCarry } from '@/domain/application/carry'
 import {
-  applicationReducer, ApplicationSubmittedError, createApplication as newApplication,
-  submittedRefusal,
+  ApplicationSubmittedError, submittedRefusal,
+} from '@/domain/application/guards'
+import {
+  applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
 import { getAuditLog } from '@/server/audit'
 import { getApplication as loadApplication, putApplication } from '@/server/store'

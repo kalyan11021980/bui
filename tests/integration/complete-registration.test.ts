@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import {
-  applicationReducer, createApplication, isComplete, outstandingFields,
-} from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { isComplete, outstandingFields } from '@/domain/application/queries'
 import { applyCarry } from '@/domain/application/carry'
 import { AuditLog } from '@/domain/audit/log'
 import { createDigester } from '@/domain/audit/digest'

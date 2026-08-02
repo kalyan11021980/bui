@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
-import {
-  applicationReducer, createApplication, isComplete, outstandingFields,
-} from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { isComplete, outstandingFields } from '@/domain/application/queries'
 import { applyCarry, carryNotice, type CarryNotice } from '@/domain/application/carry'
 import { revealField } from '@/ui/panel/reveal'
 import { COLOR } from '@/ui/theme/tokens'
