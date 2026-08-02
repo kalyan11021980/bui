@@ -961,6 +961,12 @@ git commit -m "feat: complete field catalog with business, license, tax and GSA"
 
 The compliance surface. This gets the heaviest test coverage in the codebase.
 
+> **Superseded by Task 4b.** Task 4 shipped as written (commit `3f4bd13`) and its
+> review found two defects baked into this text: the engine accepted `state` and
+> never read it, and `licenseCount: number` could not express more than one
+> licence. Task 4b fixes both. Read Task 4b, not this section, for the current
+> shape of `ApplicantProfile` and `requiredFields`.
+
 **Files:**
 - Create: `src/domain/requirements/version.ts`, `src/domain/requirements/rules.ts`, `src/domain/requirements/engine.ts`
 - Test: `tests/domain/requirements/engine.test.ts`
@@ -1156,6 +1162,441 @@ git commit -m "feat: add deterministic requirements engine"
 
 ---
 
+### Task 4b: State-specific rules, honest licence modelling, shared schemas
+
+Task 4's review found the engine accepted `state` and never read it, while the
+spec (§15) and the catalog copy both promise per-state requirements. It also
+found `licenseCount: number` could not express more than one licence, despite
+the source UI having an "Add Additional License" control. Both are fixed here,
+along with the minor findings from Tasks 2–4.
+
+**Files:**
+- Modify: `src/domain/field-id.ts` (add one id)
+- Create: `src/domain/catalog/schemas.ts`, `src/domain/catalog/state-forms.ts`
+- Modify: `src/domain/catalog/identity.ts`, `src/domain/catalog/license.ts`, `src/domain/catalog/address.ts`, `src/domain/catalog/contact.ts`, `src/domain/catalog/business.ts`, `src/domain/catalog/index.ts`
+- Create: `src/domain/requirements/key.ts`
+- Modify: `src/domain/requirements/rules.ts`, `src/domain/requirements/engine.ts`, `src/domain/requirements/version.ts`
+- Test: `tests/domain/requirements/key.test.ts`, `tests/domain/requirements/engine.test.ts` (replace)
+
+**Interfaces:**
+- Consumes: everything from Tasks 1–4
+- Produces: `RequirementKey`, `reqKey(id, instance?)`, `parseReqKey(key)`, `LicenseType`, `STATE_RULES`, revised `ApplicantProfile` (with `licenses: readonly LicenseType[]` replacing `licenseCount`), `requiredFields(profile): RequirementKey[]`
+
+- [ ] **Step 1: Write the failing key test**
+
+`tests/domain/requirements/key.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { reqKey, parseReqKey } from '@/domain/requirements/key'
+
+describe('requirement keys', () => {
+  it('leaves a non-repeated field id unqualified', () => {
+    expect(reqKey('first_name')).toBe('first_name')
+    expect(parseReqKey('first_name')).toEqual({
+      fieldId: 'first_name', instance: null,
+    })
+  })
+
+  it('qualifies a repeated field with its instance', () => {
+    expect(reqKey('license_number', 0)).toBe('license_number#0')
+    expect(reqKey('license_number', 1)).toBe('license_number#1')
+  })
+
+  it('round-trips an instance key', () => {
+    expect(parseReqKey(reqKey('license_number', 2))).toEqual({
+      fieldId: 'license_number', instance: 2,
+    })
+  })
+
+  it('rejects a negative or non-integer instance', () => {
+    expect(() => reqKey('license_number', -1)).toThrow(/instance/i)
+    expect(() => reqKey('license_number', 1.5)).toThrow(/instance/i)
+  })
+
+  it('rejects a malformed key', () => {
+    expect(() => parseReqKey('license_number#')).toThrow(/malformed/i)
+    expect(() => parseReqKey('license_number#x')).toThrow(/malformed/i)
+  })
+})
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `npx vitest run tests/domain/requirements/key.test.ts`
+Expected: FAIL — cannot resolve `@/domain/requirements/key`.
+
+- [ ] **Step 3: Write the key helpers**
+
+`src/domain/requirements/key.ts`:
+
+```ts
+import type { FieldId } from '../field-id'
+
+/**
+ * Identifies one required answer. For most fields this is just the FieldId.
+ * Fields inside a repeatable group (licences) are qualified by instance:
+ * `license_number#0`, `license_number#1`.
+ */
+export type RequirementKey = string
+
+export function reqKey(id: FieldId, instance?: number): RequirementKey {
+  if (instance === undefined) return id
+  if (!Number.isInteger(instance) || instance < 0) {
+    throw new Error(`Invalid instance ${instance}: must be a non-negative integer`)
+  }
+  return `${id}#${instance}`
+}
+
+export function parseReqKey(
+  key: RequirementKey,
+): { fieldId: FieldId; instance: number | null } {
+  const hash = key.indexOf('#')
+  if (hash === -1) return { fieldId: key as FieldId, instance: null }
+
+  const idPart = key.slice(0, hash)
+  const instancePart = key.slice(hash + 1)
+  if (idPart === '' || !/^\d+$/.test(instancePart)) {
+    throw new Error(`Malformed requirement key: ${key}`)
+  }
+  return { fieldId: idPart as FieldId, instance: Number(instancePart) }
+}
+```
+
+- [ ] **Step 4: Run it and confirm it passes**
+
+Run: `npx vitest run tests/domain/requirements/key.test.ts`
+Expected: PASS (5 tests)
+
+- [ ] **Step 5: Extract the shared schemas**
+
+Create `src/domain/catalog/schemas.ts`:
+
+```ts
+import { z } from 'zod'
+
+/** Format only. Calendar validity is checked where dates are compared. */
+export const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+
+export const zipSchema = z
+  .string()
+  .regex(/^\d{5}(-\d{4})?$/, 'Enter a 5-digit ZIP code')
+
+export const phoneSchema = z
+  .string()
+  .regex(/^\+?1?\d{10}$/, 'Enter a 10-digit phone number')
+```
+
+Then in `identity.ts` and `license.ts`, delete the local `const isoDate = ...`
+and import it: `import { isoDate } from './schemas'`.
+In `address.ts`, delete the local `zipSchema` definition and re-export it:
+`export { zipSchema } from './schemas'`.
+In `contact.ts`, do the same for `phoneSchema`:
+`export { phoneSchema } from './schemas'`.
+`business.ts` keeps importing `zipSchema` from `./address` and `phoneSchema`
+from `./contact` — those re-exports keep it working unchanged.
+
+- [ ] **Step 6: Add the Ohio out-of-state buyer form**
+
+In `src/domain/field-id.ts`, add `| 'oh_foreign_buyer_form'` to the `FieldId`
+union (put it in a new `// state-specific forms` group at the end).
+
+Create `src/domain/catalog/state-forms.ts`:
+
+```ts
+import { z } from 'zod'
+import { defineField, type FieldDef } from '../field-def'
+
+/**
+ * Forms required by one state and not others. Adding an entry here is not
+ * enough — it must also be referenced from STATE_RULES in requirements/rules.ts.
+ */
+export const STATE_FORM_FIELDS: readonly FieldDef[] = [
+  defineField({
+    id: 'oh_foreign_buyer_form',
+    label: 'Ohio out-of-state buyer form',
+    type: 'file',
+    purpose: 'Ohio requires this before an out-of-state dealer can bid there',
+    authority: 'STATE_DEALER_BOARD',
+    consequence: 'Without it your bids on Ohio lots will be rejected.',
+    validation: z.array(z.string().min(1)).min(1, 'Upload the completed form'),
+  }),
+]
+```
+
+In `src/domain/catalog/index.ts`, import `STATE_FORM_FIELDS`, add it to the
+`ALL_FIELDS` spread, and add it to the re-export list.
+
+- [ ] **Step 7: Write the failing engine test**
+
+Replace `tests/domain/requirements/engine.test.ts` entirely:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { requiredFields } from '@/domain/requirements/engine'
+import { CATALOG } from '@/domain/catalog'
+import { parseReqKey } from '@/domain/requirements/key'
+import type { ApplicantProfile } from '@/domain/requirements/rules'
+
+const base: ApplicantProfile = {
+  applicantType: 'individual',
+  country: 'US',
+  state: 'GA',
+  wantsGsa: false,
+  licenses: [],
+}
+
+describe('requiredFields', () => {
+  it('asks an individual for identity, address and mobile', () => {
+    const k = requiredFields(base)
+    expect(k).toContain('first_name')
+    expect(k).toContain('dob')
+    expect(k).toContain('addr_line1')
+    expect(k).toContain('phone_mobile')
+  })
+
+  it('never asks an individual for business or licence fields', () => {
+    const k = requiredFields(base)
+    expect(k).not.toContain('biz_legal_name')
+    expect(k).not.toContain('license_number#0')
+  })
+
+  it('asks a business for business fields and a taxpayer ID', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).toContain('biz_name')
+    expect(k).toContain('biz_legal_name')
+    expect(k).toContain('tax_id')
+  })
+
+  it('asks for no licence fields when a business holds none', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k.some((x) => x.startsWith('license_'))).toBe(false)
+  })
+
+  it('asks for one licence group per licence held', () => {
+    const k = requiredFields({
+      ...base, applicantType: 'business', licenses: ['dealer', 'salvage'],
+    })
+    expect(k).toContain('license_number#0')
+    expect(k).toContain('license_number#1')
+    expect(k).not.toContain('license_number#2')
+    expect(k).toContain('license_expiry#0')
+    expect(k).toContain('license_expiry#1')
+  })
+
+  it('adds GSA fields only when the applicant wants GSA', () => {
+    expect(requiredFields(base)).not.toContain('gsa_bidder_number')
+    expect(requiredFields({ ...base, wantsGsa: true }))
+      .toContain('gsa_bidder_number')
+  })
+
+  it('adds the Ohio form for an Ohio applicant and not a Georgia one', () => {
+    expect(requiredFields({ ...base, state: 'OH' }))
+      .toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'GA' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('handles an unknown or absent state without inventing requirements', () => {
+    expect(requiredFields({ ...base, state: null }))
+      .not.toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, state: 'ZZ' }))
+      .not.toContain('oh_foreign_buyer_form')
+  })
+
+  it('is case-insensitive about the state code', () => {
+    expect(requiredFields({ ...base, state: 'oh' }))
+      .toContain('oh_foreign_buyer_form')
+  })
+
+  it('omits optional fields — line 2 is never required', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).not.toContain('addr_line2')
+    expect(k).not.toContain('biz_addr_line2')
+  })
+
+  it('returns no duplicates', () => {
+    const k = requiredFields({
+      ...base, applicantType: 'business', wantsGsa: true,
+      licenses: ['dealer', 'salvage'], state: 'OH',
+    })
+    expect(new Set(k).size).toBe(k.length)
+  })
+
+  it('returns the exact expected set for an individual in Georgia', () => {
+    expect([...requiredFields(base)].sort()).toEqual([
+      'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'dl_expiry', 'dl_number', 'dob', 'first_name',
+      'id_form', 'id_images', 'last_name', 'phone_mobile',
+    ])
+  })
+
+  it('resolves every key it returns to a real catalog field', () => {
+    const profiles: ApplicantProfile[] = [
+      base,
+      { ...base, applicantType: 'business', licenses: ['dealer'] },
+      { ...base, wantsGsa: true },
+      { ...base, state: null },
+      { ...base, state: 'OH', applicantType: 'business', licenses: ['dealer', 'salvage'] },
+    ]
+    for (const p of profiles) {
+      for (const key of requiredFields(p)) {
+        const { fieldId } = parseReqKey(key)
+        expect(CATALOG.has(fieldId), `catalog is missing ${fieldId}`).toBe(true)
+      }
+    }
+  })
+})
+```
+
+- [ ] **Step 8: Run it and confirm it fails**
+
+Run: `npx vitest run tests/domain/requirements/engine.test.ts`
+Expected: FAIL — `licenses` is not a known property of `ApplicantProfile`.
+
+- [ ] **Step 9: Rewrite the rules**
+
+Replace `src/domain/requirements/rules.ts`:
+
+```ts
+import type { FieldId } from '../field-id'
+
+export type LicenseType = 'dealer' | 'dismantler' | 'exporter' | 'salvage'
+
+export type ApplicantProfile = {
+  applicantType: 'business' | 'individual'
+  country: string
+  /** Two-letter code, or null before the applicant has told us. */
+  state: string | null
+  wantsGsa: boolean
+  /** One entry per licence held. Empty means none. */
+  licenses: readonly LicenseType[]
+}
+
+export const CORE_IDENTITY: readonly FieldId[] = [
+  'first_name', 'last_name', 'id_form', 'dl_number', 'dl_expiry',
+  'dob', 'id_images',
+]
+
+export const CORE_ADDRESS: readonly FieldId[] = [
+  'addr_line1', 'addr_city', 'addr_state', 'addr_zip',
+]
+
+export const CORE_CONTACT: readonly FieldId[] = ['phone_mobile']
+
+export const BUSINESS_CORE: readonly FieldId[] = [
+  'biz_name', 'biz_legal_name',
+  'biz_addr_line1', 'biz_addr_city', 'biz_addr_state', 'biz_addr_zip',
+  'biz_phone',
+]
+
+/** Repeated once per licence held. Emitted as instance-qualified keys. */
+export const LICENSE_GROUP: readonly FieldId[] = [
+  'license_type', 'license_number', 'license_effective',
+  'license_expiry', 'license_image',
+]
+
+export const GSA_CORE: readonly FieldId[] = ['gsa_bidder_number', 'gsa_email']
+
+export type StateRule = {
+  /** Fields this state requires on top of the national baseline. */
+  additional: readonly FieldId[]
+  /** Why, in terms a compliance reviewer can check. */
+  note: string
+  /**
+   * False until a compliance owner has confirmed this rule against the
+   * state's current requirements. See spec §10.3 — encoding state licensing
+   * rules is not a developer judgement call.
+   */
+  signedOff: boolean
+}
+
+/**
+ * Per-state requirements. A state absent from this table gets the national
+ * baseline only. Keys are upper-case two-letter codes.
+ */
+export const STATE_RULES: Readonly<Record<string, StateRule>> = {
+  GA: {
+    additional: [],
+    note: 'Georgia requires no additional forms beyond the national baseline.',
+    signedOff: false,
+  },
+  OH: {
+    additional: ['oh_foreign_buyer_form'],
+    note: 'Ohio requires the Foreign and Qualifying Out of State Buyer Form '
+      + 'before an out-of-state dealer may bid.',
+    signedOff: false,
+  },
+}
+```
+
+- [ ] **Step 10: Rewrite the engine**
+
+Replace `src/domain/requirements/engine.ts`:
+
+```ts
+import {
+  BUSINESS_CORE, CORE_ADDRESS, CORE_CONTACT, CORE_IDENTITY,
+  GSA_CORE, LICENSE_GROUP, STATE_RULES, type ApplicantProfile,
+} from './rules'
+import { reqKey, type RequirementKey } from './key'
+
+/**
+ * The single authority on what an applicant owes. Pure: same profile in,
+ * same key list out. No LLM, no I/O. See spec §8.
+ */
+export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
+  const out: RequirementKey[] = [
+    ...CORE_IDENTITY, ...CORE_ADDRESS, ...CORE_CONTACT,
+  ].map((id) => reqKey(id))
+
+  if (profile.applicantType === 'business') {
+    for (const id of BUSINESS_CORE) out.push(reqKey(id))
+    out.push(reqKey('tax_id'))
+
+    profile.licenses.forEach((_licence, index) => {
+      for (const id of LICENSE_GROUP) out.push(reqKey(id, index))
+    })
+  }
+
+  if (profile.wantsGsa) for (const id of GSA_CORE) out.push(reqKey(id))
+
+  const rule = profile.state
+    ? STATE_RULES[profile.state.toUpperCase()]
+    : undefined
+  if (rule) for (const id of rule.additional) out.push(reqKey(id))
+
+  return [...new Set(out)]
+}
+```
+
+- [ ] **Step 11: Bump the rules version**
+
+In `src/domain/requirements/version.ts`, change `RULES_VERSION` to `2` — the
+requirement set an applicant owes has changed, which is exactly what this
+constant tracks.
+
+- [ ] **Step 12: Run the whole suite**
+
+Run: `npx vitest run`
+Expected: PASS. The engine test now has 13 tests, the key test 5.
+
+- [ ] **Step 13: Typecheck**
+
+Run: `npm run typecheck`
+Expected: no errors.
+
+- [ ] **Step 14: Commit**
+
+```bash
+git add src/domain tests/domain
+git commit -m "feat: per-state requirements, multi-licence support, shared schemas"
+```
+
+---
+
 ### Task 5: Application state and reducer
 
 **Files:**
@@ -1182,7 +1623,7 @@ const profile: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 0,
+  licenses: [],
 }
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -1312,7 +1753,7 @@ Expected: FAIL — cannot resolve `@/domain/application/reducer`.
 `src/domain/application/state.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import type { ApplicantProfile } from '../requirements/rules'
 
 export type FieldStatus =
@@ -1340,26 +1781,27 @@ export type ApplicationState = {
   id: string
   rulesVersion: number
   profile: ApplicantProfile
-  fields: Partial<Record<FieldId, FieldState>>
+  /** Keyed by RequirementKey — plain FieldId, or `id#n` for licences. */
+  fields: Partial<Record<RequirementKey, FieldState>>
   submittedAt: string | null
 }
 
 export type Action =
   | {
       type: 'SET_VALUE'
-      fieldId: FieldId
+      fieldId: RequirementKey
       value: unknown
       source: ProvenanceSource
       at: string
       documentId?: string
       box?: readonly [number, number, number, number]
       confidence?: number
-      fromFieldId?: FieldId
+      fromFieldId?: RequirementKey
     }
-  | { type: 'CONFIRM'; fieldId: FieldId; at: string; shownCopyHash: string }
-  | { type: 'VERIFY'; fieldId: FieldId; at: string }
-  | { type: 'REJECT'; fieldId: FieldId; at: string; reason: string }
-  | { type: 'SUPERSEDE'; fieldId: FieldId; at: string }
+  | { type: 'CONFIRM'; fieldId: RequirementKey; at: string; shownCopyHash: string }
+  | { type: 'VERIFY'; fieldId: RequirementKey; at: string }
+  | { type: 'REJECT'; fieldId: RequirementKey; at: string; reason: string }
+  | { type: 'SUPERSEDE'; fieldId: RequirementKey; at: string }
   | { type: 'UPDATE_PROFILE'; patch: Partial<ApplicantProfile>; at: string }
 ```
 
@@ -1368,7 +1810,7 @@ export type Action =
 `src/domain/application/reducer.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import { requiredFields } from '../requirements/engine'
 import type { ApplicantProfile } from '../requirements/rules'
 import { RULES_VERSION } from '../requirements/version'
@@ -1390,7 +1832,7 @@ export function createApplication(
 /** Statuses that satisfy a requirement. */
 const SATISFIED: ReadonlySet<string> = new Set(['confirmed', 'verified'])
 
-export function outstandingFields(state: ApplicationState): FieldId[] {
+export function outstandingFields(state: ApplicationState): RequirementKey[] {
   return requiredFields(state.profile).filter((id) => {
     const f = state.fields[id]
     return !f || !SATISFIED.has(f.status)
@@ -1465,7 +1907,7 @@ export function applicationReducer(
 
 function requireField(
   state: ApplicationState,
-  id: FieldId,
+  id: RequirementKey,
   verb: string,
 ): FieldState {
   const f = state.fields[id]
@@ -1475,7 +1917,7 @@ function requireField(
 
 function withField(
   state: ApplicationState,
-  id: FieldId,
+  id: RequirementKey,
   field: FieldState,
 ): ApplicationState {
   return { ...state, fields: { ...state.fields, [id]: field } }
@@ -1522,7 +1964,7 @@ const business: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 1,
+  licenses: ['dealer'],
 }
 
 function withAddress() {
@@ -1593,7 +2035,7 @@ Expected: FAIL — cannot resolve `@/domain/application/carry`.
 `src/domain/application/carry.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import { applicationReducer } from './reducer'
 import type { ApplicationState } from './state'
 
@@ -1602,7 +2044,7 @@ import type { ApplicationState } from './state'
  * The current design asks for an address up to three times; these rules
  * are the fix.
  */
-export const CARRY_RULES: readonly { from: FieldId; to: FieldId }[] = [
+export const CARRY_RULES: readonly { from: RequirementKey; to: RequirementKey }[] = [
   { from: 'addr_line1', to: 'biz_addr_line1' },
   { from: 'addr_line2', to: 'biz_addr_line2' },
   { from: 'addr_city', to: 'biz_addr_city' },
@@ -1642,8 +2084,8 @@ export function applyCarry(
 
 export function carriedFrom(
   state: ApplicationState,
-  id: FieldId,
-): FieldId | null {
+  id: RequirementKey,
+): RequirementKey | null {
   const f = state.fields[id]
   if (!f?.provenance || f.provenance.source !== 'carried') return null
   return f.provenance.fromFieldId ?? null
@@ -1777,7 +2219,7 @@ Expected: FAIL — cannot resolve `@/domain/audit/log`.
 `src/domain/audit/event.ts`:
 
 ```ts
-import type { FieldId } from '../field-id'
+import type { RequirementKey } from '../requirements/key'
 import type { ProvenanceSource } from '../application/state'
 
 export type AuditKind =
@@ -1788,7 +2230,7 @@ export type AuditEvent = {
   seq: number
   at: string
   kind: AuditKind
-  fieldId?: FieldId
+  fieldId?: RequirementKey
   source?: ProvenanceSource
   /** Present only for non-sensitive fields. */
   value?: unknown
@@ -1807,6 +2249,7 @@ export type AuditEvent = {
 ```ts
 import type { Action } from '../application/state'
 import { CATALOG } from '../catalog'
+import { parseReqKey } from '../requirements/key'
 import type { AuditEvent, AuditKind } from './event'
 
 /**
@@ -1847,7 +2290,7 @@ export class AuditLog {
 
     if (action.type === 'SET_VALUE') {
       base.source = action.source
-      const def = CATALOG.get(action.fieldId)
+      const def = CATALOG.get(parseReqKey(action.fieldId).fieldId)
       if (def?.sensitive) {
         base.valueDigest = digest(String(action.value))
       } else {
@@ -2137,15 +2580,16 @@ export function Rationale({ field, id }: { field: FieldDef; id?: string }) {
 ```tsx
 import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
-import type { FieldId } from '@/domain/field-id'
+import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { Rationale } from './Rationale'
 
 type Props = {
-  fieldId: FieldId
+  /** A RequirementKey: a plain FieldId, or `license_number#0` for licences. */
+  fieldId: RequirementKey
   state: FieldState | undefined
-  onConfirm?: (id: FieldId) => void
-  onEdit?: (id: FieldId) => void
+  onConfirm?: (id: RequirementKey) => void
+  onEdit?: (id: RequirementKey) => void
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -2156,7 +2600,8 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 export function FieldRow({ fieldId, state, onConfirm, onEdit }: Props) {
-  const def = fieldDef(fieldId)
+  // A key may carry an instance suffix; the catalog is keyed by bare FieldId.
+  const def = fieldDef(parseReqKey(fieldId).fieldId)
   const status = state?.status ?? 'empty'
   const isDerived = status === 'derived'
   const rationaleId = `rationale-${fieldId}`
@@ -2285,7 +2730,7 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const AT = '2026-08-01T12:00:00.000Z'
 const profile: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 0,
+  wantsGsa: false, licenses: [],
 }
 
 describe('ApplicationPanel', () => {
@@ -2414,7 +2859,7 @@ export function ProgressSummary({ done, total, onSubmit }: Props) {
 ```tsx
 import { outstandingFields } from '@/domain/application/reducer'
 import type { ApplicationState } from '@/domain/application/state'
-import type { FieldId } from '@/domain/field-id'
+import type { RequirementKey } from '@/domain/requirements/key'
 import { requiredFields } from '@/domain/requirements/engine'
 import { COLOR } from '@/ui/theme/tokens'
 import { FieldRow } from './FieldRow'
@@ -2422,8 +2867,8 @@ import { ProgressSummary } from './ProgressSummary'
 
 type Props = {
   state: ApplicationState
-  onConfirm?: (id: FieldId) => void
-  onEdit?: (id: FieldId) => void
+  onConfirm?: (id: RequirementKey) => void
+  onEdit?: (id: RequirementKey) => void
   onSubmit?: () => void
 }
 
@@ -2515,7 +2960,7 @@ import type { Action } from '@/domain/application/state'
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
-  wantsGsa: false, licenseCount: 1,
+  wantsGsa: false, licenses: ['dealer'],
 }
 
 beforeEach(() => resetStore())
@@ -2634,7 +3079,7 @@ export async function GET(request: Request) {
     country: 'US',
     state: null,
     wantsGsa: false,
-    licenseCount: 0,
+    licenses: [],
   }
   const created = createApplication(id, profile)
   putApplication(created)
@@ -2682,7 +3127,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 import { useState } from 'react'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
-import type { FieldId } from '@/domain/field-id'
+import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const profile: ApplicantProfile = {
@@ -2690,13 +3135,13 @@ const profile: ApplicantProfile = {
   country: 'US',
   state: 'GA',
   wantsGsa: false,
-  licenseCount: 1,
+  licenses: ['dealer'],
 }
 
 export default function Page() {
   const [state, setState] = useState(() => createApplication('demo', profile))
 
-  const confirm = (id: FieldId) =>
+  const confirm = (id: RequirementKey) =>
     setState((s) =>
       applicationReducer(s, {
         type: 'CONFIRM',
