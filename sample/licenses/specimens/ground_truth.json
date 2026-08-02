@@ -1,0 +1,79 @@
+{
+  "_note": "Hand-transcribed from the specimen images. Field keys are our own catalog FieldIds (src/domain/field-id.ts), so a score here reads directly as 'could OCR fill this required field'. `dl_number_box` is an EYEBALLED region on a 0-1000 scale, adequate for asking 'did the box land on the right field rather than a neighbour', NOT for tight IoU claims.",
+  "_multiline": "A value is a LIST when the card prints it across two lines. Those come back as separate detections, so a concatenated string would score a correct read as a miss.",
+  "specimens": [
+    {
+      "image": "wa_enhanced.png",
+      "state": "WA",
+      "px": [1560, 1006],
+      "notes": "Enhanced DL. Guilloche background plus a large diagonal SAMPLE overprint crossing the data fields. The licence number is printed TWICE — at `4d LIC#` and again at `5 DD` — so selecting its box by value alone crops the wrong half of the card.",
+      "labels": { "dl_number": "4d LIC#" },
+      "fields": {
+        "dl_number": "WDLJK00580GF",
+        "last_name": "SAMPLE",
+        "first_name": "JANE",
+        "dob": "01/06/1978",
+        "dl_expiry": "09/04/2024",
+        "addr_line1": "123 STREET ADDRESS",
+        "addr_city": "YOUR CITY",
+        "addr_state": "WA",
+        "addr_zip": "99999-0000"
+      },
+      "dl_number_box": [428, 244, 699, 288]
+    },
+    {
+      "image": "ma_2016.png",
+      "state": "MA",
+      "px": [795, 501],
+      "notes": "Heavy security overlay: dove hologram over the ISS/EXP block, CS59 ghost text, SAMPLE vertical band.",
+      "fields": {
+        "dl_number": "S99988801",
+        "last_name": "SAMPLE",
+        "first_name": "CONNOR",
+        "dob": "01/12/1959",
+        "dl_expiry": "01/12/2021",
+        "addr_line1": ["123 NORTH MAIN STREET", "APT. 1"],
+        "addr_city": "NORTH QUINCY",
+        "addr_state": "MA",
+        "addr_zip": "02171-1748"
+      },
+      "dl_number_box": [836, 295, 962, 343]
+    },
+    {
+      "image": "dc_2018.png",
+      "state": "DC",
+      "px": [696, 441],
+      "notes": "Cleanest of the four. Expiry is labelled EPX, not EXP.",
+      "fields": {
+        "dl_number": "A9999999",
+        "last_name": "JONES",
+        "first_name": ["ANGELINA", "GABRIELA"],
+        "dob": "02/21/1984",
+        "dl_expiry": "02/21/2018",
+        "addr_line1": ["1234 COMMODORE JOSHUA BARNEY DRIVE, NE", "#1234"],
+        "addr_city": "WASHINGTON",
+        "addr_state": "DC",
+        "addr_zip": "00000-0000"
+      },
+      "dl_number_box": [313, 245, 431, 286]
+    },
+    {
+      "image": "ca_2019.png",
+      "state": "CA",
+      "px": [602, 385],
+      "notes": "Lowest resolution (~178 dpi at card size). Ghosted repeat of the DOB digits over the portrait.",
+      "fields": {
+        "dl_number": "I1234568",
+        "last_name": "CARDHOLDER",
+        "first_name": "IMA",
+        "dob": "08/31/1977",
+        "dl_expiry": "08/31/2014",
+        "addr_line1": "2570 24TH STREET",
+        "addr_city": "ANYTOWN",
+        "addr_state": "CA",
+        "addr_zip": "95818"
+      },
+      "dl_number_box": [362, 213, 507, 260]
+    }
+  ]
+}
