@@ -10,6 +10,7 @@ export const STATE_FORM_FIELDS: readonly FieldDef[] = [
     id: 'oh_foreign_buyer_form',
     label: 'Ohio out-of-state buyer form',
     type: 'file',
+    section: 'state_forms',
     purpose: 'Ohio requires this before an out-of-state dealer can bid there',
     authority: 'STATE_DEALER_BOARD',
     consequence: 'Without it your bids on Ohio lots will be rejected.',

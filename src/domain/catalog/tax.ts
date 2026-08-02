@@ -6,6 +6,7 @@ export const TAX_FIELDS: readonly FieldDef[] = [
     id: 'tax_id',
     label: 'Taxpayer ID (SSN or EIN)',
     type: 'taxid',
+    section: 'tax',
     purpose: 'So we can pay you when a vehicle you consign sells',
     authority: 'IRS',
     consequence:

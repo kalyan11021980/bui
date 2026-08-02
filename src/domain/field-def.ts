@@ -1,6 +1,7 @@
 import type { ZodType } from 'zod'
 import type { Authority } from './authority'
 import type { DocType, FieldId } from './field-id'
+import type { Section } from './section'
 
 export type FieldType =
   | 'text' | 'date' | 'select' | 'phone' | 'address' | 'file' | 'taxid'
@@ -13,6 +14,12 @@ type FieldDefBase<T> = {
   purpose: string
   /** WHO requires it. Required. */
   authority: Authority
+  /**
+   * Which panel section this row lives under. Required, for the same reason
+   * `purpose` and `authority` are: a field with no home is a field someone
+   * forgot to place, and it would render in a heap with everything else.
+   */
+  section: Section
   /** Vetted, legally reviewed. Never model-generated. */
   consequence?: string
   /** Privacy answer, shown by default on sensitive fields. */
