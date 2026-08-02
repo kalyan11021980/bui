@@ -17,6 +17,56 @@ export function createApplication(
   }
 }
 
+/**
+ * Thrown when an action would change an application that has already been
+ * sent for review. Its own class, not a bare Error, so the route can answer
+ * with 409 Conflict — "the state moved on" — rather than 422, which invites a
+ * caller to retry with a better value when no value will be accepted.
+ */
+export class ApplicationSubmittedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ApplicationSubmittedError'
+  }
+}
+
+/**
+ * Why this application refuses to change, or null if it does not.
+ *
+ * Both the condition and the wording live here, so the reducer's throw and
+ * the route's 409 cannot drift into disagreeing about when an application is
+ * closed or what to tell the person who found out. The message names the
+ * time, because "you cannot do that" with no reason is the greyed-out button
+ * in a different costume, and it names who to ask, because from the
+ * applicant's side there is no self-service way out of this state.
+ */
+export function submittedRefusal(state: ApplicationState): string | null {
+  if (state.submittedAt === null) return null
+  return (
+    `This application was sent for review on ${state.submittedAt} and can no `
+    + 'longer be changed. Buyer Services will be in touch if anything needs '
+    + 'correcting.'
+  )
+}
+
+/**
+ * Every action is refused once `submittedAt` is set — including VERIFY and
+ * REJECT, which are reviewer verbs rather than applicant ones. Phase 1 has no
+ * authentication at all (see the route's phase-2 TODO), so accepting a
+ * reviewer verb here would mean anyone holding the id could mark a submitted
+ * KYC record verified. Refusing everything is the only honest position until
+ * there is someone to attribute the verb to.
+ *
+ * TODO(phase-4): the repair loop. The spec puts re-opening in phase 4, driven
+ * by a REVIEWER's rejection on an authenticated path — never by the applicant
+ * deciding to keep typing. That is where VERIFY, REJECT and a re-open
+ * transition come back, with an actor recorded on each.
+ */
+function refuseIfSubmitted(state: ApplicationState): void {
+  const refusal = submittedRefusal(state)
+  if (refusal !== null) throw new ApplicationSubmittedError(refusal)
+}
+
 /** Statuses that satisfy a requirement. */
 const SATISFIED: ReadonlySet<string> = new Set(['confirmed', 'verified'])
 
@@ -35,6 +85,12 @@ export function applicationReducer(
   state: ApplicationState,
   action: Action,
 ): ApplicationState {
+  // Before the switch, so no action can be added later that quietly escapes
+  // it. Enforced HERE rather than in the route so the client path is covered
+  // by the same rule: an invariant that only one caller honours is not an
+  // invariant (§8.2).
+  refuseIfSubmitted(state)
+
   switch (action.type) {
     case 'SET_VALUE': {
       if (action.source === 'carried' && action.fromFieldId === undefined) {
@@ -94,9 +150,8 @@ export function applicationReducer(
     }
 
     case 'SUBMIT': {
-      if (state.submittedAt !== null) {
-        throw new Error(`Application "${state.id}" was already submitted at ${state.submittedAt}`)
-      }
+      // A second submission is refused by `refuseIfSubmitted` above, together
+      // with every other mutation, rather than by a rule of its own here.
       const outstanding = outstandingFields(state)
       if (outstanding.length > 0) {
         // §8.2: reject any completion attempt while requirements remain. The

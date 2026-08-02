@@ -382,3 +382,100 @@ describe('POST /api/application — §8.2 enforcement', () => {
     expect(ok.status).toBe(200)
   })
 })
+
+describe('POST /api/application — a submitted application is closed', () => {
+  const LATER = '2026-08-02T09:00:00.000Z'
+
+  /** A complete, submitted application, created the way a caller would. */
+  async function submittedApp(): Promise<string> {
+    const id = await newApp()
+    const answers: Array<[string, unknown]> = [
+      ['first_name', 'Ada'], ['last_name', 'Lovelace'],
+      ['id_form', 'drivers_license'], ['dl_number', 'D1234567'],
+      ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'],
+      ['id_images', ['front.png']],
+      ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
+      ['addr_state', 'GA'], ['addr_zip', '30301'],
+      ['phone_mobile', '4045551234'],
+    ]
+    for (const [fieldId, value] of answers) {
+      const res = await post(id, {
+        type: 'SET_VALUE', fieldId, value, source: 'user', at: AT,
+      })
+      expect(res.status, `${fieldId} should have been accepted`).toBe(200)
+    }
+    expect((await post(id, { type: 'SUBMIT', at: AT })).status).toBe(200)
+    return id
+  }
+
+  it('409s the exact probe from the re-review, and stores nothing', async () => {
+    // "complete a 12-field registration → SUBMIT → 200 → then SET_VALUE
+    // first_name = 'Mallory' → 200, and the stored value becomes 'Mallory'."
+    // An application sent for review could be rewritten afterwards while the
+    // reviewer's copy diverged.
+    const id = await submittedApp()
+
+    const res = await post(id, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+      source: 'user', at: LATER,
+    })
+
+    expect(res.status).toBe(409)
+    expect(await res.json())
+      .toMatchObject({ error: expect.stringMatching(/sent for review/i) })
+    expect((await stateOf(id)).fields.first_name?.value).toBe('Ada')
+  })
+
+  it('409s every other mutating action too, and leaves the record alone', async () => {
+    const id = await submittedApp()
+    const before = JSON.stringify(await stateOf(id))
+
+    const actions: unknown[] = [
+      { type: 'CONFIRM', fieldId: 'first_name', at: LATER, shownCopyHash: 'catalog-v1' },
+      { type: 'VERIFY', fieldId: 'first_name', at: LATER },
+      { type: 'REJECT', fieldId: 'first_name', at: LATER, reason: 'looks wrong' },
+      { type: 'SUPERSEDE', fieldId: 'first_name', at: LATER },
+      { type: 'UPDATE_PROFILE', patch: { applicantType: 'business' }, at: LATER },
+      { type: 'SUBMIT', at: LATER },
+    ]
+    for (const action of actions) {
+      const res = await post(id, action)
+      expect(res.status, JSON.stringify(action)).toBe(409)
+    }
+
+    expect(JSON.stringify(await stateOf(id))).toBe(before)
+  })
+
+  it('writes nothing to the audit trail for a refused action', async () => {
+    // A refusal that still appended would put an event in the compliance
+    // record for a change that never happened.
+    const id = await submittedApp()
+    const before = getAuditLog().sizeFor(id)
+
+    await post(id, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+      source: 'user', at: LATER,
+    })
+
+    expect(getAuditLog().sizeFor(id)).toBe(before)
+  })
+
+  it('separates "already decided" from "not allowed" — 409, not 422', async () => {
+    // 422 says "well-formed and not allowed"; a caller retrying with a better
+    // value would be reasonable. 409 says the state moved on and no value
+    // will be accepted, which is the truth here.
+    const id = await submittedApp()
+    const res = await post(id, {
+      type: 'SET_VALUE', fieldId: 'addr_zip', value: 'not-a-zip',
+      source: 'user', at: LATER,
+    })
+    expect(res.status).toBe(409)
+  })
+
+  it('still reads back, because the record is closed and not gone', async () => {
+    const id = await submittedApp()
+    const res = await GET(req(`http://localhost/api/application?id=${id}`))
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as ApplicationState).submittedAt).toBe(AT)
+  })
+})

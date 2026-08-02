@@ -62,6 +62,11 @@ export default function Page() {
 
   const outstanding = outstandingFields(state)
   const complete = isComplete(state)
+  // Once it is sent for review, the reducer refuses every change (F2). The
+  // panel must not keep offering an edit it knows will be refused: a control
+  // that responds to typing by throwing is worse than one that is not there,
+  // and the rows stay visible and readable either way.
+  const closed = state.submittedAt !== null
 
   // The button is never disabled, so the attempt is always allowed. The
   // reducer refuses an incomplete submission (§8.2); the check here is so the
@@ -76,27 +81,28 @@ export default function Page() {
     <main style={{ padding: 24 }}>
       <ApplicationPanel
         state={state}
-        onConfirm={confirm}
-        onEdit={edit}
-        onChange={change}
         onSubmit={submit}
-        {...(carry && { carry })}
+        {...(!closed && { onConfirm: confirm, onEdit: edit, onChange: change })}
+        {...(carry && !closed && { carry })}
       />
 
       {/* Submitting while incomplete is allowed to be ATTEMPTED — the button
           is never disabled (§9). What it does is tell the truth about what is
-          still outstanding, rather than going grey and explaining nothing. */}
-      {attemptedSubmit && (
+          still outstanding, rather than going grey and explaining nothing.
+          The same is true after submission: the attempt is allowed and the
+          answer is that the application is closed. */}
+      {(attemptedSubmit || closed) && (
         <p
           role="status"
           style={{
             maxWidth: 560, marginTop: 12, padding: '10px 14px', fontSize: 14,
-            background: state.submittedAt !== null ? COLOR.successSurface : COLOR.errorSurface,
+            background: closed ? COLOR.successSurface : COLOR.errorSurface,
             color: COLOR.textPrimary,
           }}
         >
-          {state.submittedAt !== null
-            ? 'Sent for review. Buyer Services will be in touch.'
+          {closed
+            ? 'Sent for review — these answers can no longer be changed. '
+              + 'Buyer Services will be in touch if anything needs correcting.'
             : `Not sent yet — ${outstanding.length} ${outstanding.length === 1 ? 'answer is' : 'answers are'} still needed above.`}
         </p>
       )}

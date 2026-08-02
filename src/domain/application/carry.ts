@@ -58,6 +58,13 @@ export type CarryResult = {
  * and persisted and logged all the same.
  */
 export function applyCarry(state: ApplicationState, at: string): CarryResult {
+  // A submitted application is closed to every mutation, and carry is a
+  // mutation. Today nothing would be carried anyway — submission requires
+  // every destination to be confirmed, and confirmed values are not carryable
+  // — but relying on that leaves the reducer throwing the day it stops being
+  // true, on a path the caller cannot see.
+  if (state.submittedAt !== null) return { state, applied: [] }
+
   const required = new Set(requiredFields(state.profile))
   let next = state
   const applied: Action[] = []

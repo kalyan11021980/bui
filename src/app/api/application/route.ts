@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import {
+  applicationReducer, ApplicationSubmittedError, createApplication,
+  submittedRefusal,
+} from '@/domain/application/reducer'
 import { applyCarry } from '@/domain/application/carry'
 import {
   describeZodError, requestBodySchema, toAction,
@@ -82,6 +85,13 @@ export async function POST(request: Request) {
   const current = getApplication(parsed.data.id)
   if (!current) return fail(404, 'unknown application')
 
+  // Checked ahead of the requirements check so a closed application answers
+  // 409 whatever the action carries. Otherwise a bad ZIP posted to a
+  // submitted application would come back 422 — "fix the value and retry" —
+  // when no value will ever be accepted.
+  const closed = submittedRefusal(current)
+  if (closed !== null) return fail(409, closed)
+
   const action = toAction(parsed.data.action)
   const refusal = checkAgainstRequirements(current, action)
   if (refusal) return fail(422, refusal)
@@ -89,6 +99,13 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(applyAction(current, action))
   } catch (error) {
+    // A closed application is a CONFLICT, not a rejected value. 422 says
+    // "well-formed and not allowed", which invites the caller to retry with a
+    // better value; 409 says the state moved on and no value will be
+    // accepted. On a KYC surface the difference is whether an applicant
+    // believes their correction landed.
+    if (error instanceof ApplicationSubmittedError) return fail(409, error.message)
+
     // The reducer enforces its own invariants by throwing (confirming a field
     // with no value, carrying with no origin). Those are rejected requests,
     // not server faults: a 500 with a stack trace is both the wrong signal to

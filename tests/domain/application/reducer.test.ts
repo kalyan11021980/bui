@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  applicationReducer, createApplication, isComplete, outstandingFields,
+  applicationReducer, ApplicationSubmittedError, createApplication,
+  isComplete, outstandingFields,
 } from '@/domain/application/reducer'
 import type { Action } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
@@ -189,9 +190,12 @@ describe('SUBMIT', () => {
   })
 
   it('refuses a second submission', () => {
+    // Still refused, but now by the same guard that refuses every other
+    // mutation once submittedAt is set (F2) rather than by a rule of SUBMIT's
+    // own — hence the reworded message.
     const submitted = applicationReducer(completed(), { type: 'SUBMIT', at: AT })
     expect(() => applicationReducer(submitted, { type: 'SUBMIT', at: AT }))
-      .toThrow(/already submitted/i)
+      .toThrow(/sent for review/i)
   })
 
   it('leaves the previous state untouched when it refuses', () => {
@@ -208,6 +212,86 @@ describe('SUBMIT', () => {
     expect(after).not.toBe(before)
     expect(JSON.stringify(before)).toBe(snapshot)
     expect(isComplete(after)).toBe(true)
+  })
+})
+
+describe('a submitted application is closed to further change', () => {
+  function submitted() {
+    let s = createApplication('app-1', profile)
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    return applicationReducer(s, { type: 'SUBMIT', at: AT })
+  }
+
+  const LATER = '2026-08-02T09:00:00.000Z'
+
+  const mutations: Action[] = [
+    {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+      source: 'user', at: LATER,
+    },
+    { type: 'CONFIRM', fieldId: 'first_name', at: LATER, shownCopyHash: 'catalog-v1' },
+    { type: 'VERIFY', fieldId: 'first_name', at: LATER },
+    { type: 'REJECT', fieldId: 'first_name', at: LATER, reason: 'no' },
+    { type: 'SUPERSEDE', fieldId: 'first_name', at: LATER },
+    { type: 'UPDATE_PROFILE', patch: { applicantType: 'business' }, at: LATER },
+    { type: 'SUBMIT', at: LATER },
+  ]
+
+  it.each(mutations.map((a) => [a.type, a] as const))(
+    'refuses %s once the application has been sent for review',
+    (_type, action) => {
+      const s = submitted()
+      const snapshot = JSON.stringify(s)
+
+      expect(() => applicationReducer(s, action)).toThrow(ApplicationSubmittedError)
+      // The value the reviewer is looking at must be the value that is stored.
+      // A refusal that still mutated would be the same bug wearing a message.
+      expect(JSON.stringify(s)).toBe(snapshot)
+    },
+  )
+
+  it('rewrites nothing when the applicant tries to change a name after review', () => {
+    // The probe from the re-review, exactly: complete, SUBMIT, then set
+    // first_name to 'Mallory'. It used to be accepted, and the reviewer's
+    // copy silently diverged from the record.
+    const s = submitted()
+    expect(() =>
+      applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: 'first_name', value: 'Mallory',
+        source: 'user', at: LATER,
+      }),
+    ).toThrow(/sent for review/i)
+    expect(s.fields.first_name?.value).toBe('x')
+  })
+
+  it('names when it was submitted, so the message is actionable', () => {
+    try {
+      applicationReducer(submitted(), { type: 'SUBMIT', at: LATER })
+      expect.unreachable('a second submission must be refused')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApplicationSubmittedError)
+      expect((error as Error).message).toContain(AT)
+      expect((error as Error).message).toMatch(/buyer services/i)
+    }
+  })
+
+  it('still accepts every one of those actions before submission', () => {
+    // Guards the guard: a rule that refused everything unconditionally would
+    // pass every assertion above.
+    let s = createApplication('app-1', profile)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada',
+      source: 'ocr', at: AT,
+    })
+    expect(() =>
+      applicationReducer(s, {
+        type: 'CONFIRM', fieldId: 'first_name', at: AT, shownCopyHash: 'catalog-v1',
+      }),
+    ).not.toThrow()
   })
 })
 
