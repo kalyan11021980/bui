@@ -135,6 +135,20 @@ describe('AuditLog', () => {
     expect(a('123-45-6789')).not.toBe(b('123-45-6789'))
   })
 
+  it('does not reveal the input in the digest', () => {
+    expect(digester('123-45-6789')).not.toContain('123')
+    expect(digester('123-45-6789')).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('digests identical inputs identically — a known, documented equality leak', () => {
+    // Deliberate, and the reason the digest is deterministic at all: a
+    // reviewer must be able to show that the value confirmed at one step is
+    // the value recorded at another. The cost is that two applicants sharing
+    // a taxpayer ID are visibly linked to anyone holding the log. Asserted
+    // here so the trade-off is visible rather than merely true.
+    expect(digester('123-45-6789')).toBe(digester('123-45-6789'))
+  })
+
   it('logs a rejection with its reason', () => {
     const log = new AuditLog(digester)
     log.append('app-1', {
