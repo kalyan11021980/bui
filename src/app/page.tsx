@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
-import { fieldInputId } from '@/ui/panel/FieldInput'
 import {
   applicationReducer, createApplication, isComplete, outstandingFields,
 } from '@/domain/application/reducer'
