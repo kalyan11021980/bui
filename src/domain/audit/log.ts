@@ -1,5 +1,5 @@
 import type { Action, ProvenanceSource } from '../application/state'
-import { CATALOG } from '../catalog'
+import { fieldDef } from '../catalog'
 import { parseReqKey } from '../requirements/key'
 import type { AuditEvent, AuditKind } from './event'
 import type { Digester } from './digest'
@@ -36,12 +36,21 @@ export class AuditLog {
     if (applicationId === '') {
       throw new Error('Audit events must name the application they belong to')
     }
+    // Fail CLOSED. `fieldDef` THROWS on an unrecognised id; the previous
+    // `CATALOG.get(...)?.sensitive` was silent, so an unknown id fell through
+    // to the raw-value branch and a mistyped `tax_id` wrote a plaintext SSN
+    // into the log. This resolution happens before anything is built, so a
+    // refused append leaves no partial entry behind. Not knowing whether a
+    // field is sensitive is a reason to refuse, never a reason to assume it
+    // is not. Every action type carrying a fieldId is checked, not just
+    // SET_VALUE — an id that cannot be resolved is never safe to record.
+    if ('fieldId' in action) fieldDef(parseReqKey(action.fieldId).fieldId)
     const fieldIdPart = 'fieldId' in action ? { fieldId: action.fieldId } : {}
 
     let valuePart: { source?: ProvenanceSource; value?: unknown; valueDigest?: string } = {}
     if (action.type === 'SET_VALUE') {
-      const def = CATALOG.get(parseReqKey(action.fieldId).fieldId)
-      valuePart = def?.sensitive
+      const def = fieldDef(parseReqKey(action.fieldId).fieldId)
+      valuePart = def.sensitive
         ? { source: action.source, valueDigest: this.#digest(JSON.stringify(action.value)) }
         : { source: action.source, value: action.value }
     }

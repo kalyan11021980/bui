@@ -151,6 +151,58 @@ describe('AuditLog', () => {
   })
 })
 
+describe('AuditLog — the sensitive-value boundary fails CLOSED', () => {
+  it('refuses to append a SET_VALUE for a field id the catalog does not know', () => {
+    // The bug: `CATALOG.get(...)` missed, `def?.sensitive` was falsy, and the
+    // code took the RAW-VALUE branch. A one-character typo in a sensitive
+    // field id therefore wrote a plaintext SSN into the log. An unknown id is
+    // not evidence that a value is safe to store in the clear.
+    const log = new AuditLog(digester)
+    expect(() =>
+      log.append('app-1', {
+        type: 'SET_VALUE', fieldId: 'tax_id_typo', value: '123-45-6789',
+        source: 'user', at: AT,
+      }),
+    ).toThrow(/unknown field/i)
+  })
+
+  it('leaves no trace of the value when it refuses', () => {
+    const log = new AuditLog(digester)
+    try {
+      log.append('app-1', {
+        type: 'SET_VALUE', fieldId: 'tax_id_typo', value: '123-45-6789',
+        source: 'user', at: AT,
+      })
+    } catch {
+      // expected
+    }
+    expect(log.size()).toBe(0)
+    expect(JSON.stringify(log.entries())).not.toContain('123-45-6789')
+  })
+
+  it('refuses an unknown field id on every action type, not just SET_VALUE', () => {
+    const log = new AuditLog(digester)
+    expect(() =>
+      log.append('app-1', { type: 'CONFIRM', fieldId: 'not_a_field', at: AT, shownCopyHash: 'c' }),
+    ).toThrow(/unknown field/i)
+    expect(() =>
+      log.append('app-1', { type: 'REJECT', fieldId: 'not_a_field', at: AT, reason: 'r' }),
+    ).toThrow(/unknown field/i)
+    expect(log.size()).toBe(0)
+  })
+
+  it('refuses a malformed requirement key rather than logging it', () => {
+    const log = new AuditLog(digester)
+    expect(() =>
+      log.append('app-1', {
+        type: 'SET_VALUE', fieldId: 'tax_id#abc', value: '123-45-6789',
+        source: 'user', at: AT,
+      }),
+    ).toThrow()
+    expect(JSON.stringify(log.entries())).not.toContain('123-45-6789')
+  })
+})
+
 describe('AuditLog — per-application trails (spec §10.1)', () => {
   it('stamps every event with the application it belongs to', () => {
     const log = new AuditLog(digester)
