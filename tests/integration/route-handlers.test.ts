@@ -6,7 +6,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 // setting it here at module load, ahead of every test, is sufficient.
 process.env.AUDIT_DIGEST_SECRET = 'route-handler-test-secret-32-chars-min!'
 
-import { GET, POST } from '@/app/api/application/route'
+import { POST as CREATE } from '@/app/api/application/route'
+import { GET } from '@/app/api/application/[id]/route'
+import { POST } from '@/app/api/application/[id]/actions/route'
 import { __resetStoreForTests } from '@/server/store'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
 import type { ApplicationState } from '@/domain/application/state'
@@ -17,12 +19,17 @@ function req(url: string, init?: RequestInit): Request {
   return new Request(url, init)
 }
 
-function postBody(id: string, action: unknown): RequestInit {
+function postBody(action: unknown): RequestInit {
   return {
     method: 'POST',
-    body: JSON.stringify({ id, action }),
+    body: JSON.stringify({ action }),
     headers: { 'content-type': 'application/json' },
   }
+}
+
+/** Next hands a dynamic segment handler its params as a Promise. */
+function ctx(id: string) {
+  return { params: Promise.resolve({ id }) }
 }
 
 /**
@@ -31,17 +38,23 @@ function postBody(id: string, action: unknown): RequestInit {
  * existence any more, which is the point of the change.
  */
 async function newApp(): Promise<string> {
-  const res = await GET(req('http://localhost/api/application'))
+  const res = await CREATE()
   return ((await res.json()) as ApplicationState).id
 }
 
 async function post(id: string, action: unknown) {
-  return POST(req('http://localhost/api/application', postBody(id, action)))
+  return POST(
+    req(`http://localhost/api/application/${id}/actions`, postBody(action)),
+    ctx(id),
+  )
+}
+
+async function read(id: string) {
+  return GET(req(`http://localhost/api/application/${id}`), ctx(id))
 }
 
 async function stateOf(id: string): Promise<ApplicationState> {
-  const res = await GET(req(`http://localhost/api/application?id=${id}`))
-  return (await res.json()) as ApplicationState
+  return (await (await read(id)).json()) as ApplicationState
 }
 
 /** A business applicant, which is what the licence and tax fields need. */
@@ -58,19 +71,19 @@ beforeEach(() => {
   __resetAuditLogForTests()
 })
 
-describe('GET /api/application', () => {
-  it('creates a new application when no id is given, stamped with a rules version', async () => {
-    const res = await GET(req('http://localhost/api/application'))
+describe('POST /api/application — creation', () => {
+  it('creates a new application, stamped with a rules version', async () => {
+    const res = await CREATE()
     expect(res.status).toBe(200)
     const body = (await res.json()) as ApplicationState
     expect(body.id).toBeTruthy()
     expect(body.rulesVersion).toBeGreaterThan(0)
   })
 
-  it('generates the id itself rather than trusting the query string', async () => {
-    // Any id the caller supplied used to be created on demand, so `?id=1` and
-    // `?id=2` both worked — and the response carries tax_id.value.
-    const res = await GET(req('http://localhost/api/application?id=1'))
+  it('generates the id itself rather than trusting one the caller names', async () => {
+    // An id the caller supplied used to be created on demand, so /1 and /2
+    // both worked — and the response carries tax_id.value.
+    const res = await read('1')
     expect(res.status).toBe(404)
     expect(await res.json()).toMatchObject({ error: expect.stringMatching(/unknown/i) })
   })
@@ -83,7 +96,7 @@ describe('GET /api/application', () => {
     }
   })
 
-  it('returns the same application on a second GET instead of recreating it', async () => {
+  it('returns the same application on a second read instead of recreating it', async () => {
     const id = await newApp()
     const first = await stateOf(id)
     const second = await stateOf(id)
@@ -91,7 +104,7 @@ describe('GET /api/application', () => {
   })
 })
 
-describe('POST /api/application', () => {
+describe('POST /api/application/[id]/actions', () => {
   it('404s for an unknown application id', async () => {
     const res = await post('nope', {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada', source: 'user', at: AT,
@@ -148,7 +161,7 @@ describe('POST /api/application', () => {
   })
 })
 
-describe('POST /api/application — carried provenance (§9)', () => {
+describe('POST /api/application/[id]/actions — carried provenance', () => {
   it('carries a personal address into the business address on the write path', async () => {
     // applyCarry had no caller outside tests: the route applied the reducer
     // and persisted, so §9's headline case was unsolved in the running app.
@@ -208,13 +221,15 @@ describe('POST /api/application — carried provenance (§9)', () => {
  * returned 200 and was stored before this wave. Phase 3 puts an LLM on this
  * exact surface, so each of these is a tool call a misbehaving model can make.
  */
-describe('POST /api/application — §8.2 enforcement', () => {
+describe('POST /api/application/[id]/actions — enforcement', () => {
   it('400s on a body that is not JSON at all', async () => {
+    const id = await newApp()
     const res = await POST(
-      req('http://localhost/api/application', {
+      req(`http://localhost/api/application/${id}/actions`, {
         method: 'POST', body: 'not json',
         headers: { 'content-type': 'application/json' },
       }),
+      ctx(id),
     )
     expect(res.status).toBe(400)
   })
@@ -383,7 +398,7 @@ describe('POST /api/application — §8.2 enforcement', () => {
   })
 })
 
-describe('POST /api/application — a submitted application is closed', () => {
+describe('POST /api/application/[id]/actions — a submitted application is closed', () => {
   const LATER = '2026-08-02T09:00:00.000Z'
 
   /** A complete, submitted application, created the way a caller would. */
@@ -474,13 +489,13 @@ describe('POST /api/application — a submitted application is closed', () => {
 
   it('still reads back, because the record is closed and not gone', async () => {
     const id = await submittedApp()
-    const res = await GET(req(`http://localhost/api/application?id=${id}`))
+    const res = await read(id)
     expect(res.status).toBe(200)
     expect(((await res.json()) as ApplicationState).submittedAt).toBe(AT)
   })
 })
 
-describe('POST /api/application — CLEAR_VALUE', () => {
+describe('POST /api/application/[id]/actions — CLEAR_VALUE', () => {
   it('returns a field to outstanding and records it in the trail', async () => {
     const id = await newApp()
     await post(id, {

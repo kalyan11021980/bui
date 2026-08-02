@@ -98,6 +98,11 @@ export const actionSchema = z.discriminatedUnion('type', [
   submit,
 ])
 
+/** The body of `POST /api/application/[id]/actions`. The id comes from the path. */
+export const actionRequestSchema = z.object({ action: actionSchema }).strict()
+
+/** The same call with the application named in the envelope, for callers that
+ * cannot address it in a URL — the shape phase 3's tool calls parse through. */
 export const requestBodySchema = z
   .object({ id: z.string().min(1, 'id is required'), action: actionSchema })
   .strict()
