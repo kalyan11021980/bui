@@ -1,0 +1,79 @@
+import { z } from 'zod'
+import { defineField, type FieldDef } from '../field-def'
+import { zipSchema } from './address'
+import { phoneSchema } from './contact'
+
+export const BUSINESS_FIELDS: readonly FieldDef[] = [
+  defineField({
+    id: 'biz_name',
+    label: 'Business name',
+    type: 'text',
+    purpose: 'The name buyers and sellers will see on your account',
+    authority: 'IAA_POLICY',
+    validation: z.string().min(1, 'Enter your business name'),
+  }),
+  defineField({
+    id: 'biz_legal_name',
+    label: 'Business legal name',
+    type: 'text',
+    purpose: 'Must match the name on your dealer license exactly',
+    authority: 'STATE_DEALER_BOARD',
+    consequence: 'A mismatch is the most common reason registration is delayed.',
+    destination: 'W-9, line 1',
+    validation: z.string().min(1, 'Enter the legal name'),
+    derivableFrom: ['dealer_license'],
+  }),
+  defineField({
+    id: 'biz_addr_line1',
+    label: 'Business address',
+    type: 'address',
+    purpose: 'Where your dealer license is registered',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().min(1, 'Enter the business address'),
+    derivableFrom: ['dealer_license'],
+  }),
+  defineField({
+    id: 'biz_addr_line2',
+    label: 'Business address line 2',
+    type: 'text',
+    purpose: 'Suite or unit, if you have one',
+    authority: 'IAA_POLICY',
+    validation: z.string().optional(),
+  }),
+  defineField({
+    id: 'biz_addr_city',
+    label: 'Business city',
+    type: 'text',
+    purpose: 'Where your dealer license is registered',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().min(1, 'Enter the city'),
+    derivableFrom: ['dealer_license'],
+  }),
+  defineField({
+    id: 'biz_addr_state',
+    label: 'Business state',
+    type: 'select',
+    purpose: 'Determines which dealer license we need from you',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().length(2, 'Select a state'),
+    derivableFrom: ['dealer_license'],
+    orchestratorVisible: true,
+  }),
+  defineField({
+    id: 'biz_addr_zip',
+    label: 'Business ZIP code',
+    type: 'text',
+    purpose: 'Where your dealer license is registered',
+    authority: 'STATE_DEALER_BOARD',
+    validation: zipSchema,
+    derivableFrom: ['dealer_license'],
+  }),
+  defineField({
+    id: 'biz_phone',
+    label: 'Business phone',
+    type: 'phone',
+    purpose: 'How Buyer Services reaches your business',
+    authority: 'IAA_POLICY',
+    validation: phoneSchema,
+  }),
+]
