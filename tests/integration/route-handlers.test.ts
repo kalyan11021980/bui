@@ -82,6 +82,13 @@ describe('POST /api/application', () => {
 
   it('records a SET_VALUE for tax_id in the audit log, but never the raw value', async () => {
     await GET(req('http://localhost/api/application?id=app-1'))
+    // A taxpayer ID is only ever asked of a business, and the route now
+    // refuses fields outside the requirements engine's set — so this test has
+    // to reach tax_id the way a real applicant does, by being a business.
+    await POST(req('http://localhost/api/application', postBody('app-1', {
+      type: 'UPDATE_PROFILE', patch: { applicantType: 'business' },
+      at: '2026-08-01T11:59:00.000Z',
+    })))
 
     const before = getAuditLog().size()
     const res = await POST(
@@ -115,5 +122,173 @@ describe('POST /api/application', () => {
     expect(log.entriesFor('app-b').map((e) => e.value)).toEqual(['Bob'])
     expect(log.entriesFor('app-a')[0]?.seq).toBe(1)
     expect(log.entriesFor('app-b')[0]?.seq).toBe(1)
+  })
+})
+
+/**
+ * Spec §8.2 names this handler as the enforcement point. Every case below
+ * returned 200 and was stored before this wave. Phase 3 puts an LLM on this
+ * exact surface, so each of these is a tool call a misbehaving model can make.
+ */
+describe('POST /api/application — §8.2 enforcement', () => {
+  async function post(id: string, action: unknown) {
+    return POST(req('http://localhost/api/application', postBody(id, action)))
+  }
+  async function newApp(id: string) {
+    await GET(req(`http://localhost/api/application?id=${id}`))
+  }
+  async function stateOf(id: string): Promise<ApplicationState> {
+    const res = await GET(req(`http://localhost/api/application?id=${id}`))
+    return (await res.json()) as ApplicationState
+  }
+
+  it('400s on a body that is not JSON at all', async () => {
+    const res = await POST(
+      req('http://localhost/api/application', {
+        method: 'POST', body: 'not json',
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('400s on a body missing the action entirely', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', undefined)
+    expect(res.status).toBe(400)
+  })
+
+  it('400s on an unrecognised action type', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', { type: 'DROP_TABLE', at: '2026-08-01T12:00:00.000Z' })
+    expect(res.status).toBe(400)
+  })
+
+  it('400s on an action carrying an unrecognised property', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada', source: 'user',
+      at: '2026-08-01T12:00:00.000Z', patch: { wantsGsa: true },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('422s and stores nothing for a value the field schema refuses', async () => {
+    // The table row: `SET_VALUE dob = {evil:1}` was stored, status confirmed.
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'dob', value: { evil: 1 },
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(422)
+    expect((await stateOf('app-1')).fields.dob).toBeUndefined()
+  })
+
+  it('422s and stores nothing for a field id that is not in the catalog', async () => {
+    // The table row: `SET_VALUE not_a_field = 'zzz'` was stored under a
+    // non-existent key. This is also the network path to the C2 leak.
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'not_a_field', value: 'zzz',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(422)
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/unknown field/i) })
+    const fields = (await stateOf('app-1')).fields as Record<string, unknown>
+    expect(fields.not_a_field).toBeUndefined()
+  })
+
+  it('never lets an unknown field id put a raw sensitive value in the log', async () => {
+    // The C2 probe, driven from the network exactly as reported.
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'tax_id_typo', value: '123-45-6789',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(422)
+    expect(JSON.stringify(getAuditLog().entries())).not.toContain('123-45-6789')
+  })
+
+  it('422s for a field outside the applicant\'s required set', async () => {
+    // The table row: `SET_VALUE gsa_bidder_number` with `wantsGsa: false`.
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'gsa_bidder_number', value: 'GSA-1',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(422)
+    expect(await res.json())
+      .toMatchObject({ error: expect.stringMatching(/not part of this application/i) })
+  })
+
+  it('accepts the same field once the profile actually requires it', async () => {
+    // The mirror of the case above: enforcement must track the profile, not
+    // just say no to everything unusual.
+    await newApp('app-1')
+    await post('app-1', {
+      type: 'UPDATE_PROFILE', patch: { wantsGsa: true },
+      at: '2026-08-01T12:00:00.000Z',
+    })
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'gsa_bidder_number', value: 'GSA-1',
+      source: 'user', at: '2026-08-01T12:00:01.000Z',
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('422s rather than 500ing when the reducer refuses the action', async () => {
+    // CONFIRM on a field with no value throws inside the reducer; it escaped
+    // POST uncaught and became a 500 with a dev stack trace.
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'CONFIRM', fieldId: 'first_name',
+      at: '2026-08-01T12:00:00.000Z', shownCopyHash: 'catalog-v1',
+    })
+    expect(res.status).toBe(422)
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/no value yet/i) })
+  })
+
+  it('400s on a profile patch carrying an unrecognised key', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'UPDATE_PROFILE', patch: { applicantTyp: 'business' },
+      at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('400s on a profile patch with a licence type that does not exist', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['forklift'] },
+      at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('runs the field\'s own catalog schema — a bad ZIP is refused', async () => {
+    await newApp('app-1')
+    const res = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'addr_zip', value: 'not-a-zip',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(res.status).toBe(422)
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/ZIP/i) })
+  })
+
+  it('refuses an impossible calendar date, not just a badly-shaped one', async () => {
+    await newApp('app-1')
+    for (const bad of ['1982-13-45', '2026-02-30', '31-08-1982']) {
+      const res = await post('app-1', {
+        type: 'SET_VALUE', fieldId: 'dob', value: bad,
+        source: 'user', at: '2026-08-01T12:00:00.000Z',
+      })
+      expect(res.status, `${bad} must be refused`).toBe(422)
+    }
+    const ok = await post('app-1', {
+      type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31',
+      source: 'user', at: '2026-08-01T12:00:00.000Z',
+    })
+    expect(ok.status).toBe(200)
   })
 })

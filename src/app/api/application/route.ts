@@ -1,13 +1,23 @@
 import { NextResponse } from 'next/server'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import {
+  describeZodError, requestBodySchema, toAction,
+} from '@/domain/application/action-schema'
 import { getApplication, putApplication } from '@/server/store'
 import { getAuditLog } from '@/server/audit'
-import type { Action } from '@/domain/application/state'
+import { CATALOG, fieldDef } from '@/domain/catalog'
+import { requiredFields } from '@/domain/requirements/engine'
+import { parseReqKey } from '@/domain/requirements/key'
+import type { Action, ApplicationState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
+
+function fail(status: number, error: string) {
+  return NextResponse.json({ error }, { status })
+}
 
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  if (!id) return fail(400, 'id required')
 
   const existing = getApplication(id)
   if (existing) return NextResponse.json(existing)
@@ -24,19 +34,94 @@ export async function GET(request: Request) {
   return NextResponse.json(created)
 }
 
+/**
+ * Spec §8.2: invariants live in code, not in prompts. This handler is THE
+ * enforcement point — it rejects any action naming a field outside the
+ * requirements engine's current set, and any value the field's own schema
+ * refuses. Phase 3 puts an LLM on this exact surface, so a check that is only
+ * in the panel is not a check at all.
+ *
+ * Returns 400 for "this is not a well-formed request" and 422 for "this is
+ * well-formed and not allowed", so a caller can tell a bug from a rejection.
+ */
 export async function POST(request: Request) {
-  const body = (await request.json()) as { id: string; action: Action }
-  const current = getApplication(body.id)
-  if (!current) {
-    return NextResponse.json({ error: 'unknown application' }, { status: 404 })
+  let raw: unknown
+  try {
+    raw = await request.json()
+  } catch {
+    return fail(400, 'Request body must be valid JSON')
   }
 
-  const next = applicationReducer(current, body.action)
-  // Record the action before persisting the state it produces: an action we
-  // cannot audit is an action we should not apply. If the audit call throws,
-  // the store must be left untouched rather than silently holding a mutation
-  // with no corresponding trail entry.
-  getAuditLog().append(current.id, body.action)
+  const parsed = requestBodySchema.safeParse(raw)
+  if (!parsed.success) return fail(400, describeZodError(parsed.error))
+
+  const current = getApplication(parsed.data.id)
+  if (!current) return fail(404, 'unknown application')
+
+  const action = toAction(parsed.data.action)
+  const refusal = checkAgainstRequirements(current, action)
+  if (refusal) return fail(422, refusal)
+
+  try {
+    return NextResponse.json(applyAction(current, action))
+  } catch (error) {
+    // The reducer enforces its own invariants by throwing (confirming a field
+    // with no value, carrying with no origin). Those are rejected requests,
+    // not server faults: a 500 with a stack trace is both the wrong signal to
+    // the caller and, on a KYC surface, the wrong thing to emit.
+    return fail(422, error instanceof Error ? error.message : 'Action rejected')
+  }
+}
+
+/**
+ * Applies the action, carries what follows from it, and records every one of
+ * those in the trail before anything is persisted.
+ *
+ * Ordering is deliberate: an action we cannot audit is an action we must not
+ * apply, so if any append throws, the store is left holding the previous
+ * state rather than a mutation with no corresponding trail entry.
+ */
+function applyAction(current: ApplicationState, action: Action): ApplicationState {
+  const log = getAuditLog()
+  const next = applicationReducer(current, action)
+  log.append(current.id, action)
   putApplication(next)
-  return NextResponse.json(next)
+  return next
+}
+
+/**
+ * Returns a refusal message, or null if the action is allowed.
+ *
+ * The check is against `requiredFields`, NOT `outstandingFields`: a field the
+ * applicant has already confirmed is still a field they are entitled to go
+ * back and correct. Outstanding-only would make every answer final on first
+ * submission, which is a worse failure than the one being fixed.
+ */
+function checkAgainstRequirements(
+  current: ApplicationState,
+  action: Action,
+): string | null {
+  if (!('fieldId' in action)) return null
+
+  let bareId
+  try {
+    bareId = parseReqKey(action.fieldId).fieldId
+  } catch {
+    return `Malformed field key: ${action.fieldId}`
+  }
+
+  if (!CATALOG.has(bareId)) return `Unknown field: ${action.fieldId}`
+
+  if (!requiredFields(current.profile).includes(action.fieldId)) {
+    return `Field "${action.fieldId}" is not part of this application`
+  }
+
+  if (action.type === 'SET_VALUE') {
+    const result = fieldDef(bareId).validation.safeParse(action.value)
+    if (!result.success) {
+      return describeZodError(result.error)
+    }
+  }
+
+  return null
 }
