@@ -1,10 +1,7 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
 
-/**
- * Forms required by one state and not others. Adding an entry here is not
- * enough — it must also be referenced from STATE_RULES in requirements/rules.ts.
- */
+/** An entry here does nothing until STATE_RULES in requirements/rules.ts references it. */
 export const STATE_FORM_FIELDS: readonly FieldDef[] = [
   defineField({
     id: 'oh_foreign_buyer_form',

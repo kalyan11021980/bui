@@ -14,21 +14,16 @@ type Props = {
   state: FieldState | undefined
   onChange: (id: RequirementKey, value: unknown) => void
   /**
-   * Drop the recorded answer: what is on screen is no longer a valid value.
-   * Required, not optional — a field that can record a value and cannot
+   * Required, not optional: a field that can record a value and cannot
    * unrecord it is how the record ends up disagreeing with the screen.
    */
   onClear: (id: RequirementKey) => void
 }
 
 /**
- * The id the visible label points at. Derived from the FULL RequirementKey,
- * so a business holding two licences gets two distinct, separately-labelled
- * "License number" inputs rather than one label pointing at both.
- *
- * `#` is legal in an HTML id but has to be escaped in every CSS selector that
- * touches it, which is a papercut waiting to be forgotten; `--` encodes the
- * same information and appears in no FieldId.
+ * Derived from the full RequirementKey, so two licences get two separately
+ * labelled "License number" inputs. `#` is replaced because it is legal in an
+ * HTML id but must be escaped in every CSS selector that touches it.
  */
 export function fieldInputId(fieldId: RequirementKey): string {
   return `field-${fieldId.replace('#', '--')}`
@@ -38,65 +33,47 @@ function errorId(fieldId: RequirementKey): string {
   return `${fieldInputId(fieldId)}-error`
 }
 
-/** The HTML input type that suits this field. */
 function inputTypeFor(type: FieldDef['type']): string {
   switch (type) {
     case 'date': return 'date'
     case 'phone': return 'tel'
     case 'file': return 'file'
     // `taxid` is deliberately NOT type="password": hiding what you typed from
-    // yourself is how a mistyped SSN gets submitted. Confidentiality is
-    // handled at rest and in the audit log, not by blanking the glyphs.
+    // yourself is how a mistyped SSN gets submitted.
     case 'text': case 'taxid': case 'address': case 'select': default: return 'text'
   }
 }
 
-/** The fixed choices for this field, when its schema is an enum. */
 function optionsFor(def: FieldDef): readonly string[] | null {
   return def.validation instanceof ZodEnum ? def.validation.options : null
 }
 
-/** Turns a stored value back into something an input element can show. */
 function toInputValue(value: unknown): string {
   if (value === null || value === undefined) return ''
   return typeof value === 'string' ? value : String(value)
 }
 
 /**
- * The data-entry control for one field. Split out of FieldRow, which already
- * carries key parsing, instance disambiguation, status styling, value
- * rendering, rationale, provenance, rejection and buttons.
+ * Reports a value upward only once the field's own catalog schema accepts it,
+ * so a half-typed phone number is not dispatched nine times. What has been
+ * typed stays on screen either way; only the dispatch waits.
  *
- * It reports a value upward only once the field's OWN catalog schema accepts
- * it — the same schema the route enforces (§8.2). Anything else would send
- * every keystroke of a phone number to a handler that must reject nine of
- * them. What the user has typed so far still stays on screen; only the
- * dispatch waits.
- *
- * The corollary, and the whole of F3: when the draft stops being a valid
- * value, the RECORD must not go on holding the last one that was. Waiting
- * quietly is only honest while the record and the screen still agree. Type
- * "Ada" and then clear the box, or type a good ZIP and append a digit, and
- * the applicant was left attesting to a value that was no longer in front of
- * them, still counted as done.
+ * The corollary: when the draft stops being valid the record must not go on
+ * holding the last value that was, or the applicant is left attesting to
+ * something no longer in front of them, still counted as done.
  */
 export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
   const external = toInputValue(state?.value)
   const [draft, setDraft] = useState(external)
   const [lastExternal, setLastExternal] = useState(external)
-  // The draft that caused us to ask for a clear. The clear comes back as an
-  // empty external value, and that echo must not reset the box the applicant
-  // is still typing in — they cleared the RECORD, not the field.
+  // The draft that caused us to ask for a clear. The clear echoes back as an
+  // empty external value, which must not reset the box they are typing in.
   const clearedFrom = useRef<string | null>(null)
 
-  // Adjusting state during render, rather than in an effect: when a value is
-  // carried in from another field (§9) the input must show it immediately,
-  // not one paint later. React's documented pattern for deriving state from
-  // props.
+  // Adjusted during render, not in an effect: a carried value must appear
+  // immediately, not one paint later.
   if (external !== lastExternal) {
     setLastExternal(external)
-    // Anything else — a carried value, an OCR fill, a clear from somewhere
-    // else — is news from outside and does belong on screen.
     if (!(external === '' && clearedFrom.current === draft)) setDraft(external)
     clearedFrom.current = null
   }
@@ -105,8 +82,7 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
   const isFile = def.type === 'file'
 
   const result = def.validation.safeParse(isFile ? state?.value ?? [] : draft)
-  // An untouched field is outstanding, not wrong. Shouting at someone for not
-  // having typed anything yet is how a form reads as hostile.
+  // An untouched field is outstanding, not wrong.
   const error = draft !== '' && !result.success
     ? result.error.issues[0]?.message ?? 'Check this value'
     : null
@@ -115,17 +91,16 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
     setDraft(next)
 
     // An empty box is an answer removed, never a value — some catalog schemas
-    // are `.optional()` and would happily accept "" as a recorded answer.
+    // are `.optional()` and would accept "" as a recorded answer.
     if (next !== '' && def.validation.safeParse(next).success) {
       onChange(fieldId, next)
       return
     }
 
-    // Nothing valid is on screen any more. If the record still holds
-    // something, it now disagrees with what the applicant can see, and the
-    // field must go back to outstanding rather than count as done. Only when
-    // there IS something to drop: typing rubbish into an empty field is not a
-    // divergence, and a clear per keystroke would be noise in the trail.
+    // Nothing valid on screen, so a stored value now disagrees with what the
+    // applicant sees. Only when there is something to drop — typing rubbish
+    // into an empty field is not a divergence, and a clear per keystroke
+    // would be noise in the trail.
     if (state?.value !== null && state?.value !== undefined) {
       clearedFrom.current = next
       onClear(fieldId)
@@ -140,8 +115,7 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
     style: {
       width: '100%', boxSizing: 'border-box' as const, padding: '8px 10px',
       fontSize: 15, color: COLOR.textPrimary, background: COLOR.surface,
-      // The invalid border is the WARNING ORANGE, never the brand red: red is
-      // IAA's primary and means "IAA", not "you got it wrong".
+      // Warning orange, never the brand red: red means "IAA", not "wrong".
       border: `1px solid ${error !== null ? COLOR.error : COLOR.border}`,
     },
   }
@@ -154,11 +128,9 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
           type="file"
           multiple
           onChange={(e) => {
-            // Phase 1 has no upload service, so only the FILE NAMES are
-            // stored — enough to satisfy the catalog schema and show the user
-            // what they picked. Phase 2 replaces this with a real upload and
-            // a document id; the value shape (an array of strings) is chosen
-            // so that swap does not change the state model.
+            // TODO(phase-2): real upload and a document id. Only file NAMES
+            // are stored for now; the array-of-strings shape is chosen so the
+            // swap does not change the state model.
             const names = [...(e.target.files ?? [])].map((f) => f.name)
             if (names.length > 0) onChange(fieldId, names)
           }}

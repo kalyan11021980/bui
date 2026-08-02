@@ -36,9 +36,6 @@ export default function Page() {
 
   const change = (id: RequirementKey, value: unknown) => {
     const at = new Date().toISOString()
-    // Carry runs on every edit, so filling in a home address populates the
-    // business address as it is typed rather than at some later checkpoint
-    // the applicant has to go and find. Spec §9.
     const result = applyCarry(
       applicationReducer(state, {
         type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
@@ -46,20 +43,12 @@ export default function Page() {
       at,
     )
     setState(result.state)
-    // Replaced on every edit, including with null: the acknowledgement belongs
-    // to the LAST edit that actually changed something elsewhere, and one left
-    // behind on a row they have moved on from is a claim about the wrong
-    // keystroke. Computed outside the state updater because updaters must stay
-    // pure — React is entitled to run them twice.
+    // Replaced on every edit, including with null — one left behind on a row
+    // they have moved on from is a claim about the wrong keystroke. Computed
+    // outside the state updater, which React may run twice.
     setCarry(carryNotice(id, result.applied))
   }
 
-  /**
-   * The applicant's on-screen text is no longer a valid value, so the record
-   * must stop holding the one that was. Carry runs afterwards for the same
-   * reason it runs on a change: an unconfirmed mirror of a value that has
-   * just been deleted is a stale plausible value (§10.4).
-   */
   const clear = (id: RequirementKey) => {
     const at = new Date().toISOString()
     const result = applyCarry(
@@ -70,22 +59,18 @@ export default function Page() {
     setCarry(carryNotice(id, result.applied))
   }
 
-  // "Fix this" moves the caret to the field rather than mutating anything:
-  // the value is already editable in place, so an edit action would add a
-  // state transition with nothing to show for it.
+  // "Fix this" moves the caret rather than mutating: the value is already
+  // editable in place.
   const edit = (id: RequirementKey) => revealField(id)
 
   const outstanding = outstandingFields(state)
   const complete = isComplete(state)
-  // Once it is sent for review, the reducer refuses every change (F2). The
-  // panel must not keep offering an edit it knows will be refused: a control
-  // that responds to typing by throwing is worse than one that is not there,
-  // and the rows stay visible and readable either way.
+  // The reducer refuses every change once submitted, so the panel must stop
+  // offering edits it knows will be refused. Rows stay visible either way.
   const closed = state.submittedAt !== null
 
-  // The button is never disabled, so the attempt is always allowed. The
-  // reducer refuses an incomplete submission (§8.2); the check here is so the
-  // panel can answer with what is missing instead of throwing at the user.
+  // The button is never disabled. The reducer refuses an incomplete
+  // submission; this check is so the panel can say what is missing instead.
   const submit = () => {
     setAttemptedSubmit(true)
     if (!complete || state.submittedAt !== null) return
@@ -103,11 +88,8 @@ export default function Page() {
         {...(carry && !closed && { carry })}
       />
 
-      {/* Submitting while incomplete is allowed to be ATTEMPTED — the button
-          is never disabled (§9). What it does is tell the truth about what is
-          still outstanding, rather than going grey and explaining nothing.
-          The same is true after submission: the attempt is allowed and the
-          answer is that the application is closed. */}
+      {/* The attempt is always allowed; the answer is what is outstanding, or
+          that the application is closed. */}
       {(attemptedSubmit || closed) && (
         <p
           role="status"

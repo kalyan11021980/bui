@@ -4,10 +4,7 @@ import {
 } from './rules'
 import { reqKey, type RequirementKey } from './key'
 
-/**
- * The single authority on what an applicant owes. Pure: same profile in,
- * same key list out. No LLM, no I/O. See spec §8.
- */
+/** The single authority on what an applicant owes. Pure — no LLM, no I/O. */
 export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
   const out: RequirementKey[] = [
     ...CORE_IDENTITY, ...CORE_ADDRESS, ...CORE_CONTACT,

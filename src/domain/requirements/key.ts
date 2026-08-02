@@ -1,9 +1,8 @@
 import type { FieldId } from '../field-id'
 
 /**
- * Identifies one required answer. For most fields this is just the FieldId.
- * Fields inside a repeatable group (licences) are qualified by instance:
- * `license_number#0`, `license_number#1`.
+ * One required answer: a FieldId, or `license_number#0` for a field inside a
+ * repeatable group.
  */
 export type RequirementKey = string
 

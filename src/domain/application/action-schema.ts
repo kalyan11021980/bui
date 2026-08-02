@@ -3,16 +3,11 @@ import type { Action } from './state'
 
 /**
  * The wire shape of an Action, and the only sanctioned way to turn untrusted
- * input into one. Lives in the domain because it is pure — no I/O, no
- * network, no clock — and because spec §8.2 names this the enforcement
- * surface: the route handler uses it today, and the phase-3 orchestrator's
- * tool calls will be parsed through exactly the same schema rather than a
- * second, drifting copy.
+ * input into one. Phase 3's orchestrator tool calls parse through this same
+ * schema rather than a second, drifting copy.
  *
  * Every variant is `.strict()`: an unrecognised property is a rejected
- * request, not a silently dropped one. A caller sending `patch` alongside
- * `SET_VALUE` has misunderstood something, and guessing on their behalf is
- * how bad data gets in.
+ * request, not a silently dropped one.
  */
 
 const provenanceSource = z.enum(['ocr', 'user', 'lookup', 'carried'])
@@ -23,10 +18,8 @@ const setValue = z
   .object({
     type: z.literal('SET_VALUE'),
     fieldId: requirementKey,
-    // Deliberately unconstrained here: the authority on what a value may be
-    // is the field's OWN schema in the catalog, which the route runs once it
-    // knows which field this is. A missing `value` arrives as `undefined` and
-    // is rejected there by the field's schema.
+    // Unconstrained here: the authority is the field's own catalog schema,
+    // which the route runs once it knows which field this is.
     value: z.unknown(),
     source: provenanceSource,
     at: timestamp,
@@ -37,11 +30,6 @@ const setValue = z
   })
   .strict()
 
-/**
- * Strict and value-less. A CLEAR_VALUE carrying a `value` has misunderstood
- * what it is asking for, and guessing on the caller's behalf is how a field
- * ends up holding something nobody meant to record.
- */
 const clearValue = z
   .object({
     type: z.literal('CLEAR_VALUE'),
@@ -79,10 +67,9 @@ const supersede = z
 const licenseType = z.enum(['dealer', 'dismantler', 'exporter', 'salvage'])
 
 /**
- * Strict, because the profile is the ONLY input to the requirements engine.
- * An unrecognised key landing in the profile changes nothing today and
- * silently changes an applicant's legal obligations the day someone adds a
- * rule that reads it.
+ * Strict because the profile is the only input to the requirements engine: an
+ * unrecognised key changes nothing today and changes an applicant's legal
+ * obligations the day a rule reads it.
  */
 const profilePatch = z
   .object({
@@ -118,13 +105,10 @@ export const requestBodySchema = z
 type ParsedAction = z.infer<typeof actionSchema>
 
 /**
- * Rebuilds a real `Action` from parsed input.
- *
- * This is not ceremony. `exactOptionalPropertyTypes` distinguishes "absent"
- * from "present and undefined", and Zod's `.optional()` produces the latter,
- * so spreading the parsed object straight through would hand the reducer a
- * `documentId: undefined` that then lands in provenance as a real key. Each
- * optional is re-attached only when it actually has a value.
+ * Rebuilds a real `Action` from parsed input. Optionals are re-attached one
+ * at a time because Zod's `.optional()` produces "present and undefined",
+ * which `exactOptionalPropertyTypes` treats as a real key — spreading would
+ * land `documentId: undefined` in provenance.
  */
 export function toAction(parsed: ParsedAction): Action {
   switch (parsed.type) {

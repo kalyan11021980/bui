@@ -6,10 +6,7 @@ type Props = {
   onSubmit?: () => void
 }
 
-/**
- * The primary button is NEVER disabled (spec §9). A greyed-out button reads
- * as broken; naming what is outstanding reads as a next step.
- */
+/** The primary button is NEVER disabled. Name what is outstanding instead. */
 export function ProgressSummary({ done, total, onSubmit }: Props) {
   const remaining = total - done
   return (

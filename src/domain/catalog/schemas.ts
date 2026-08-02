@@ -1,19 +1,14 @@
 import { z } from 'zod'
 
 /**
- * Shape AND calendar validity. The format-only version accepted `1982-13-45`,
- * which never mattered while no schema was executed in production; the moment
- * the route began running catalog schemas it became the difference between
- * rejecting a typo'd date of birth and filing it with the IRS.
+ * Calendar validity, not just shape: `1982-13-45` is the difference between
+ * rejecting a typo'd date of birth and filing it with the IRS. Never reads
+ * the clock — "is this in the past" is asked where dates are compared.
  *
- * Pure: it depends on the input string only, never on the current time. "Is
- * this date in the past / has this licence expired" is a separate question,
- * asked where dates are compared, with the timestamp passed in.
+ * Round-tripping catches what the ISO parser silently normalises, so
+ * 2026-02-30 cannot slip through as 2026-03-02.
  */
 function isRealCalendarDate(value: string): boolean {
-  // Date's ISO parser rejects impossible days (2026-02-30, month 13) outright.
-  // Round-tripping back to a string also catches anything it silently
-  // normalises, so 2026-02-30 cannot slip through as 2026-03-02.
   const parsed = new Date(`${value}T00:00:00.000Z`)
   if (Number.isNaN(parsed.getTime())) return false
   return parsed.toISOString().slice(0, 10) === value

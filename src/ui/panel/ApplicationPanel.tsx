@@ -8,11 +8,7 @@ import { COLOR } from '@/ui/theme/tokens'
 import { FieldRow } from './FieldRow'
 import { ProgressSummary } from './ProgressSummary'
 
-/**
- * Supplying these makes every row editable (spec §15 / §11.1), and they come
- * as a pair for the reason FieldRow spells out: a row that can record a value
- * and cannot unrecord it lets the stored record drift away from the screen.
- */
+/** A pair, for the reason FieldRow spells out. */
 type EditHandlers =
   | {
       onChange: (id: RequirementKey, value: unknown) => void
@@ -25,24 +21,14 @@ type Props = EditHandlers & {
   onConfirm?: (id: RequirementKey) => void
   onEdit?: (id: RequirementKey) => void
   onSubmit?: () => void
-  /**
-   * What the applicant's last edit carried elsewhere, so the row they typed
-   * into can say so. Absent when the last edit saved them nothing.
-   */
+  /** Absent when the last edit changed nothing elsewhere. */
   carry?: CarryNotice
 }
 
 /**
- * The panel alone can complete an application. That is a resilience
- * requirement, not a rival to the agent — if the model is down, registration
- * must not be. Spec §11.1.
- *
- * Rows are chunked under headings taken from the catalog's own `section`,
- * in the order the requirements engine emits them. The flat 25-row column
- * this replaces is what made carry invisible — the business address it filled
- * in sat about 600px below the fold — and it was also less structure than the
- * IAA screens being replaced, which at least separated Identification,
- * Address and License Information.
+ * The panel alone can complete an application: if the model is down,
+ * registration must not be. Rows are chunked under headings from the
+ * catalog's own `section`, in the order the requirements engine emits them.
  */
 export function ApplicationPanel(props: Props) {
   const { state, onConfirm, onEdit, onSubmit, carry } = props
@@ -50,8 +36,7 @@ export function ApplicationPanel(props: Props) {
   const outstanding = new Set(outstandingFields(state))
   const done = required.length - outstanding.size
   const sections = groupIntoSections(required)
-  // Passed on as one object so the pairing survives the hand-off; splitting
-  // them into two spreads would let one arrive without the other.
+  // One object, so the pairing survives the hand-off.
   const editing: EditHandlers = props.onChange !== undefined
     ? { onChange: props.onChange, onClear: props.onClear }
     : {}
@@ -76,9 +61,6 @@ export function ApplicationPanel(props: Props) {
           const doneHere = section.fields.filter((id) => !outstanding.has(id)).length
 
           return (
-            // A landmark per section, named by its own heading, so the
-            // headings are navigable rather than decorative — the point of
-            // sectioning is being able to find a thing you were told about.
             <section
               key={section.id}
               aria-labelledby={headingId}
@@ -92,9 +74,8 @@ export function ApplicationPanel(props: Props) {
                   borderBottom: `1px solid ${COLOR.divider}`,
                 }}
               >
-                {/* The count lives BESIDE the heading rather than inside it,
-                    so the section's accessible name stays "Address" and does
-                    not change every time a field is answered. */}
+                {/* Beside the heading, not inside it, so the section's
+                    accessible name stays "Address". */}
                 <h3
                   id={headingId}
                   style={{

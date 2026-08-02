@@ -45,15 +45,9 @@ export type Action =
       fromFieldId?: RequirementKey
     }
   /**
-   * Removes the recorded answer, returning the field to outstanding.
-   *
-   * Distinct from `SET_VALUE` with a null value, which would have to be
-   * exempted from the field's own catalog schema at the route (§8.2) and
-   * would land as `confirmed` by the "the user typed it" rule — an empty
-   * answer counting as done is the bug, not the fix.
-   *
-   * The trail is still append-only: the value that was there is in the
-   * SET_VALUE that put it there, and this records that it stopped applying.
+   * Removes the recorded answer, returning the field to outstanding. Distinct
+   * from `SET_VALUE` with null, which the field's own catalog schema would
+   * have to exempt and which would land as `confirmed`.
    */
   | { type: 'CLEAR_VALUE'; fieldId: RequirementKey; at: string }
   | { type: 'CONFIRM'; fieldId: RequirementKey; at: string; shownCopyHash: string }
@@ -61,9 +55,5 @@ export type Action =
   | { type: 'REJECT'; fieldId: RequirementKey; at: string; reason: string }
   | { type: 'SUPERSEDE'; fieldId: RequirementKey; at: string }
   | { type: 'UPDATE_PROFILE'; patch: Partial<ApplicantProfile>; at: string }
-  /**
-   * Hands the application to review. Refused while anything is outstanding
-   * (spec §8.2), which is not the same as disabling the button: the panel
-   * always lets the attempt happen and answers with what is still missing.
-   */
+  /** Refused while anything is outstanding. */
   | { type: 'SUBMIT'; at: string }

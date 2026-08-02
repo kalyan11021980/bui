@@ -1,9 +1,9 @@
 import type { FieldStatus } from '@/domain/application/state'
 
 /**
- * Sampled from the existing IAA screens (spec §9). Note that RED IS THE
- * BRAND, so red must never signal an error — that is what `error` (orange)
- * is for. Component libraries default `destructive` to red; override it.
+ * Sampled from the existing IAA screens. RED IS THE BRAND, so red must never
+ * signal an error — `error` is orange. Component libraries default
+ * `destructive` to red; override it.
  */
 export const COLOR = Object.freeze({
   primary: '#B82018',
@@ -21,11 +21,7 @@ export const COLOR = Object.freeze({
   surface: '#FFFFFF',
 })
 
-/**
- * `derived` deliberately gets a neutral rather than a fourth hue: red,
- * orange and green are all taken, and the "we read this but you have not
- * confirmed it" state is carried by texture (a dashed rule) instead. Spec §9.
- */
+/** `derived` is neutral by design — that state is carried by texture (a dashed rule). */
 export const STATUS_COLOR: Record<FieldStatus, string> = {
   empty: COLOR.textMuted,
   derived: COLOR.textMuted,

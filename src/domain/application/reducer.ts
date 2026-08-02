@@ -17,12 +17,7 @@ export function createApplication(
   }
 }
 
-/**
- * Thrown when an action would change an application that has already been
- * sent for review. Its own class, not a bare Error, so the route can answer
- * with 409 Conflict — "the state moved on" — rather than 422, which invites a
- * caller to retry with a better value when no value will be accepted.
- */
+/** Its own class so the route can answer 409 rather than 422. */
 export class ApplicationSubmittedError extends Error {
   constructor(message: string) {
     super(message)
@@ -31,14 +26,8 @@ export class ApplicationSubmittedError extends Error {
 }
 
 /**
- * Why this application refuses to change, or null if it does not.
- *
- * Both the condition and the wording live here, so the reducer's throw and
- * the route's 409 cannot drift into disagreeing about when an application is
- * closed or what to tell the person who found out. The message names the
- * time, because "you cannot do that" with no reason is the greyed-out button
- * in a different costume, and it names who to ask, because from the
- * applicant's side there is no self-service way out of this state.
+ * Why this application refuses to change, or null if it does not. Shared by
+ * the reducer's throw and the route's 409 so the two cannot disagree.
  */
 export function submittedRefusal(state: ApplicationState): string | null {
   if (state.submittedAt === null) return null
@@ -50,17 +39,12 @@ export function submittedRefusal(state: ApplicationState): string | null {
 }
 
 /**
- * Every action is refused once `submittedAt` is set — including VERIFY and
- * REJECT, which are reviewer verbs rather than applicant ones. Phase 1 has no
- * authentication at all (see the route's phase-2 TODO), so accepting a
- * reviewer verb here would mean anyone holding the id could mark a submitted
- * KYC record verified. Refusing everything is the only honest position until
- * there is someone to attribute the verb to.
+ * Refuses every action once `submittedAt` is set, including the reviewer
+ * verbs VERIFY and REJECT — phase 1 has no authentication, so anyone holding
+ * the id could otherwise mark a submitted KYC record verified.
  *
- * TODO(phase-4): the repair loop. The spec puts re-opening in phase 4, driven
- * by a REVIEWER's rejection on an authenticated path — never by the applicant
- * deciding to keep typing. That is where VERIFY, REJECT and a re-open
- * transition come back, with an actor recorded on each.
+ * TODO(phase-4): re-open transition, driven by a reviewer on an authenticated
+ * path, which is when VERIFY and REJECT come back with an actor recorded.
  */
 function refuseIfSubmitted(state: ApplicationState): void {
   const refusal = submittedRefusal(state)
@@ -85,10 +69,8 @@ export function applicationReducer(
   state: ApplicationState,
   action: Action,
 ): ApplicationState {
-  // Before the switch, so no action can be added later that quietly escapes
-  // it. Enforced HERE rather than in the route so the client path is covered
-  // by the same rule: an invariant that only one caller honours is not an
-  // invariant (§8.2).
+  // Before the switch, so an action added later cannot escape it. Here rather
+  // than in the route so the client path is covered by the same rule.
   refuseIfSubmitted(state)
 
   switch (action.type) {
@@ -100,8 +82,7 @@ export function applicationReducer(
       }
       const next: FieldState = {
         value: action.value,
-        // A value the user typed is confirmed by the act of typing it.
-        // A value we derived still needs their eyes on it. Spec §9.1.
+        // Typing it is confirming it; anything we derived still needs eyes.
         status: action.source === 'user' ? 'confirmed' : 'derived',
         provenance: {
           source: action.source,
@@ -116,14 +97,10 @@ export function applicationReducer(
 
     case 'CLEAR_VALUE': {
       const current = state.fields[action.fieldId]
-      // Clearing what was never recorded is not an error, it is the state the
-      // caller asked for. Returning `state` itself keeps a no-op cheap and
-      // keeps carry's `applied` list honest about what actually happened.
+      // Clearing what was never recorded is a no-op, not an error.
       if (!current || current.value === null) return state
-      // Provenance goes with the value. "Read from your license, high
-      // confidence" describing a value that is gone is a lie about the
-      // record, and provenance is what a reviewer reads to decide how hard
-      // to look. Any rejection goes too: it was about the old value.
+      // Provenance and rejection go with the value — both described the old
+      // one, and a reviewer reads provenance to decide how hard to look.
       return withField(state, action.fieldId, { value: null, status: 'empty' })
     }
 
@@ -163,12 +140,9 @@ export function applicationReducer(
     }
 
     case 'SUBMIT': {
-      // A second submission is refused by `refuseIfSubmitted` above, together
-      // with every other mutation, rather than by a rule of its own here.
       const outstanding = outstandingFields(state)
       if (outstanding.length > 0) {
-        // §8.2: reject any completion attempt while requirements remain. The
-        // message names them, because "cannot submit" with no reason is the
+        // Names what is missing: "cannot submit" with no reason is the
         // greyed-out button in a different costume.
         throw new Error(
           `Cannot submit: ${outstanding.length} still outstanding — ${outstanding.join(', ')}`,
@@ -180,29 +154,15 @@ export function applicationReducer(
 }
 
 /**
- * Brings stored fields back into line with what the new profile requires.
+ * Brings stored fields back into line with what the new profile requires: no
+ * longer required becomes `superseded`, required again returns to `derived`
+ * ("we still have this, look at it again") rather than counting as answered.
  *
- * Dropping a licence from two to one used to leave `license_number#1` sitting
- * in `state.fields`: invisible to the panel and to `outstandingFields`, but
- * still persisted and still in the audit trail — a licence number the
- * applicant believes they removed. Spec §8.5 specifies `superseded` for
- * exactly this, and both the status and the SUPERSEDE action already existed
- * with nothing dispatching them.
+ * Values are never deleted, only restatused. The supersession is not audited
+ * separately — it is a deterministic function of the profile change, which is
+ * audited together with rulesVersion.
  *
- * The reverse direction matters too: adding the licence back must not leave a
- * required field stuck in a status that no longer describes it. A superseded
- * field that becomes required again returns to `derived`, which is to say
- * "we still have this, please look at it again" rather than silently counting
- * as answered.
- *
- * Values are never deleted — the trail is append-only and so, in spirit, is
- * this. Only the status changes.
- *
- * The supersession is not separately audited: it is a deterministic function
- * of the profile change, which IS audited (patch, since I3) together with the
- * application's rulesVersion, so the trail can reproduce it. Only the resume
- * path — an application reopened after `RULES_VERSION` itself moves — remains
- * deferred to phase 4.
+ * TODO(phase-4): resync on resume, when RULES_VERSION itself has moved.
  */
 function resyncFields(
   state: ApplicationState,

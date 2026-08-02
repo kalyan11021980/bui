@@ -43,17 +43,13 @@ export type StateRule = {
   /** Why, in terms a compliance reviewer can check. */
   note: string
   /**
-   * False until a compliance owner has confirmed this rule against the
-   * state's current requirements. See spec §10.3 — encoding state licensing
-   * rules is not a developer judgement call.
+   * False until a compliance owner has confirmed this against the state's
+   * current requirements. Encoding licensing rules is not a developer call.
    */
   signedOff: boolean
 }
 
-/**
- * Per-state requirements. A state absent from this table gets the national
- * baseline only. Keys are upper-case two-letter codes.
- */
+/** Keyed by upper-case two-letter code. Absent means national baseline only. */
 export const STATE_RULES: Readonly<Record<string, StateRule>> = {
   GA: {
     additional: [],

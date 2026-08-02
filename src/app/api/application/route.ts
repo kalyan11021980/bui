@@ -24,21 +24,9 @@ function fail(status: number, error: string) {
  * With no `id`, creates a new application and returns it. With an `id`,
  * returns that application, or 404.
  *
- * The id is generated HERE, not taken from the query string. Previously any
- * id the caller supplied would be created on demand, so `?id=1` and `?id=2`
- * both worked and the response carries `tax_id.value` — the one place on this
- * branch where a raw taxpayer ID crosses a wire. A UUID is not authorisation,
- * but it stops the ids being enumerable, and this is the response shape
- * phases 2-4 extend.
- *
- * TODO(phase-2): ownership check. Nothing here establishes WHO is asking.
- * Knowing an application id is currently sufficient to read every value in
- * it, including the taxpayer ID and date of birth. What is missing is an
- * authenticated session, an owner recorded on the application at creation,
- * and a comparison of the two before this handler returns anything —
- * plus a decision about whether values should be masked in the response at
- * all, per §8.1. Phase 1 is demo-scoped and in-memory; this must not ship to
- * real applicants as it stands.
+ * TODO(phase-2): no ownership check — knowing an id is enough to read every
+ * value in the application, including tax_id and dob. Needs an authenticated
+ * session and an owner recorded at creation.
  */
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get('id')
@@ -62,14 +50,9 @@ export async function GET(request: Request) {
 }
 
 /**
- * Spec §8.2: invariants live in code, not in prompts. This handler is THE
- * enforcement point — it rejects any action naming a field outside the
- * requirements engine's current set, and any value the field's own schema
- * refuses. Phase 3 puts an LLM on this exact surface, so a check that is only
- * in the panel is not a check at all.
- *
- * Returns 400 for "this is not a well-formed request" and 422 for "this is
- * well-formed and not allowed", so a caller can tell a bug from a rejection.
+ * 400 malformed, 404 unknown, 409 submitted, 422 well-formed but not allowed.
+ * Every action is re-validated here, not just in the panel — phase 3 puts an
+ * LLM on this surface.
  */
 export async function POST(request: Request) {
   let raw: unknown
@@ -85,10 +68,8 @@ export async function POST(request: Request) {
   const current = getApplication(parsed.data.id)
   if (!current) return fail(404, 'unknown application')
 
-  // Checked ahead of the requirements check so a closed application answers
-  // 409 whatever the action carries. Otherwise a bad ZIP posted to a
-  // submitted application would come back 422 — "fix the value and retry" —
-  // when no value will ever be accepted.
+  // Ahead of the requirements check, so a closed application answers 409
+  // whatever the action carries rather than 422 "fix the value and retry".
   const closed = submittedRefusal(current)
   if (closed !== null) return fail(409, closed)
 
@@ -99,35 +80,17 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(applyAction(current, action))
   } catch (error) {
-    // A closed application is a CONFLICT, not a rejected value. 422 says
-    // "well-formed and not allowed", which invites the caller to retry with a
-    // better value; 409 says the state moved on and no value will be
-    // accepted. On a KYC surface the difference is whether an applicant
-    // believes their correction landed.
     if (error instanceof ApplicationSubmittedError) return fail(409, error.message)
-
-    // The reducer enforces its own invariants by throwing (confirming a field
-    // with no value, carrying with no origin). Those are rejected requests,
-    // not server faults: a 500 with a stack trace is both the wrong signal to
-    // the caller and, on a KYC surface, the wrong thing to emit.
+    // The reducer signals a rejected request by throwing; that is a 422, not
+    // a 500 with a stack trace.
     return fail(422, error instanceof Error ? error.message : 'Action rejected')
   }
 }
 
 /**
- * Applies the action, carries what follows from it, and records every one of
- * those in the trail before anything is persisted.
- *
- * Carry runs here rather than being left to a caller because this is the only
- * write path: with it anywhere else, §9's headline case — an applicant typing
- * the same address three times — stays unsolved in the running app, which is
- * exactly where it was.
- *
- * Ordering is deliberate. Every carried SET_VALUE is audited alongside the
- * action that triggered it, because a carried value is still a value that
- * landed in the applicant's record. And an action we cannot audit is an
- * action we must not apply: if any append throws, the store is left holding
- * the previous state rather than a mutation with no corresponding trail.
+ * Carry runs on this path because it is the only write path. Auditing happens
+ * before the store is updated, so an append that throws leaves the previous
+ * state in place rather than a mutation with no trail entry.
  */
 function applyAction(current: ApplicationState, action: Action): ApplicationState {
   const log = getAuditLog()
@@ -142,12 +105,9 @@ function applyAction(current: ApplicationState, action: Action): ApplicationStat
 }
 
 /**
- * Returns a refusal message, or null if the action is allowed.
- *
- * The check is against `requiredFields`, NOT `outstandingFields`: a field the
- * applicant has already confirmed is still a field they are entitled to go
- * back and correct. Outstanding-only would make every answer final on first
- * submission, which is a worse failure than the one being fixed.
+ * A refusal message, or null if the action is allowed. Checked against
+ * `requiredFields` rather than `outstandingFields` — an already-confirmed
+ * field is still one the applicant may go back and correct.
  */
 function checkAgainstRequirements(
   current: ApplicationState,

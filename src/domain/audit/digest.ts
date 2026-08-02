@@ -2,43 +2,22 @@ import { createHmac, scryptSync } from 'node:crypto'
 
 export type Digester = (input: string) => string
 
-/**
- * A fixed, non-secret salt. scrypt's salt exists to stop precomputation being
- * shared across different deployments; it is not the secret. The secret is
- * the HMAC key below.
- */
+/** Not the secret — the HMAC key is. scrypt's salt only scopes precomputation. */
 const SCRYPT_SALT = 'iaa-audit-digest-v1'
 
 /**
- * Keyed AND deliberately slow, in that order.
+ * HMAC-SHA256 under the secret, then scrypt over that output. Keying stops an
+ * attacker holding only the log; the slow hash stops one holding the log and
+ * the secret, which matters because a 9-digit taxpayer ID or a date of birth
+ * is a small enough space to exhaust against a fast hash.
  *
- * 1. HMAC-SHA256 under the secret. Keying stops an attacker who has only the
- *    log: without the secret they cannot compute a candidate digest at all.
- * 2. scrypt over the HMAC output. Slowness stops an attacker who has BOTH the
- *    log and the secret, which matters because the inputs are low-entropy — a
- *    9-digit taxpayer ID or a date of birth is a small enough space to
- *    exhaust against a fast hash.
+ * KNOWN AND ACCEPTED: the digest is deterministic, so the log leaks EQUALITY —
+ * two applications sharing a taxpayer ID are visibly linked to anyone holding
+ * it. Per-entry salting would fix that and destroy the property that makes
+ * these digests useful (showing the value at step 40 is the one confirmed at
+ * step 12). Hiding equality needs a different construction; phase-4 question.
  *
- * The previous version passed the secret as scrypt's *salt* parameter. That
- * is keyed and it does work, but it is not what the salt parameter is for,
- * and a reader checking this against the scrypt spec has to stop and work out
- * whether it is a bug. Feeding scrypt an already-keyed input with a fixed
- * salt uses both primitives the way they are specified.
- *
- * KNOWN AND ACCEPTED: the digest is deterministic, so identical inputs
- * produce identical digests — the log therefore leaks EQUALITY across
- * applicants. Two applications sharing a taxpayer ID are visibly linked to
- * anyone holding the log. This is inherent to a per-value digest and is not
- * fixed by salting per entry, because a per-entry salt would also destroy the
- * only property that makes these digests useful: being able to show that the
- * value recorded at step 40 is the one the applicant confirmed at step 12.
- * Hiding equality needs a different construction (per-application keys, or
- * encryption under a recoverable key) plus a decision about what a compliance
- * reviewer is entitled to see. That is a phase-4 question, recorded here
- * rather than left implied.
- *
- * The secret is injected rather than read from the environment so the domain
- * layer stays pure and testable.
+ * The secret is injected so the domain layer stays pure.
  */
 export function createDigester(secret: string): Digester {
   if (secret.length < 32) {
