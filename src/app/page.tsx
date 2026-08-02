@@ -6,6 +6,7 @@ import { fieldInputId } from '@/ui/panel/FieldInput'
 import {
   applicationReducer, createApplication, isComplete, outstandingFields,
 } from '@/domain/application/reducer'
+import { applyCarry } from '@/domain/application/carry'
 import { COLOR } from '@/ui/theme/tokens'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
@@ -33,15 +34,18 @@ export default function Page() {
     )
 
   const change = (id: RequirementKey, value: unknown) =>
-    setState((s) =>
-      applicationReducer(s, {
-        type: 'SET_VALUE',
-        fieldId: id,
-        value,
-        source: 'user',
-        at: new Date().toISOString(),
-      }),
-    )
+    setState((s) => {
+      const at = new Date().toISOString()
+      // Carry runs on every edit, so filling in a home address populates the
+      // business address as it is typed rather than at some later checkpoint
+      // the applicant has to go and find. Spec §9.
+      return applyCarry(
+        applicationReducer(s, {
+          type: 'SET_VALUE', fieldId: id, value, source: 'user', at,
+        }),
+        at,
+      ).state
+    })
 
   // "Fix this" moves the caret to the field rather than mutating anything:
   // the value is already editable in place, so an edit action would add a

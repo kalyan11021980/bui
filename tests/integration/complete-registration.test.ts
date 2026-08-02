@@ -58,7 +58,7 @@ describe('a whole registration, panel only', () => {
     }
     expect(s.fields.biz_addr_line1).toBeUndefined()
 
-    s = applyCarry(s, AT)
+    s = applyCarry(s, AT).state
 
     // The business address is now populated without the user typing it again,
     // but still needs confirmation — carrying saves typing, not attention.

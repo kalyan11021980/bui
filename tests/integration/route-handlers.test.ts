@@ -125,6 +125,74 @@ describe('POST /api/application', () => {
   })
 })
 
+describe('POST /api/application — carried provenance (§9)', () => {
+  const AT = '2026-08-01T12:00:00.000Z'
+
+  async function business(id: string) {
+    await GET(req(`http://localhost/api/application?id=${id}`))
+    await POST(req('http://localhost/api/application', postBody(id, {
+      type: 'UPDATE_PROFILE', patch: { applicantType: 'business', state: 'GA' }, at: AT,
+    })))
+  }
+
+  it('carries a personal address into the business address on the write path', async () => {
+    // applyCarry had no caller outside tests: the route applied the reducer
+    // and persisted, so §9's headline case was unsolved in the running app.
+    await business('app-1')
+    const res = await POST(req('http://localhost/api/application', postBody('app-1', {
+      type: 'SET_VALUE', fieldId: 'addr_line1', value: '2345 Anywhere St',
+      source: 'user', at: AT,
+    })))
+
+    const body = (await res.json()) as ApplicationState
+    expect(body.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
+    // Carried, so still `derived`: the applicant confirms it. Carrying saves
+    // typing, not attention.
+    expect(body.fields.biz_addr_line1?.status).toBe('derived')
+    expect(body.fields.biz_addr_line1?.provenance?.fromFieldId).toBe('addr_line1')
+  })
+
+  it('audits every carried value, not just the action that triggered it', async () => {
+    await business('app-1')
+    const before = getAuditLog().sizeFor('app-1')
+
+    await POST(req('http://localhost/api/application', postBody('app-1', {
+      type: 'SET_VALUE', fieldId: 'addr_city', value: 'Atlanta',
+      source: 'user', at: AT,
+    })))
+
+    const trail = getAuditLog().entriesFor('app-1')
+    expect(trail.length).toBe(before + 2)
+    const carried = trail.find((e) => e.fieldId === 'biz_addr_city')
+    expect(carried).toBeDefined()
+    expect(carried?.source).toBe('carried')
+    expect(carried?.value).toBe('Atlanta')
+  })
+
+  it('persists the carried value, not just the reduced one', async () => {
+    await business('app-1')
+    await POST(req('http://localhost/api/application', postBody('app-1', {
+      type: 'SET_VALUE', fieldId: 'addr_zip', value: '30301',
+      source: 'user', at: AT,
+    })))
+
+    const res = await GET(req('http://localhost/api/application?id=app-1'))
+    const reloaded = (await res.json()) as ApplicationState
+    expect(reloaded.fields.biz_addr_zip?.value).toBe('30301')
+  })
+
+  it('does not carry into fields an individual applicant is never asked for', async () => {
+    await GET(req('http://localhost/api/application?id=app-2'))
+    const res = await POST(req('http://localhost/api/application', postBody('app-2', {
+      type: 'SET_VALUE', fieldId: 'addr_line1', value: '2345 Anywhere St',
+      source: 'user', at: AT,
+    })))
+
+    const body = (await res.json()) as ApplicationState
+    expect(body.fields.biz_addr_line1).toBeUndefined()
+  })
+})
+
 /**
  * Spec §8.2 names this handler as the enforcement point. Every case below
  * returned 200 and was stored before this wave. Phase 3 puts an LLM on this

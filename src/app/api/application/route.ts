@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { applyCarry } from '@/domain/application/carry'
 import {
   describeZodError, requestBodySchema, toAction,
 } from '@/domain/application/action-schema'
@@ -77,16 +78,27 @@ export async function POST(request: Request) {
  * Applies the action, carries what follows from it, and records every one of
  * those in the trail before anything is persisted.
  *
- * Ordering is deliberate: an action we cannot audit is an action we must not
- * apply, so if any append throws, the store is left holding the previous
- * state rather than a mutation with no corresponding trail entry.
+ * Carry runs here rather than being left to a caller because this is the only
+ * write path: with it anywhere else, §9's headline case — an applicant typing
+ * the same address three times — stays unsolved in the running app, which is
+ * exactly where it was.
+ *
+ * Ordering is deliberate. Every carried SET_VALUE is audited alongside the
+ * action that triggered it, because a carried value is still a value that
+ * landed in the applicant's record. And an action we cannot audit is an
+ * action we must not apply: if any append throws, the store is left holding
+ * the previous state rather than a mutation with no corresponding trail.
  */
 function applyAction(current: ApplicationState, action: Action): ApplicationState {
   const log = getAuditLog()
-  const next = applicationReducer(current, action)
+  const reduced = applicationReducer(current, action)
+  const carried = applyCarry(reduced, action.at)
+
   log.append(current.id, action)
-  putApplication(next)
-  return next
+  for (const carriedAction of carried.applied) log.append(current.id, carriedAction)
+
+  putApplication(carried.state)
+  return carried.state
 }
 
 /**
