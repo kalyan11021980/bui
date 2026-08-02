@@ -45,4 +45,17 @@ describe('demoteForCardExtent', () => {
   it('demotes when nothing was detected at all', () => {
     expect(demoteForCardExtent('full', [], 2000)).toBe('text-only')
   })
+
+  it('spans across all detections, not just the first', () => {
+    // Combined span 100-800 = 700/1000 * 2000px = 1400px, full. Reading only
+    // detections[0] (span 100-200) would give 200px and demote wrongly.
+    const detections = [spanning(100, 200), spanning(700, 800)]
+    expect(demoteForCardExtent('full', detections, 2000)).toBe('full')
+  })
+
+  it('keeps full at exactly the 1000px card-width boundary', () => {
+    // 500/1000 * 2000px = 1000px of card, right at CROP_FLOOR_PX.
+    const detections = [spanning(0, 500)]
+    expect(demoteForCardExtent('full', detections, 2000)).toBe('full')
+  })
 })
