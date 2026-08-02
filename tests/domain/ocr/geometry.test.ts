@@ -12,6 +12,13 @@ describe('toPixels — stretch', () => {
     const result = toPixels([250, 500, 500, 750], { width: 800, height: 400 }, 'stretch')
     expect(result).toEqual({ x: 200, y: 200, width: 200, height: 100 })
   })
+
+  it('clamps an inverted box to non-negative width and height', () => {
+    // x0 > x1 and y0 > y1: malformed model output, not filtered upstream.
+    const result = toPixels([600, 700, 200, 300], { width: 1600, height: 1000 }, 'stretch')
+    expect(result.width).toBeGreaterThanOrEqual(0)
+    expect(result.height).toBeGreaterThanOrEqual(0)
+  })
 })
 
 describe('toPixels — pad', () => {
@@ -33,6 +40,13 @@ describe('toPixels — pad', () => {
     const result = toPixels([0, 0, 1000, 100], { width: 1600, height: 800 }, 'pad')
     expect(result.y).toBe(0)
     expect(result.height).toBe(0)
+  })
+
+  it('clamps an inverted box to non-negative width and height', () => {
+    // x0 > x1 and y0 > y1: malformed model output, not filtered upstream.
+    const result = toPixels([600, 700, 200, 300], { width: 1600, height: 800 }, 'pad')
+    expect(result.width).toBeGreaterThanOrEqual(0)
+    expect(result.height).toBeGreaterThanOrEqual(0)
   })
 })
 
