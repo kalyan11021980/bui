@@ -88,8 +88,10 @@ export function applicationReducer(
       })
     }
 
-    case 'UPDATE_PROFILE':
-      return { ...state, profile: { ...state.profile, ...action.patch } }
+    case 'UPDATE_PROFILE': {
+      const profile: ApplicantProfile = { ...state.profile, ...action.patch }
+      return { ...state, profile, fields: resyncFields(state, profile) }
+    }
 
     case 'SUBMIT': {
       if (state.submittedAt !== null) {
@@ -107,6 +109,51 @@ export function applicationReducer(
       return { ...state, submittedAt: action.at }
     }
   }
+}
+
+/**
+ * Brings stored fields back into line with what the new profile requires.
+ *
+ * Dropping a licence from two to one used to leave `license_number#1` sitting
+ * in `state.fields`: invisible to the panel and to `outstandingFields`, but
+ * still persisted and still in the audit trail — a licence number the
+ * applicant believes they removed. Spec §8.5 specifies `superseded` for
+ * exactly this, and both the status and the SUPERSEDE action already existed
+ * with nothing dispatching them.
+ *
+ * The reverse direction matters too: adding the licence back must not leave a
+ * required field stuck in a status that no longer describes it. A superseded
+ * field that becomes required again returns to `derived`, which is to say
+ * "we still have this, please look at it again" rather than silently counting
+ * as answered.
+ *
+ * Values are never deleted — the trail is append-only and so, in spirit, is
+ * this. Only the status changes.
+ *
+ * The supersession is not separately audited: it is a deterministic function
+ * of the profile change, which IS audited (patch, since I3) together with the
+ * application's rulesVersion, so the trail can reproduce it. Only the resume
+ * path — an application reopened after `RULES_VERSION` itself moves — remains
+ * deferred to phase 4.
+ */
+function resyncFields(
+  state: ApplicationState,
+  profile: ApplicantProfile,
+): ApplicationState['fields'] {
+  const required = new Set(requiredFields(profile))
+  const next: ApplicationState['fields'] = { ...state.fields }
+
+  for (const [key, field] of Object.entries(state.fields)) {
+    if (!field) continue
+
+    if (!required.has(key) && field.status !== 'superseded') {
+      next[key] = { ...field, status: 'superseded' }
+    } else if (required.has(key) && field.status === 'superseded' && field.value !== null) {
+      next[key] = { ...field, status: 'derived' }
+    }
+  }
+
+  return next
 }
 
 function requireField(

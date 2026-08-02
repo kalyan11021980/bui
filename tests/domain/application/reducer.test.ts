@@ -210,3 +210,110 @@ describe('SUBMIT', () => {
     expect(isComplete(after)).toBe(true)
   })
 })
+
+describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)', () => {
+  const twoLicences: ApplicantProfile = {
+    applicantType: 'business', country: 'US', state: 'GA',
+    wantsGsa: false, licenses: ['dealer', 'salvage'],
+  }
+
+  function withTwoLicenceNumbers() {
+    let s = createApplication('app-1', twoLicences)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'license_number#0', value: 'GA-DLR-1',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'license_number#1', value: 'GA-SLV-2',
+      source: 'user', at: AT,
+    })
+    return s
+  }
+
+  it('supersedes a licence field orphaned by dropping a licence', () => {
+    // license_number#1 used to stay in state.fields: invisible to the panel
+    // and to outstandingFields, but still persisted and still logged — a
+    // licence number the applicant believes they removed.
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+    expect(s.fields['license_number#0']?.status).toBe('confirmed')
+  })
+
+  it('keeps the superseded value rather than deleting it', () => {
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.value).toBe('GA-SLV-2')
+  })
+
+  it('leaves a superseded field out of the outstanding set and out of completion', () => {
+    const s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(outstandingFields(s)).not.toContain('license_number#1')
+  })
+
+  it('supersedes business fields when a business becomes an individual', () => {
+    let s = createApplication('app-1', twoLicences)
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'tax_id', value: '12-3456789',
+      source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { applicantType: 'individual', licenses: [] }, at: AT,
+    })
+    expect(s.fields.tax_id?.status).toBe('superseded')
+  })
+
+  it('revives a superseded field to derived when it is required again', () => {
+    // Otherwise adding the licence back leaves a required field stuck in a
+    // status that no longer describes it.
+    let s = applicationReducer(withTwoLicenceNumbers(), {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer', 'salvage'] }, at: AT,
+    })
+    // `derived`, not `confirmed`: we still have the value, and the applicant
+    // gets to look at it again rather than have it silently count as answered.
+    expect(s.fields['license_number#1']?.status).toBe('derived')
+    expect(s.fields['license_number#1']?.value).toBe('GA-SLV-2')
+    expect(outstandingFields(s)).toContain('license_number#1')
+  })
+
+  it('leaves still-required fields alone', () => {
+    const before = withTwoLicenceNumbers()
+    const s = applicationReducer(before, {
+      type: 'UPDATE_PROFILE', patch: { state: 'OH' }, at: AT,
+    })
+    expect(s.fields['license_number#0']?.status).toBe('confirmed')
+    expect(s.fields['license_number#1']?.status).toBe('confirmed')
+  })
+
+  it('does not mutate the state it resyncs', () => {
+    const before = withTwoLicenceNumbers()
+    const snapshot = JSON.stringify(before)
+    applicationReducer(before, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('does not let an orphaned licence number block completion', () => {
+    let s = withTwoLicenceNumbers()
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { licenses: ['dealer'] }, at: AT,
+    })
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    expect(isComplete(s)).toBe(true)
+    expect(s.fields['license_number#1']?.status).toBe('superseded')
+  })
+})
