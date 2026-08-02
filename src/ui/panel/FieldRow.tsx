@@ -3,6 +3,7 @@ import { fieldDef } from '@/domain/catalog'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { FieldInput, fieldInputId } from './FieldInput'
+import { formatValue } from './format'
 import { Rationale } from './Rationale'
 
 type Props = {
@@ -82,7 +83,7 @@ export function FieldRow({ fieldId, state, onConfirm, onEdit, onChange }: Props)
           selected, so the stored names are printed. */}
       {state?.value != null && (!onChange || def.type === 'file') && (
         <div style={{ fontSize: 15, color: COLOR.textPrimary, margin: '4px 0' }}>
-          {String(state.value)}
+          {formatValue(state.value, def.type)}
         </div>
       )}
 

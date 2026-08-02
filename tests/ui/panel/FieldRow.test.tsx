@@ -61,6 +61,26 @@ describe('FieldRow', () => {
     expect(screen.queryByRole('button', { name: /looks right/i })).toBeNull()
   })
 
+  it('renders a list of files readably rather than running the names together', () => {
+    render(
+      <FieldRow
+        fieldId="id_images"
+        state={{ value: ['front.jpg', 'back.jpg'], status: 'confirmed' }}
+      />,
+    )
+    expect(screen.getByText('2 files: front.jpg, back.jpg')).toBeInTheDocument()
+  })
+
+  it('never renders [object Object] for a structured value', () => {
+    render(
+      <FieldRow
+        fieldId="addr_line1"
+        state={{ value: { street: '2345 Anywhere St' }, status: 'derived' }}
+      />,
+    )
+    expect(document.body.textContent).not.toContain('[object Object]')
+  })
+
   it('shows a human-readable rejection reason', () => {
     render(
       <FieldRow
