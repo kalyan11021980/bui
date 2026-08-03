@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractAamva, splitAddressBlock } from '@/domain/ocr/extract/aamva'
+import { extractAamva, respaceAddress, splitAddressBlock } from '@/domain/ocr/extract/aamva'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
 import type { Detection } from '@/domain/ocr/grounding'
 
@@ -347,5 +347,39 @@ describe('splitAddressBlock', () => {
   it('does not invent a state from the last two letters of the city', () => {
     expect(splitAddressBlock('1 A ST\nANYTOWN95818')).toEqual({})
     expect(splitAddressBlock('1 A ST\nSPRINGFIELD 62704')).toEqual({})
+  })
+})
+
+describe('respaceAddress', () => {
+  it('borrows word breaks from the plain pass', () => {
+    expect(respaceAddress('123STREETADDRESS', '123 Street Address')).toBe('123 STREET ADDRESS')
+  })
+
+  it('never substitutes a glyph, even where the plain pass reads differently', () => {
+    // The grounded pass's own zero survives — the plain pass's letter O is
+    // never copied over it. This is the safety condition the whole task
+    // exists for: see task-15-brief.md.
+    const respaced = respaceAddress('5235J0HNTYLERHWY', '5235 JOHN TYLER HWY')
+    expect(respaced).toBe('5235 J0HN TYLER HWY')
+    expect(respaced).toContain('0')
+    expect(respaced).not.toContain('JOHN')
+  })
+
+  it('leaves the value unspaced when the plain pass has nothing that lines up', () => {
+    // Real case: ma_2016's plain pass drops the house number entirely, so
+    // no window of the full value's length can align without guessing.
+    const raw = '123NORTHMAINSTREETAPT.1'
+    const unrelated = 'North Main Street, Apt. 1'
+    expect(respaceAddress(raw, unrelated)).toBe(raw)
+  })
+
+  it('leaves the value unspaced against text with no correspondence at all', () => {
+    const raw = '123STREETADDRESS'
+    expect(respaceAddress(raw, 'completely unrelated text with no bearing here')).toBe(raw)
+  })
+
+  it('is a no-op with no plain pass, or nothing to space', () => {
+    expect(respaceAddress('123STREETADDRESS', '')).toBe('123STREETADDRESS')
+    expect(respaceAddress('', 'some text')).toBe('')
   })
 })

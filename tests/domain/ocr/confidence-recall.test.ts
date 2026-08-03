@@ -115,4 +115,55 @@ describe('confidence against ground truth', () => {
         .toBeLessThan(QUIET_THRESHOLD)
     }
   })
+
+  it('re-spaces a genuinely correct address into cross-pass agreement', () => {
+    // Before re-spacing, WA's own street and city — spelled correctly by
+    // both passes — disagreed on nothing but the missing spaces and scored
+    // 0.47. That was the cross-pass signal lying about every address.
+    const wa = fixtures.find((f) => slug(f.image) === 'wa_enhanced.png')
+    const scored = scoredFields(wa!)
+    const line1 = scored.find((c) => c.key === 'addr_line1')
+    const city = scored.find((c) => c.key === 'addr_city')
+
+    expect(line1?.raw).toBe('123 STREET ADDRESS')
+    expect(city?.raw).toBe('YOUR CITY')
+    expect(line1?.evidence.crossPassAgreed).toBe(true)
+    expect(city?.evidence.crossPassAgreed).toBe(true)
+    expect(scoreEvidence(line1!.evidence)).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+    expect(scoreEvidence(city!.evidence)).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+  })
+
+  /**
+   * Locked rather than counted, same reasoning as aamva-recall.test.ts's
+   * TOTALS: measured before re-spacing (2026-08-02) at 10 of 28 address
+   * fields quiet, 19 agreed / 9 disagreed. After: 13 quiet, 24 agreed / 4
+   * disagreed — every flip is a spacing artefact going away, not a misread
+   * being waved through (the test above and the CA/VA glyph cases guard
+   * that). Two fields stay unspaced on purpose: the plain pass for ma_2016
+   * and dc_2018's addr_line1 does not contain the same text (a missing house
+   * number, a split across lines) close enough to align safely.
+   */
+  it('quiets 13 of 28 address fields across the corpus, up from 10 before re-spacing', () => {
+    const ADDR = new Set(['addr_line1', 'addr_city', 'addr_state', 'addr_zip'])
+    let total = 0
+    let quiet = 0
+    let agreed = 0
+    let disagreed = 0
+
+    for (const f of fixtures) {
+      for (const c of scoredFields(f)) {
+        if (!ADDR.has(c.key)) continue
+        total += 1
+        if (scoreEvidence(c.evidence) >= QUIET_THRESHOLD) quiet += 1
+        if (c.evidence.crossPassAgreed === true) agreed += 1
+        if (c.evidence.crossPassAgreed === false) disagreed += 1
+      }
+    }
+
+    // Guards the tallies below: an empty corpus would pass every count as 0.
+    expect(total).toBe(28)
+    expect(quiet).toBe(13)
+    expect(agreed).toBe(24)
+    expect(disagreed).toBe(4)
+  })
 })

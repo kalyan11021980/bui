@@ -1,4 +1,6 @@
+import { respaceAddress } from './extract/aamva'
 import type { Candidate, Evidence } from './extract/types'
+import { parseReqKey } from '@/domain/requirements/key'
 
 /** At or above this a row goes quiet. Below it, the crop comes out. */
 export const QUIET_THRESHOLD = 0.8
@@ -62,6 +64,24 @@ export function scoreEvidence(evidence: Evidence): number {
   return Math.min(1, Math.max(0, Number(score.toFixed(3))))
 }
 
+/**
+ * Free-text address lines and cities, the only fields grounded OCR runs
+ * together with no space at all. State and ZIP are single fixed-shape
+ * tokens — nothing to re-space, so left alone to avoid inventing a boundary
+ * inside a two-letter code.
+ */
+const RESPACE_FIELDS: ReadonlySet<string> = new Set([
+  'addr_line1', 'addr_line2', 'addr_city', 'biz_addr_line1', 'biz_addr_line2', 'biz_addr_city',
+])
+
+function fieldIdOf(key: string): string {
+  try {
+    return parseReqKey(key).fieldId
+  } catch {
+    return key
+  }
+}
+
 const WORD_CHAR = /[A-Z0-9]/
 
 /** `needle` as a whole token in `haystack`, not merely a substring — 'CA' in
@@ -109,9 +129,18 @@ export function withCrossPass(
   const haystack = plainText.toUpperCase()
 
   return candidates.map((candidate) => {
-    const needle = (candidate.asRead ?? candidate.raw).toUpperCase()
+    // Re-spaced first, so cross-pass compares the same value the applicant
+    // will see — not the space-stripped one that always disagreed on a
+    // spacing artefact rather than a misread. `raw`, not `asRead`: an
+    // address has no pre-conversion form the way a date does, it just has a
+    // right-side-up printed one.
+    const raw = RESPACE_FIELDS.has(fieldIdOf(candidate.key))
+      ? respaceAddress(candidate.raw, plainText)
+      : candidate.raw
+    const needle = (candidate.asRead ?? raw).toUpperCase()
     return {
       ...candidate,
+      raw,
       evidence: {
         ...candidate.evidence,
         crossPassAgreed: isWholeWordMatch(haystack, needle),

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { extractAamva } from '@/domain/ocr/extract/aamva'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
+import { QUIET_THRESHOLD, scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
 import type { Detection } from '@/domain/ocr/grounding'
 
 /**
@@ -16,6 +17,7 @@ type Fixture = {
   image: string
   detections: Detection[]
   text: string
+  plainText: string
 }
 
 type Truth = { image: string; fields: Record<string, string | string[]> }
@@ -32,6 +34,13 @@ const truth: Truth[] = JSON.parse(
 ).specimens
 
 const slug = (path: string): string => path.split('/').pop() ?? path
+
+/** The one named specimen a test wants, not the whole corpus array. */
+function fixture(name: string): Fixture {
+  const found = cards.find((c) => slug(c.image) === `${name}.png`)
+  if (!found) throw new Error(`no fixture named ${name}`)
+  return found
+}
 
 /** Grounded output has no spaces and OCR keeps or drops punctuation at whim. */
 const flat = (value: string): string => value.toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -235,5 +244,16 @@ describe('AAMVA recall against recorded specimens', () => {
       expect(c.evidence.checksumValid, c.key).toBeNull()
       expect(c.evidence.crossPassAgreed, c.key).toBeNull()
     }
+  })
+
+  it('leaves a misread address disagreeing, however it is spaced', () => {
+    const card = fixture('va_2023')
+    const [line1] = withCrossPass(
+      parseCandidates(extractAamva(card.detections, card.text)), card.plainText,
+    ).filter((c) => c.key === 'addr_line1')
+
+    // The zero-for-O survives re-spacing, so the passes still disagree.
+    expect(line1?.raw).toContain('0')
+    expect(scoreEvidence(line1!.evidence)).toBeLessThan(QUIET_THRESHOLD)
   })
 })

@@ -76,6 +76,62 @@ export function splitAddressBlock(raw: string): {
   return { line1: lines.slice(0, -1).join(' '), ...tail }
 }
 
+/** How much of the aligned window may miss before it is not a match at all. */
+const RESPACE_MISMATCH_RATIO = 0.3
+
+/**
+ * Grounded output never carries a space; the plain pass does, but can misread
+ * a glyph the grounded pass read correctly (or vice versa) — so its
+ * characters cannot be trusted, only its word breaks. Finds the plain-pass
+ * window whose letters best line up with `raw`'s own, then copies over only
+ * the space positions from that window. `raw`'s characters are never
+ * replaced, so a wrong glyph the grounded pass read stays wrong and visible —
+ * see the safety condition in task-15-brief.md.
+ */
+export function respaceAddress(raw: string, plainText: string): string {
+  const rawChars = [...raw].filter((c) => !/\s/.test(c))
+  if (rawChars.length === 0 || plainText.trim() === '') return raw
+
+  const plainChars: string[] = []
+  const spaceAfter: boolean[] = []
+  for (const ch of plainText.toUpperCase()) {
+    if (/\s/.test(ch)) {
+      if (spaceAfter.length > 0) spaceAfter[spaceAfter.length - 1] = true
+      continue
+    }
+    plainChars.push(ch)
+    spaceAfter.push(false)
+  }
+
+  const needle = rawChars.map((c) => c.toUpperCase())
+  const span = needle.length
+  if (plainChars.length < span) return raw
+
+  let bestStart = -1
+  let bestMismatches = span + 1
+  for (let start = 0; start + span <= plainChars.length; start += 1) {
+    let mismatches = 0
+    for (let i = 0; i < span && mismatches < bestMismatches; i += 1) {
+      if (plainChars[start + i] !== needle[i]) mismatches += 1
+    }
+    if (mismatches < bestMismatches) {
+      bestMismatches = mismatches
+      bestStart = start
+    }
+  }
+
+  // No plausible alignment: leave the value exactly as extracted. An ugly
+  // unspaced value is safe; guessing word breaks against unrelated text is not.
+  if (bestStart === -1 || bestMismatches > Math.ceil(span * RESPACE_MISMATCH_RATIO)) return raw
+
+  let out = ''
+  for (let i = 0; i < span; i += 1) {
+    out += rawChars[i]
+    if (spaceAfter[bestStart + i] && i < span - 1) out += ' '
+  }
+  return out
+}
+
 /**
  * Anchors a card prints flush against a letter value, with no separator left
  * for us to see. Everything else that runs straight into a letter is a fragment
