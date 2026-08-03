@@ -41,7 +41,7 @@ describe.skipIf(!ENDPOINT || !MODEL)('fit model calibration', () => {
     const endpoint = ENDPOINT!
     const model = MODEL!
 
-    const observed: Record<string, Record<string, number[]>> = {}
+    const observed: Record<string, Record<string, Box>> = {}
     const perImage: Record<string, Record<FitModel, number>> = {}
 
     for (const truth of truths) {
@@ -55,7 +55,7 @@ describe.skipIf(!ENDPOINT || !MODEL)('fit model calibration', () => {
       const missing: string[] = []
       for (const marker of Object.keys(truth.markers)) {
         const found = findValue(detections, marker)
-        if (found) observed[truth.image]![marker] = [...found.box]
+        if (found) observed[truth.image]![marker] = found.box
         else missing.push(marker)
       }
 
@@ -72,7 +72,7 @@ describe.skipIf(!ENDPOINT || !MODEL)('fit model calibration', () => {
         for (const [text, trueBox] of Object.entries(truth.markers)) {
           const box = observed[truth.image]![text]
           if (!box) continue
-          const m = toPixels(box as unknown as Box, truth.size, fit)
+          const m = toPixels(box, truth.size, fit)
           const mapped: Box = [m.x, m.y, m.x + m.width, m.y + m.height]
           const iou = intersectionOverUnion(mapped, trueBox)
           scores.push(iou)
@@ -100,9 +100,11 @@ describe.skipIf(!ENDPOINT || !MODEL)('fit model calibration', () => {
     }
 
     // The square is the control: both models are arithmetically identical on it,
-    // so a difference here means the harness is wrong, not the server.
+    // so a difference here means the harness is wrong, not the server. Assert it
+    // is present — a guarded check silently evaporates if the entry is renamed.
     const square = perImage['sample/licenses/calibration/square.png']
-    if (square) expect(square.pad).toBeCloseTo(square.stretch, 6)
+    expect(square, 'square control missing from truth.json').toBeDefined()
+    expect(square!.pad).toBeCloseTo(square!.stretch, 6)
 
     expect(Object.keys(observed).length).toBe(truths.length)
   }, 600_000)

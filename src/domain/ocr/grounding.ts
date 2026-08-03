@@ -4,7 +4,7 @@
  * against the model's own square input. The HTTP call lives in `@/server/ocr`.
  */
 
-/** `[x0, y0, x1, y1]`, 0-1000, origin top-left. */
+/** `[x0, y0, x1, y1]`, origin top-left — 0-1000 from the model, pixels once mapped. */
 export type Box = readonly [number, number, number, number]
 
 export type Detection = {
