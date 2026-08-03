@@ -1,9 +1,12 @@
+import { StrictMode } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Page from '@/app/page'
-import { createApplication } from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
+import { isComplete } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
+import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
 
@@ -41,8 +44,11 @@ const PROFILE: ApplicantProfile = {
 
 const BOX = [100, 200, 400, 260] as const
 
-/** The application as the server would return it after reading a licence. */
-function withDlNumber(state: ApplicationState): ApplicationState {
+/**
+ * The application as the server would return it after reading a licence.
+ * Below the crop floor it records no box at all, so `placed` is false there.
+ */
+function withDlNumber(state: ApplicationState, placed = true): ApplicationState {
   return {
     ...state,
     fields: {
@@ -50,7 +56,10 @@ function withDlNumber(state: ApplicationState): ApplicationState {
       dl_number: {
         value: 'WDLJK00580GF',
         status: 'derived',
-        provenance: { source: 'ocr', documentId: 'doc-1', box: BOX, confidence: 0.9 },
+        provenance: {
+          source: 'ocr', documentId: 'doc-1', confidence: 0.9,
+          ...(placed && { box: BOX }),
+        },
       },
     },
   }
@@ -59,11 +68,30 @@ function withDlNumber(state: ApplicationState): ApplicationState {
 type Call = { url: string; body: unknown }
 
 let calls: Call[]
+/** A string body is sent as-is, unparsed — Next answers a 500 with HTML. */
 let respond: (call: Call) => { status: number; body: unknown }
 /** Set to hold every action response open until the test lets it go. */
 let holdActions: Promise<void> | null
 
 const created = () => createApplication('app-1', PROFILE)
+
+/** Everything the engine asks of this profile, answered and confirmed. */
+function completed(): ApplicationState {
+  const at = '2026-08-03T00:00:00.000Z'
+  const answers: [RequirementKey, unknown][] = [
+    ['primary_activity', 'dealer'], ['preferred_language', 'English'],
+    ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
+    ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'], ['id_images', ['front.png']],
+    ['id_country', 'US'], ['id_state', 'GA'],
+    ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
+    ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
+  ]
+  return answers.reduce(
+    (state, [fieldId, value]) =>
+      applicationReducer(state, { type: 'SET_VALUE', fieldId, value, source: 'user', at }),
+    created(),
+  )
+}
 
 beforeEach(() => {
   calls = []
@@ -75,9 +103,12 @@ beforeEach(() => {
     const call = { url, body: init.body ? JSON.parse(String(init.body)) : undefined }
     calls.push(call)
     if (holdActions && url.endsWith('/actions')) await holdActions
+    // Throwing here is a request that never reached a server.
     const { status, body } = respond(call)
-    return new Response(JSON.stringify(body), {
-      status, headers: { 'content-type': 'application/json' },
+    const html = typeof body === 'string'
+    return new Response(html ? body : JSON.stringify(body), {
+      status,
+      headers: { 'content-type': html ? 'text/html' : 'application/json' },
     })
   })
 })
@@ -113,12 +144,11 @@ describe('the page', () => {
 
     await waitFor(() => expect(uploads()).toHaveLength(1))
     // No imageSize: the route is strict, and derives the size from the bytes.
+    // The payload is bare — a data: URL has its own refusal on the route.
     expect(uploads()[0]?.body).toEqual({
       docType: 'drivers_license',
       imageBase64: 'cHJlcGFyZWQtYnl0ZXM=',
     })
-    expect(String((uploads()[0]?.body as { imageBase64: string }).imageBase64))
-      .not.toMatch(/^data:/)
   })
 
   it('asks for the document the applicant said they hold', async () => {
@@ -209,6 +239,42 @@ describe('the page', () => {
     expect(input).toHaveValue('D1234567')
   })
 
+  it('stays calm when the 500 is an HTML error page, which is what Next sends', async () => {
+    // The shape production actually produces. Every other test here stubs a
+    // JSON body, so the guard that keeps `response.json()` from throwing was
+    // never travelled by a test at all.
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? { status: 500, body: '<!DOCTYPE html><html><body>Internal Server Error</body></html>' }
+        : { status: 200, body: created() }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    expect(await screen.findByText(/could not read your document/i))
+      .toHaveTextContent(/nothing is lost/i)
+    expect(screen.queryByText(/DOCTYPE|Internal Server Error/)).toBeNull()
+  })
+
+  it('says the same thing when the request never reaches a server at all', async () => {
+    // No response, so no status and no message to pass on: offline and a 500
+    // are one story to the applicant, and both leave the form to them.
+    respond = (call) => {
+      if (call.url.endsWith('/documents')) throw new TypeError('Failed to fetch')
+      return { status: 200, body: created() }
+    }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    expect(await screen.findByText(/could not read your document/i))
+      .toHaveTextContent(/nothing is lost/i)
+  })
+
   it('passes a refusal on in the words the route chose', async () => {
     respond = (call) =>
       call.url.endsWith('/documents')
@@ -221,6 +287,45 @@ describe('the page', () => {
     await uploadPhoto()
 
     expect(await screen.findByText(/too small to read/i)).toBeInTheDocument()
+  })
+
+  it('says plainly when the document gave up nothing, without calling it a failure', async () => {
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? { status: 200, body: { band: 'full', filled: [], state: created() } }
+        : { status: 200, body: created() }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    expect(await screen.findByText(/could not read anything from that photo/i))
+      .toHaveTextContent(/still yours to answer/i)
+  })
+
+  it('explains missing crops when the server is the one that says the card was small', async () => {
+    // A big photo of a distant card reads fine and crops wrong, and the server
+    // demotes it after the read. The client's own pre-flight never fires here,
+    // so this sentence is the only place the applicant learns why.
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? {
+            status: 200,
+            body: {
+              band: 'text-only', filled: ['dl_number'],
+              state: withDlNumber(created(), false),
+            },
+          }
+        : { status: 200, body: created() }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    const said = await screen.findByText(/we filled in 1 answer/i)
+    expect(said).toHaveTextContent(/too small to show you where each answer came from/i)
   })
 
   it('takes down what it said about the last photo when a new one is chosen', async () => {
@@ -328,5 +433,84 @@ describe('the page', () => {
 
     expect(await screen.findByText(/could not start your application/i)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /your application/i })).toBeNull()
+  })
+
+  it('starts one application, not one per render pass', async () => {
+    // Strict mode runs effects twice. A second application is a second
+    // abandoned record, and the first one's id is the one already on screen.
+    render(<StrictMode><Page /></StrictMode>)
+
+    await screen.findByRole('region', { name: /your application/i })
+    expect(calls.filter((c) => c.url === '/api/application')).toHaveLength(1)
+  })
+})
+
+describe('an application that has been sent for review', () => {
+  it('offers no more edits, and says why', async () => {
+    respond = () => ({ status: 200, body: { ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' } })
+
+    render(<Page />)
+
+    expect(await screen.findByText(/sent for review/i))
+      .toHaveTextContent(/can no longer be changed/i)
+    // Nothing to type into and nothing to confirm: the reducer would refuse
+    // both, so the panel must stop offering them.
+    expect(screen.queryByLabelText(/first name/i, {
+      selector: 'input, select, textarea',
+    })).toBeNull()
+    expect(screen.queryByRole('button', { name: /looks right/i })).toBeNull()
+  })
+
+  it('stops taking documents, which the route would refuse anyway', async () => {
+    respond = () => ({ status: 200, body: { ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' } })
+
+    render(<Page />)
+    await screen.findByText(/sent for review/i)
+
+    expect(screen.getByLabelText(/photo of your/i)).toBeDisabled()
+  })
+})
+
+describe('sending the application', () => {
+  it('sends a complete application and tells the server, once', async () => {
+    respond = () => ({ status: 200, body: completed() })
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+    // Guards the fixture: a state that was not complete would make the
+    // assertions below pass for the wrong reason.
+    expect(isComplete(completed())).toBe(true)
+
+    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByText(/sent for review/i)).toBeInTheDocument()
+    await waitFor(() => expect(actions()).toHaveLength(1))
+    expect(actions()[0]?.body).toMatchObject({ action: { type: 'SUBMIT' } })
+  })
+
+  it('refuses an incomplete application by naming what is missing, not by throwing', async () => {
+    // The reducer answers an incomplete SUBMIT by throwing. That is a
+    // developer's message, and it must not be what the applicant meets — so
+    // the escaping error is asserted on, not only its absence of effect.
+    const escaped: unknown[] = []
+    const catchError = (event: ErrorEvent) => {
+      escaped.push(event.error ?? event.message)
+      event.preventDefault()
+    }
+    window.addEventListener('error', catchError)
+
+    try {
+      render(<Page />)
+      await screen.findByRole('region', { name: /your application/i })
+
+      await userEvent.click(screen.getByRole('button', { name: /submit/i }))
+
+      expect(await screen.findByText(/not sent yet/i)).toHaveTextContent(/still needed above/i)
+      expect(escaped).toEqual([])
+      expect(actions()).toHaveLength(0)
+      expect(screen.queryByText(/sent for review/i)).toBeNull()
+    } finally {
+      window.removeEventListener('error', catchError)
+    }
   })
 })

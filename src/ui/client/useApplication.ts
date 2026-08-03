@@ -81,7 +81,11 @@ export function useApplication(): UseApplication {
     })
   }, [])
 
-  /** Reduces locally, mirrors upward, and reports what carry did. */
+  /**
+   * Reduces locally, mirrors upward, and reports what carry did. The null
+   * guard is the compiler's, not a case: the page renders no handlers until
+   * there is an application.
+   */
   const dispatch = (action: Action, from?: RequirementKey) => {
     if (!state) return
     const result = applyCarry(applicationReducer(state, action), action.at)
@@ -127,12 +131,14 @@ export function useApplication(): UseApplication {
     enqueue(async () => {
       const result = await sendDocument(state.id, docType, image.imageBase64)
       if (!result.ok) {
-        // A transport failure is a 500 by design, so an unset endpoint cannot
-        // pass for an empty read. It is still not an error page: the applicant
-        // fills the form in themselves, exactly as they would have.
-        setNotice(result.status === null || result.status >= 500
-          ? NO_READER
-          : result.message ?? NO_READER)
+        // A refusal below 500 already carries words written for a person. A
+        // 5xx does not — a transport failure is one by design, so an unset
+        // endpoint cannot pass for an empty read — and neither does a request
+        // that never arrived. Neither is an error page: the applicant fills
+        // the form in themselves, exactly as they would have.
+        const refusal =
+          result.status !== null && result.status < 500 ? result.message : null
+        setNotice(refusal ?? NO_READER)
         return
       }
       setState(result.value.state)

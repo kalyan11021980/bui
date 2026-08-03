@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { DocumentUpload } from '@/ui/panel/DocumentUpload'
@@ -112,6 +112,22 @@ describe('DocumentUpload', () => {
     // describes one the applicant has moved on from.
     await vi.waitFor(() => expect(onChoose).toHaveBeenCalledTimes(1))
     expect(await screen.findByRole('status')).toHaveTextContent(/too small to read/i)
+  })
+
+  it('says nothing when the picker is opened and closed again', async () => {
+    // A cancelled picker fires the same change event with no file. Treating it
+    // as a photo would put a verdict on screen about nothing.
+    const onRead = vi.fn()
+    const onChoose = vi.fn()
+    render(
+      <DocumentUpload docType="drivers_license" onRead={onRead} onChoose={onChoose} />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/photo of your/i), { target: { files: [] } })
+
+    expect(onChoose).not.toHaveBeenCalled()
+    expect(onRead).not.toHaveBeenCalled()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('says so plainly when the photo cannot be opened at all', async () => {

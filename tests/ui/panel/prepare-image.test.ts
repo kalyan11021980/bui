@@ -77,8 +77,8 @@ describe('prepareImage', () => {
 
     const prepared = await prepareImage(photo())
 
+    // The route refuses a `data:` prefix with a message of its own.
     expect(prepared.imageBase64).toBe('QUJD')
-    expect(prepared.imageBase64).not.toMatch(/^data:/)
     // The crops clip the same pixels the server measured, not the original file.
     expect(prepared.imageUrl).toBe('data:image/jpeg;base64,QUJD')
   })
