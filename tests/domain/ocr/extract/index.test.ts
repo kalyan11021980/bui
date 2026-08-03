@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import { extractFor, parseCandidates, registerStrategy } from '@/domain/ocr/extract'
+import type { Candidate, Evidence } from '@/domain/ocr/extract/types'
+
+const noEvidence: Evidence = {
+  schemaParsed: false, labelAnchored: false,
+  checksumValid: null, crossPassAgreed: null, boxPlausible: null,
+}
+
+const candidate = (key: string, raw: string): Candidate =>
+  ({ key, raw, evidence: { ...noEvidence } })
+
+describe('extractFor', () => {
+  it('returns nothing for a document type with no strategy', () => {
+    expect(extractFor('proof_of_residency', [], '')).toEqual([])
+  })
+
+  it('routes to the registered strategy', () => {
+    registerStrategy('state_id', () => [candidate('first_name', 'JAMIE')])
+    const out = extractFor('state_id', [], '')
+    expect(out).toHaveLength(1)
+    expect(out[0]?.key).toBe('first_name')
+  })
+
+  it('does not hand another document type the state_id strategy', () => {
+    // Registered above — a lookup keyed on docType, not "whatever is registered".
+    expect(extractFor('drivers_license', [], '')).toEqual([])
+  })
+})
+
+describe('parseCandidates', () => {
+  it('keeps a value its field schema accepts, and records that it parsed', () => {
+    const [kept] = parseCandidates([candidate('dob', '1982-04-17')])
+    expect(kept?.raw).toBe('1982-04-17')
+    expect(kept?.evidence.schemaParsed).toBe(true)
+  })
+
+  it('drops a value the schema rejects rather than lowering its score', () => {
+    // A date that is not a date is not a low-confidence date.
+    expect(parseCandidates([candidate('dob', '1982-13-45')])).toEqual([])
+  })
+
+  it('drops a licence number too short to be one', () => {
+    expect(parseCandidates([candidate('dl_number', 'A1')])).toEqual([])
+  })
+
+  it('parses an instanced key against its bare field definition', () => {
+    const kept = parseCandidates([candidate('license_number#0', 'GA-DLR-99481')])
+    expect(kept).toHaveLength(1)
+  })
+
+  it('drops a candidate for a field that is not in the catalog', () => {
+    expect(parseCandidates([candidate('not_a_field', 'x')])).toEqual([])
+  })
+})
