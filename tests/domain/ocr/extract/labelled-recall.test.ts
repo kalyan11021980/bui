@@ -29,16 +29,26 @@ const docs: Fixture[] = readdirSync('sample/licenses/fixtures')
   .filter((f) => f.docType === 'dealer_license' || f.docType === 'proof_of_residency')
 
 /**
- * Locked rather than merely counted, so a change to what the strategy reads
- * has to be argued for in a diff rather than silently drifting a console.log
- * nobody reads. Verified by eye against the rendered image (dealer licence)
- * and against the fixture's own detections (utility bill, bank statement) —
- * see `docs/superpowers/decisions/2026-08-02-labelled-recall.md`.
+ * Locked as key AND value, so a change to what the strategy reads — or a
+ * change to which value it attaches to a key it already read — has to be
+ * argued for in a diff rather than silently drifting a console.log nobody
+ * reads. A key-only lock would pass a candidate that kept its field but
+ * swapped in a neighbouring label's value; that failure mode is exactly what
+ * a box-adjacency search over several nearby detections can produce.
+ *
+ * Values verified by eye against the rendered image (dealer licence) and
+ * against the fixture's own detections (utility bill, bank statement) — see
+ * `docs/superpowers/decisions/2026-08-02-labelled-recall.md`.
  */
-const EXPECTED: Record<string, readonly string[]> = {
-  dealer_license: ['license_number#0', 'license_effective#0', 'license_expiry#0', 'biz_legal_name'],
-  chicago_utility_bill: [],
-  bank_statement: [],
+const EXPECTED: Record<string, Readonly<Record<string, string>>> = {
+  dealer_license: {
+    'license_number#0': 'DLR-0000-4471',
+    'license_effective#0': '2025-03-01',
+    'license_expiry#0': '2027-02-28',
+    biz_legal_name: 'SPECIMEN AUTO SALES LLC',
+  },
+  chicago_utility_bill: {},
+  bank_statement: {},
 }
 
 describe('labelled recall', () => {
@@ -56,7 +66,8 @@ describe('labelled recall', () => {
 
       const want = EXPECTED[doc.slug]
       expect(want, doc.slug).toBeDefined()
-      expect([...out.map((c) => c.key)].sort(), doc.slug).toEqual([...(want ?? [])].sort())
+      const got = Object.fromEntries(out.map((c) => [c.key, c.raw]))
+      expect(got, doc.slug).toEqual(want ?? {})
     }
   })
 
