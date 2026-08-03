@@ -178,6 +178,21 @@ describe('extractAamva', () => {
     expect(read(detections, 'addr_line1')?.raw).toBe('MAIN STREET')
   })
 
+  it('does not take a date line as the street under an address code', () => {
+    // The walk down from code 8 takes the lines under it in order, and an
+    // issue date printed between the code and the street is first in that
+    // order. `labelAnchored` pins this to the anchored walk, not the fallback.
+    const detections = [
+      det('8Address', [333, 442, 425, 473]),
+      det('01/12/2016', [340, 475, 500, 505]),
+      det('123NORTHMAINSTREET', [340, 508, 600, 538]),
+      det('NORTHQUINCY,MA02171-1748', [340, 540, 620, 570]),
+    ]
+    const line1 = read(detections, 'addr_line1')
+    expect(line1?.raw).toBe('123NORTHMAINSTREET')
+    expect(line1?.evidence.labelAnchored).toBe(true)
+  })
+
   it('does not reach across the card for a value', () => {
     // A tall ghost column to the right overlaps the label's row without ever
     // being beside it — ma_2016 prints exactly such a band.
