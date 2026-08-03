@@ -112,6 +112,15 @@ const asServer = (call: Call) => ({
   body: call.url === '/api/application' ? started() : created(),
 })
 
+/** A server that takes the document and reads nothing out of it. */
+const readNothing = (call: Call) =>
+  call.url.endsWith('/documents')
+    ? {
+        status: 200,
+        body: { band: 'full', documentId: 'doc-1', filled: [], state: created() },
+      }
+    : asServer(call)
+
 /** The same, for a server that answers with one particular application. */
 const serving = (state: ApplicationState) => (call: Call) => ({
   status: 200,
@@ -221,6 +230,46 @@ describe('the page', () => {
     )
     await waitFor(() => expect(uploads()).toHaveLength(1))
     expect((uploads()[0]?.body as { docType: string }).docType).toBe('passport')
+  })
+
+  it('asks for a dealer licence once the applicant says they hold one', async () => {
+    // The route has always taken all five document types; the page offered
+    // three, so a business applicant could not upload the one document that
+    // fills their licence and business fields at all.
+    respond = readNothing
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+    expect(screen.queryByLabelText(/photo of your dealer license/i)).toBeNull()
+
+    await userEvent.selectOptions(screen.getByLabelText(/applicant/i), 'business')
+    await userEvent.selectOptions(screen.getByLabelText(/licences/i), '1')
+
+    // Both, not one instead of the other: the licence proves the business,
+    // the ID proves the person holding it.
+    expect(screen.queryByLabelText(/photo of your driver's license/i)).toBeInTheDocument()
+    const dealer = screen.queryByLabelText(/photo of your dealer license/i)
+    expect(dealer).toBeInTheDocument()
+    await userEvent.upload(dealer!, new File(['x'], 'dealer.png', { type: 'image/png' }))
+
+    await waitFor(() => expect(uploads()).toHaveLength(1))
+    expect((uploads()[0]?.body as { docType: string }).docType).toBe('dealer_license')
+  })
+
+  it('asks for proof of address only when the address is not the one on the ID', async () => {
+    respond = readNothing
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+    expect(screen.queryByLabelText(/photo of your proof of address/i)).toBeNull()
+
+    await userEvent.click(screen.getByLabelText(/address differs from id/i))
+
+    expect(screen.queryByLabelText(/photo of your driver's license/i)).toBeInTheDocument()
+    const proof = screen.queryByLabelText(/photo of your proof of address/i)
+    expect(proof).toBeInTheDocument()
+    await userEvent.upload(proof!, new File(['x'], 'bill.png', { type: 'image/png' }))
+
+    await waitFor(() => expect(uploads()).toHaveLength(1))
+    expect((uploads()[0]?.body as { docType: string }).docType).toBe('proof_of_residency')
   })
 
   it('fills the form in from the document, still asking the applicant to check it', async () => {

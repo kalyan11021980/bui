@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
-import type { DocType } from '@/domain/field-id'
+import { documentsToUpload } from '@/domain/requirements/documents'
 import { useApplication } from '@/ui/client/useApplication'
 import { ProfileControls } from '@/ui/demo/ProfileControls'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
@@ -44,10 +44,10 @@ export default function Page() {
     app.submit()
   }
 
-  // One document, named by the ID the applicant said they hold: asking a
-  // passport holder to choose "passport" again is a question we already have
-  // the answer to.
-  const docType: DocType = state.profile.idForm
+  // Each named by what it is: asking a passport holder to choose "passport"
+  // again is a question we already have the answer to, and a dealer is not
+  // asked for a licence they never said they hold.
+  const docTypes = documentsToUpload(state.profile)
 
   return (
     <main style={{ padding: 24 }}>
@@ -57,12 +57,15 @@ export default function Page() {
         disabled={closed}
       />
 
-      <DocumentUpload
-        docType={docType}
-        onRead={(image) => app.readDocument(docType, image)}
-        onChoose={app.forgetDocumentNotice}
-        disabled={closed}
-      />
+      {docTypes.map((docType) => (
+        <DocumentUpload
+          key={docType}
+          docType={docType}
+          onRead={(image) => app.readDocument(docType, image)}
+          onChoose={app.forgetDocumentNotice}
+          disabled={closed}
+        />
+      ))}
 
       {app.notice && (
         <p role="status" style={{ ...notice, background: COLOR.surface }}>
