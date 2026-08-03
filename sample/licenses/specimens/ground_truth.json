@@ -162,6 +162,19 @@
         "addr_state": "VA",
         "addr_zip": "24450"
       }
+    },
+    {
+      "image": "nl_passport_2014.png",
+      "px": [1500, 1132],
+      "notes": "ICAO Doc 9303 Netherlands specimen passport. Dates transcribed as ISO, not as printed, since the visual field (`10 MAA/MAR 1965`) and the MRZ both round-trip to it. `passport_number` is read off the visual `documentnummer` field, which matches the MRZ document-number zone.",
+      "fields": {
+        "last_name": "De Bruijn",
+        "first_name": "Willeke",
+        "id_country": "NLD",
+        "passport_number": "SPECI2014",
+        "dob": "1965-03-10",
+        "dl_expiry": "2024-03-09"
+      }
     }
   ]
 }
