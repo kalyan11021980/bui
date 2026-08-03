@@ -1,20 +1,27 @@
 """Render synthetic licence cards with exact ground-truth boxes.
 
-Three assets:
-  card_<dpi>.png    an AAMVA-ish licence at a real physical size, so every
-                    point size on it corresponds to real printed type.
-  ladder_<dpi>.png  a point-size ladder, 5pt to 12pt, to find the size at
-                    which DeepSeek-OCR stops reading after the 500px resize.
-  <ratio>.png       calibration cards carrying four edge markers, rendered at
-                    three aspect ratios to separate the two fit models.
+Four assets:
+  card_<dpi>.png       an AAMVA-ish licence at a real physical size, so every
+                       point size on it corresponds to real printed type.
+  ladder_<dpi>.png     a point-size ladder, 5pt to 12pt, to find the size at
+                       which DeepSeek-OCR stops reading after the 500px resize.
+  <ratio>.png          calibration cards carrying four edge markers, rendered at
+                       three aspect ratios to separate the two fit models.
+  dealer_license.png   a stand-in for the one document type no issuing
+                       authority publishes a specimen of.
 
 The card and ladder emit boxes normalised 0-1000 (DeepSeek-OCR's own grounding
 scale), so a returned box compares without rescaling. The calibration cards
 emit TRUE PIXEL boxes instead: the mapping back into pixel space is the thing
 under test, so normalising the truth would assume the answer.
+
+Renders everything by default; name targets to render a subset:
+
+    python render_cards.py dealer
 """
 
 import json
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -225,7 +232,66 @@ def render_calibration(name: str, W: int, H: int) -> dict:
     }
 
 
-if __name__ == "__main__":
+# No US state publishes a specimen of an issued dealer licence, so this one
+# document type has to be invented. Franklin is not a state: a synthetic asset
+# that named a real one would eventually be mistaken for that state's document.
+DEALER_FIELDS = [
+    ("LICENSE NUMBER", "DLR-0000-4471", "license_number"),
+    ("LICENSE TYPE", "USED MOTOR VEHICLE DEALER", "license_type"),
+    ("BUSINESS NAME", "SPECIMEN AUTO SALES LLC", "biz_legal_name"),
+    ("DOING BUSINESS AS", "SAMPLE MOTORS", "biz_name"),
+    ("BUSINESS ADDRESS", "100 SPECIMEN ROAD", "biz_addr_line1"),
+    ("", "FRANKLIN CITY, FR 00000", "biz_addr_city_state_zip"),
+    ("EFFECTIVE DATE", "03/01/2025", "license_effective"),
+    ("EXPIRATION DATE", "02/28/2027", "license_expiry"),
+]
+
+
+def render_dealer_license() -> dict:
+    """A wall certificate, roughly letter landscape at 150dpi."""
+    W, H = 1275, 990
+    img = Image.new("RGB", (W, H), "#fbfaf6")
+    d = ImageDraw.Draw(img)
+    d.rectangle([24, 24, W - 25, H - 25], outline="#1b3a6b", width=4)
+    d.rectangle([40, 40, W - 41, H - 41], outline="#8d99a6", width=1)
+
+    d.text((W / 2, 96), "STATE OF FRANKLIN", font=font_px(BOLD, 46),
+           fill="#1b3a6b", anchor="mm")
+    d.text((W / 2, 148), "DEPARTMENT OF MOTOR VEHICLES", font=font_px(REG, 26),
+           fill="#3a4550", anchor="mm")
+    d.text((W / 2, 214), "MOTOR VEHICLE DEALER LICENSE", font=font_px(BOLD, 34),
+           fill="#101418", anchor="mm")
+    d.line([180, 250, W - 180, 250], fill="#1b3a6b", width=2)
+
+    truth: dict[str, dict] = {}
+    label_f, value_f = font_px(REG, 20), font_px(BOLD, 30)
+    y = 320
+    for label, value, key in DEALER_FIELDS:
+        if label:
+            d.text((120, y), label, font=label_f, fill="#5a6672")
+            y += 26
+        d.text((120, y), value, font=value_f, fill="#101418")
+        x0, y0, x1, y1 = d.textbbox((120, y), value, font=value_f)
+        truth[key] = {
+            "value": value,
+            "box": [round(x0 / W * 1000), round(y0 / H * 1000),
+                    round(x1 / W * 1000), round(y1 / H * 1000)],
+        }
+        y += 44 if label else 40
+
+    d.text((W / 2, H - 96), "SYNTHETIC SPECIMEN - NOT AN ISSUED LICENSE",
+           font=font_px(BOLD, 22), fill="#a03030", anchor="mm")
+
+    path = OUT / "dealer_license.png"
+    img.save(path)
+    (OUT / "dealer_license_truth.json").write_text(json.dumps(
+        {"image": path.name, "synthetic": True, "px": [W, H], "fields": truth},
+        indent=2,
+    ))
+    return {"image": path.name, "px": [W, H], "fields": truth}
+
+
+def render_all_calibration() -> None:
     calibration = [
         render_calibration(name, w, h) for name, (w, h) in CALIB_RATIOS.items()
     ]
@@ -235,6 +301,8 @@ if __name__ == "__main__":
               f"{c['size']['width']}x{c['size']['height']}px  "
               f"{len(c['markers'])} markers")
 
+
+def render_sweep() -> None:
     manifest = []
     # A sweep, not a sample. 600dpi is a generous scan; 150dpi is roughly a
     # 500px capture. Below that the card is smaller than anything the server
@@ -248,3 +316,20 @@ if __name__ == "__main__":
     for m in manifest:
         print(f"{m['image']:20s} {m['px'][0]}x{m['px'][1]}px  "
               f"{len(m['fields'])} fields")
+
+
+def render_dealer() -> None:
+    m = render_dealer_license()
+    print(f"{m['image']:20s} {m['px'][0]}x{m['px'][1]}px  "
+          f"{len(m['fields'])} fields")
+
+
+TARGETS = {
+    "calibration": render_all_calibration,
+    "sweep": render_sweep,
+    "dealer": render_dealer,
+}
+
+if __name__ == "__main__":
+    for name in sys.argv[1:] or list(TARGETS):
+        TARGETS[name]()

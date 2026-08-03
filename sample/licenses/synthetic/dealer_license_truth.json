@@ -1,0 +1,82 @@
+{
+  "image": "dealer_license.png",
+  "synthetic": true,
+  "px": [
+    1275,
+    990
+  ],
+  "fields": {
+    "license_number": {
+      "value": "DLR-0000-4471",
+      "box": [
+        94,
+        356,
+        263,
+        378
+      ]
+    },
+    "license_type": {
+      "value": "USED MOTOR VEHICLE DEALER",
+      "box": [
+        94,
+        426,
+        465,
+        448
+      ]
+    },
+    "biz_legal_name": {
+      "value": "SPECIMEN AUTO SALES LLC",
+      "box": [
+        94,
+        497,
+        426,
+        519
+      ]
+    },
+    "biz_name": {
+      "value": "SAMPLE MOTORS",
+      "box": [
+        94,
+        568,
+        301,
+        590
+      ]
+    },
+    "biz_addr_line1": {
+      "value": "100 SPECIMEN ROAD",
+      "box": [
+        94,
+        638,
+        339,
+        661
+      ]
+    },
+    "biz_addr_city_state_zip": {
+      "value": "FRANKLIN CITY, FR 00000",
+      "box": [
+        94,
+        683,
+        388,
+        710
+      ]
+    },
+    "license_effective": {
+      "value": "03/01/2025",
+      "box": [
+        94,
+        749,
+        212,
+        772
+      ]
+    },
+    "license_expiry": {
+      "value": "02/28/2027",
+      "box": [
+        94,
+        820,
+        212,
+        842
+      ]
+    }
+  }
+}
