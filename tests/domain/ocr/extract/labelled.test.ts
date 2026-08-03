@@ -87,4 +87,26 @@ describe('extractLabelled', () => {
     // 30th, so this must be dropped rather than normalised to March.
     expect(extractLabelled([det('Expires 02/30/2027')], '')).toEqual([])
   })
+
+  it('rejects a licence-number neighbour with no digit at all, independent of isLabel', () => {
+    // "SAMPLE MOTORS" is not a known label word, so isLabel would not catch
+    // it; the digit-shape check is the only thing standing between this and
+    // a business name being read as a licence number.
+    const out = extractLabelled([
+      at('LICENSE NUMBER', [91, 320, 233, 344]),
+      at('SAMPLE MOTORS', [91, 351, 260, 381]),
+    ], '')
+    expect(out.find((c) => c.key === 'license_number#0')).toBeUndefined()
+  })
+
+  it('rejects an inline remainder that is itself a label word, on a field with no date safety net', () => {
+    // license_effective/expiry are protected twice over: a bad inline match
+    // also has to survive isoFrom. biz_legal_name has no such second check,
+    // so this is the one place the inline label-word guard is load-bearing
+    // on its own. Contrived phrasing — no fixture prints "Business Name
+    // Type" — chosen specifically to isolate the guard from every other
+    // defence.
+    const out = extractLabelled([det('Business Name Type')], '')
+    expect(out.find((c) => c.key === 'biz_legal_name')).toBeUndefined()
+  })
 })
