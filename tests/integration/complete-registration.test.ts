@@ -8,6 +8,9 @@ import { getApplication, putApplication, __resetStoreForTests } from '@/server/s
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Action } from '@/domain/application/state'
 
+/** The domain does not check it; the server does. */
+const OWNER = 'owner-token-1'
+
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
@@ -20,7 +23,7 @@ beforeEach(() => __resetStoreForTests())
 
 describe('a whole registration, panel only', () => {
   it('completes with no LLM and no OCR', () => {
-    let s = createApplication('app-1', business)
+    let s = createApplication('app-1', business, OWNER)
     const log = new AuditLog(digest)
 
     for (const id of outstandingFields(s)) {
@@ -45,7 +48,7 @@ describe('a whole registration, panel only', () => {
   })
 
   it('saves the applicant from typing their address twice', () => {
-    let s = createApplication('app-1', business)
+    let s = createApplication('app-1', business, OWNER)
     for (const [id, v] of [
       ['addr_line1', '2345 Anywhere St'],
       ['addr_city', 'Atlanta'],
@@ -70,7 +73,7 @@ describe('a whole registration, panel only', () => {
   })
 
   it('round-trips through the store', () => {
-    const s = createApplication('app-1', business)
+    const s = createApplication('app-1', business, OWNER)
     putApplication(s)
     expect(getApplication('app-1')?.id).toBe('app-1')
     expect(getApplication('nope')).toBeUndefined()

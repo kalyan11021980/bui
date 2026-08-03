@@ -21,6 +21,8 @@ import type { RequirementKey } from '@/domain/requirements/key'
 
 export type IngestInput = {
   readonly applicationId: string
+  /** From the request header. An id alone does not open an application. */
+  readonly ownerToken: string | null
   readonly docType: DocType
   /** Bare base64 payload, no `data:` prefix. Held for the call and discarded. */
   readonly imageBase64: string
@@ -44,10 +46,10 @@ const DATA_URL =
 export async function ingestDocument(
   input: IngestInput,
 ): Promise<Result<IngestOutcome>> {
-  // Before the read: an application that does not exist, or one already sent
-  // for review, cannot be told anything — and a two-pass OCR call on its
-  // behalf is spent for nothing.
-  const existing = getApplication(input.applicationId)
+  // Before the read: an application that does not exist, one the caller does
+  // not hold the token for, or one already sent for review cannot be told
+  // anything — and a two-pass OCR call on its behalf is spent for nothing.
+  const existing = getApplication(input.applicationId, input.ownerToken)
   if (!existing.ok) return existing
 
   // Every other write path refuses a submitted application. Accepting an
@@ -86,7 +88,7 @@ export async function ingestDocument(
   for (const candidate of candidates) {
     const box = provenanceBox(band, candidate.box, imageSize)
 
-    const result = applyAction(input.applicationId, {
+    const result = applyAction(input.applicationId, input.ownerToken, {
       type: 'SET_VALUE',
       fieldId: candidate.key,
       value: candidate.raw,
@@ -107,7 +109,7 @@ export async function ingestDocument(
   // for as they are today. Fetch rather than mutate: a no-op action would put
   // an event in the audit log saying something happened.
   if (state === null) {
-    const current = getApplication(input.applicationId)
+    const current = getApplication(input.applicationId, input.ownerToken)
     if (!current.ok) return current
     state = current.value
   }

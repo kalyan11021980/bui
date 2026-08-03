@@ -56,8 +56,11 @@ function unwrap(result: Result<IngestOutcome>): IngestOutcome {
   return result.value
 }
 
+/** An application as its owner holds it: the id, and the token that opens it. */
+type Owned = { id: string; ownerToken: string | null }
+
 /** Answers everything an individual owes, then sends it for review. */
-function submit(applicationId: string): void {
+function submit(app: Owned): void {
   const answers: [string, unknown][] = [
     ['primary_activity', 'dealer'], ['preferred_language', 'English'],
     ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
@@ -67,21 +70,26 @@ function submit(applicationId: string): void {
     ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
   ]
   for (const [fieldId, value] of answers) {
-    const result = applyAction(applicationId, {
+    const result = applyAction(app.id, app.ownerToken, {
       type: 'SET_VALUE', fieldId, value, source: 'user', at: AT,
     })
     expect(result.ok, fieldId).toBe(true)
   }
-  expect(applyAction(applicationId, { type: 'SUBMIT', at: AT }).ok).toBe(true)
+  expect(applyAction(app.id, app.ownerToken, { type: 'SUBMIT', at: AT }).ok).toBe(true)
 }
 
 function ingest(
-  applicationId: string,
+  app: Owned,
   imageBase64: string,
   ocr: OcrProvider = provider,
 ) {
   return ingestDocument({
-    applicationId, docType: 'drivers_license', imageBase64, at: AT, provider: ocr,
+    applicationId: app.id,
+    ownerToken: app.ownerToken,
+    docType: 'drivers_license',
+    imageBase64,
+    at: AT,
+    provider: ocr,
   })
 }
 
@@ -93,7 +101,7 @@ beforeEach(() => {
 describe('ingestDocument', () => {
   it('fills fields from a full-resolution card and marks them derived', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL))
+    const outcome = unwrap(await ingest(app, FULL))
 
     expect(outcome.band).toBe('full')
     expect(outcome.filled).toContain('dl_number')
@@ -109,7 +117,7 @@ describe('ingestDocument', () => {
 
   it('files every field of one upload under the same document id', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL))
+    const outcome = unwrap(await ingest(app, FULL))
     const ids = outcome.filled.map((key) => outcome.state.fields[key]?.provenance?.documentId)
 
     expect(new Set(ids).size).toBe(1)
@@ -117,7 +125,7 @@ describe('ingestDocument', () => {
 
   it('records a box in original-image pixels when the band allows crops', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL))
+    const outcome = unwrap(await ingest(app, FULL))
 
     // [60,200,940,240] of 1000, stretched onto 1600x1000. Asserted as the
     // exact rectangle: a crop that is merely "wider than it is tall" would
@@ -127,7 +135,7 @@ describe('ingestDocument', () => {
 
   it('suppresses boxes in the text-only band but still fills the fields', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, SMALL))
+    const outcome = unwrap(await ingest(app, SMALL))
 
     expect(outcome.band).toBe('text-only')
     expect(outcome.filled).toContain('dl_number')
@@ -142,7 +150,7 @@ describe('ingestDocument', () => {
       'WDLJK00580GF',
     )
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL, distant))
+    const outcome = unwrap(await ingest(app, FULL, distant))
 
     expect(outcome.band).toBe('text-only')
     expect(outcome.filled).toContain('dl_number')
@@ -160,7 +168,7 @@ describe('ingestDocument', () => {
       'WDLJK00580GF 04/17/1982',
     )
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL, wide))
+    const outcome = unwrap(await ingest(app, FULL, wide))
 
     expect(outcome.band).toBe('full')
     expect(outcome.filled).toContain('dl_number')
@@ -173,7 +181,7 @@ describe('ingestDocument', () => {
   it('refuses to call OCR below the read floor, and writes nothing', async () => {
     let called = false
     const app = createApplication()
-    const result = await ingest(app.id, TINY, async () => {
+    const result = await ingest(app, TINY, async () => {
       called = true
       return { text: '', detections: [] }
     })
@@ -192,9 +200,9 @@ describe('ingestDocument', () => {
     // their ID was accepted onto a record that cannot change.
     let called = false
     const app = createApplication()
-    submit(app.id)
+    submit(app)
 
-    const result = await ingest(app.id, FULL, async () => {
+    const result = await ingest(app, FULL, async () => {
       called = true
       return { text: '', detections: [] }
     })
@@ -210,7 +218,7 @@ describe('ingestDocument', () => {
     // canvas.toDataURL() hands the client one of these. The message has to
     // name the prefix, or a perfectly good PNG reads as "not an image".
     const app = createApplication()
-    const result = await ingest(app.id, `data:image/png;base64,${FULL}`)
+    const result = await ingest(app, `data:image/png;base64,${FULL}`)
 
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -222,7 +230,7 @@ describe('ingestDocument', () => {
     // A payload that would otherwise read fine: the cap is what refuses it,
     // not the header parser giving up on garbage.
     const app = createApplication()
-    const result = await ingest(app.id, FULL + 'A'.repeat(MAX_IMAGE_BASE64_CHARS))
+    const result = await ingest(app, FULL + 'A'.repeat(MAX_IMAGE_BASE64_CHARS))
 
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -232,7 +240,7 @@ describe('ingestDocument', () => {
   it('refuses a payload that is not an image it can measure', async () => {
     let called = false
     const app = createApplication()
-    const result = await ingest(app.id, 'not-an-image', async () => {
+    const result = await ingest(app, 'not-an-image', async () => {
       called = true
       return { text: '', detections: [] }
     })
@@ -245,7 +253,7 @@ describe('ingestDocument', () => {
 
   it('attaches a confidence to every field it fills', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, FULL))
+    const outcome = unwrap(await ingest(app, FULL))
 
     expect(outcome.filled.length).toBeGreaterThan(0)
     for (const key of outcome.filled) {
@@ -259,11 +267,11 @@ describe('ingestDocument', () => {
     // Wires the confidence scorer to the second pass. Same card, same boxes;
     // only the plain read differs.
     const app = createApplication()
-    const agreed = unwrap(await ingest(app.id, FULL))
+    const agreed = unwrap(await ingest(app, FULL))
 
     __resetStoreForTests()
     const other = createApplication()
-    const silent = unwrap(await ingest(other.id, FULL, providerFor(CARD, '')))
+    const silent = unwrap(await ingest(other, FULL, providerFor(CARD, '')))
 
     const score = (o: IngestOutcome) => o.state.fields.dl_number?.provenance?.confidence ?? 0
     expect(score(agreed)).toBeGreaterThan(score(silent))
@@ -272,7 +280,7 @@ describe('ingestDocument', () => {
   it('fills nothing and fails nothing when the read yields no fields', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(
-      app.id, FULL,
+      app, FULL,
       providerFor([det('NOTHINGUSEFUL', [60, 200, 940, 240])], 'NOTHING USEFUL'),
     ))
 
@@ -284,7 +292,7 @@ describe('ingestDocument', () => {
   })
 
   it('404s an application that does not exist, even when it read nothing', async () => {
-    const result = await ingest('no-such-application', FULL, providerFor([], ''))
+    const result = await ingest({ id: 'no-such-application', ownerToken: 'any-token' }, FULL, providerFor([], ''))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.failure.kind).toBe('unknown')
@@ -294,12 +302,12 @@ describe('ingestDocument', () => {
     // An applicant who declared a state ID and uploaded a licence: dl_number
     // is not part of their application, dob still is.
     const app = createApplication()
-    const updated = applyAction(app.id, {
+    const updated = applyAction(app.id, app.ownerToken, {
       type: 'UPDATE_PROFILE', patch: { idForm: 'state_id' }, at: AT,
     })
     expect(updated.ok).toBe(true)
 
-    const outcome = unwrap(await ingest(app.id, FULL))
+    const outcome = unwrap(await ingest(app, FULL))
 
     expect(outcome.filled).not.toContain('dl_number')
     expect(outcome.filled).toContain('dob')
@@ -311,7 +319,7 @@ describe('ingestDocument', () => {
     const app = createApplication()
     // A payload that measures as a real image and carries a findable marker.
     const marked = `${FULL}SECRET-IMAGE-BYTES`
-    const outcome = unwrap(await ingest(app.id, marked))
+    const outcome = unwrap(await ingest(app, marked))
 
     expect(outcome.filled.length).toBeGreaterThan(0)
     expect(JSON.stringify(outcome.state)).not.toContain('SECRET-IMAGE-BYTES')
@@ -341,7 +349,7 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
 
   it('reads the Washington card end to end, from bytes to derived fields', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, realImage, recorded))
+    const outcome = unwrap(await ingest(app, realImage, recorded))
 
     // 1560px wide, read off the PNG itself, with the card filling the frame.
     expect(outcome.band).toBe('full')
@@ -359,7 +367,7 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
 
   it('maps the licence number onto the pixels it was printed at', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, realImage, recorded))
+    const outcome = unwrap(await ingest(app, realImage, recorded))
     const box = outcome.state.fields.dl_number?.provenance?.box
 
     // The whole chain in one number: PNG header to 1560x1006, grounded box
@@ -372,11 +380,11 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
     // read should be able to tell, and every specimen in the corpus is a PNG.
     const jpeg = readFileSync('sample/licenses/encodings/wa_enhanced.jpg').toString('base64')
     const app = createApplication()
-    const fromJpeg = unwrap(await ingest(app.id, jpeg, recorded))
+    const fromJpeg = unwrap(await ingest(app, jpeg, recorded))
 
     __resetStoreForTests()
     const other = createApplication()
-    const fromPng = unwrap(await ingest(other.id, realImage, recorded))
+    const fromPng = unwrap(await ingest(other, realImage, recorded))
 
     expect(fromJpeg.band).toBe(fromPng.band)
     expect(fromJpeg.filled).toEqual(fromPng.filled)
@@ -386,7 +394,7 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
 
   it('places every recorded box inside the image it came from', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app.id, realImage, recorded))
+    const outcome = unwrap(await ingest(app, realImage, recorded))
     const boxes = outcome.filled
       .map((key) => outcome.state.fields[key]?.provenance?.box)
       .filter((box): box is readonly [number, number, number, number] => box !== undefined)

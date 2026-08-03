@@ -7,6 +7,9 @@ import { outstandingFields } from '@/domain/application/queries'
 import { requiredFields } from '@/domain/requirements/engine'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
+/** The domain does not check it; the server does. */
+const OWNER = 'owner-token-1'
+
 const AT = '2026-08-01T12:00:00.000Z'
 const profile: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
@@ -16,7 +19,7 @@ const profile: ApplicantProfile = {
 
 describe('ApplicationPanel', () => {
   it('shows how many fields are left', () => {
-    const s = createApplication('app-1', profile)
+    const s = createApplication('app-1', profile, OWNER)
     render(<ApplicationPanel state={s} />)
     const total = outstandingFields(s).length
     expect(screen.getByText(new RegExp(`0 of ${total}`))).toBeInTheDocument()
@@ -28,7 +31,7 @@ describe('ApplicationPanel', () => {
     // from a bug that rendered only the outstanding ones. Completing one
     // field makes the two counts diverge — a satisfied field must still be
     // visible and revisitable, not disappear from the panel.
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -39,7 +42,7 @@ describe('ApplicationPanel', () => {
   })
 
   it('never disables the submit button — it explains instead', () => {
-    const s = createApplication('app-1', profile)
+    const s = createApplication('app-1', profile, OWNER)
     render(<ApplicationPanel state={s} />)
     const btn = screen.getByRole('button', { name: /submit/i })
     expect(btn).not.toBeDisabled()
@@ -47,7 +50,7 @@ describe('ApplicationPanel', () => {
   })
 
   it('reports progress as fields are completed', () => {
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'user', at: AT,
@@ -62,7 +65,7 @@ describe('ApplicationPanel', () => {
 
   it('passes a confirm through to the caller', async () => {
     const onConfirm = vi.fn()
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'ocr', at: AT,
@@ -75,7 +78,7 @@ describe('ApplicationPanel', () => {
   })
 
   it('threads the document image down to the row that has a box', () => {
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'ocr', at: AT, box: [10, 20, 100, 60],
@@ -93,7 +96,7 @@ describe('ApplicationPanel', () => {
   it('does not offer a crop when the panel was never given the document', () => {
     // The common case pre-upload, and every case after a reload: a box can
     // exist on the record while the browser holds no pixels for it.
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
       source: 'ocr', at: AT, box: [10, 20, 100, 60],
@@ -104,7 +107,7 @@ describe('ApplicationPanel', () => {
 
   it('calls onSubmit when everything is done', async () => {
     const onSubmit = vi.fn()
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
         type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
@@ -120,7 +123,7 @@ describe('ApplicationPanel', () => {
     // business address ~600px below the fold, so the applicant reported a
     // working feature as broken. Headings are what make "it landed over
     // there" a sentence the screen can finish.
-    const s = createApplication('app-1', profile)
+    const s = createApplication('app-1', profile, OWNER)
     render(<ApplicationPanel state={s} />)
 
     expect(screen.getByRole('heading', { name: /^identification$/i })).toBeInTheDocument()
@@ -134,7 +137,7 @@ describe('ApplicationPanel', () => {
   })
 
   it('shows how far along each section is, not just the whole application', () => {
-    let s = createApplication('app-1', profile)
+    let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'addr_city', value: 'Atlanta',
       source: 'user', at: AT,
@@ -156,7 +159,7 @@ describe('ApplicationPanel', () => {
       wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
       idForm: 'drivers_license',
     }
-    const s = createApplication('app-2', bizProfile)
+    const s = createApplication('app-2', bizProfile, OWNER)
     render(<ApplicationPanel state={s} />)
 
     const first = screen.getByRole('region', { name: /^license 1$/i })
@@ -176,7 +179,7 @@ describe('ApplicationPanel', () => {
       wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
       idForm: 'drivers_license',
     }
-    let s = createApplication('app-2', bizProfile)
+    let s = createApplication('app-2', bizProfile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'license_number#0', value: 'GA-DLR-1',
       source: 'ocr', at: AT,

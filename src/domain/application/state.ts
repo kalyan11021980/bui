@@ -25,6 +25,14 @@ export type FieldState<T = unknown> = {
 
 export type ApplicationState = {
   id: string
+  /**
+   * A capability, not authentication: no session, no login, no identity behind
+   * it. It only makes knowing an id insufficient to read or change the record.
+   *
+   * Null on every response but the one that creates the application — the
+   * server keeps the real one and never echoes it back.
+   */
+  ownerToken: string | null
   rulesVersion: number
   profile: ApplicantProfile
   /** Keyed by RequirementKey — plain FieldId, or `id#n` for licences. */

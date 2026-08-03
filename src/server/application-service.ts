@@ -7,6 +7,9 @@ import {
   applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
 import { getAuditLog } from '@/server/audit'
+import {
+  newOwnerToken, ownsApplication, withoutOwnerToken,
+} from '@/server/ownership'
 import { getApplication as loadApplication, putApplication } from '@/server/store'
 import { checkAgainstRequirements } from './action-guard'
 import { failure, type Failure } from './http'
@@ -33,25 +36,32 @@ const STARTING_PROFILE: ApplicantProfile = {
  * The id is generated here rather than accepted from the caller, so ids are
  * not enumerable — the response carries `tax_id.value`.
  *
- * TODO(phase-2): no ownership check. Knowing an id is enough to read every
- * value in the application, including tax_id and dob. Needs an authenticated
- * session and an owner recorded at creation.
+ * The only result that carries the owner token. Every other one is redacted on
+ * the way out, so no route has to remember to do it.
  */
 export function createApplication(): ApplicationState {
-  const created = newApplication(randomUUID(), STARTING_PROFILE)
+  const created = newApplication(randomUUID(), STARTING_PROFILE, newOwnerToken())
   putApplication(created)
   return created
 }
 
-export function getApplication(id: string): Result<ApplicationState> {
-  const existing = loadApplication(id)
-  if (!existing) return { ok: false, failure: failure('unknown', 'unknown application') }
-  return { ok: true, value: existing }
+export function getApplication(
+  id: string,
+  ownerToken: string | null,
+): Result<ApplicationState> {
+  const existing = owned(id, ownerToken)
+  if (!existing.ok) return existing
+  return { ok: true, value: withoutOwnerToken(existing.value) }
 }
 
-export function applyAction(id: string, action: Action): Result<ApplicationState> {
-  const current = loadApplication(id)
-  if (!current) return { ok: false, failure: failure('unknown', 'unknown application') }
+export function applyAction(
+  id: string,
+  ownerToken: string | null,
+  action: Action,
+): Result<ApplicationState> {
+  const found = owned(id, ownerToken)
+  if (!found.ok) return found
+  const current = found.value
 
   // Ahead of the requirements check, so a closed application answers 409
   // whatever the action carries rather than 422 "fix the value and retry".
@@ -62,7 +72,7 @@ export function applyAction(id: string, action: Action): Result<ApplicationState
   if (refusal) return { ok: false, failure: failure('rejected', refusal) }
 
   try {
-    return { ok: true, value: commit(current, action) }
+    return { ok: true, value: withoutOwnerToken(commit(current, action)) }
   } catch (error) {
     if (error instanceof ApplicationSubmittedError) {
       return { ok: false, failure: failure('submitted', error.message) }
@@ -74,6 +84,19 @@ export function applyAction(id: string, action: Action): Result<ApplicationState
       failure: failure('rejected', error instanceof Error ? error.message : 'Action rejected'),
     }
   }
+}
+
+/**
+ * The stored record, if the caller holds its token. A wrong token answers
+ * exactly what an unknown id answers: 403 here would confirm the id exists,
+ * which is the same leak wearing a smaller hat.
+ */
+function owned(id: string, ownerToken: string | null): Result<ApplicationState> {
+  const existing = loadApplication(id)
+  if (!existing || !ownsApplication(existing, ownerToken)) {
+    return { ok: false, failure: failure('unknown', 'unknown application') }
+  }
+  return { ok: true, value: existing }
 }
 
 /**

@@ -67,6 +67,10 @@ export function useApplication(): UseApplication {
     queue.current = queue.current.then(run, run).catch(() => undefined)
   }
 
+  // The one thing that makes this browser the owner of that id. Held here
+  // rather than in state, so there is a single copy of it.
+  const ownerToken = useRef<string | null>(null)
+
   const started = useRef(false)
   useEffect(() => {
     // Strict mode runs this twice; a second application would be a second,
@@ -76,8 +80,12 @@ export function useApplication(): UseApplication {
 
     enqueue(async () => {
       const result = await startApplication()
-      if (result.ok) setState(result.value)
-      else setNotice(NO_START)
+      if (!result.ok) {
+        setNotice(NO_START)
+        return
+      }
+      ownerToken.current = result.value.ownerToken
+      setState({ ...result.value, ownerToken: null })
     })
   }, [])
 
@@ -95,7 +103,7 @@ export function useApplication(): UseApplication {
     // Only the action itself goes up: the server runs the same carry rules on
     // the same state, and sending its results too would double them.
     enqueue(async () => {
-      const sent = await sendAction(state.id, action)
+      const sent = await sendAction(state.id, ownerToken.current, action)
       if (!sent.ok) setOutOfStep(true)
     })
   }
@@ -129,7 +137,9 @@ export function useApplication(): UseApplication {
     setNotice(READING)
 
     enqueue(async () => {
-      const result = await sendDocument(state.id, docType, image.imageBase64)
+      const result = await sendDocument(
+        state.id, ownerToken.current, docType, image.imageBase64,
+      )
       if (!result.ok) {
         // A refusal below 500 already carries words written for a person. A
         // 5xx does not — a transport failure is one by design, so an unset

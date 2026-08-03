@@ -65,7 +65,7 @@ function withDlNumber(state: ApplicationState, placed = true): ApplicationState 
   }
 }
 
-type Call = { url: string; body: unknown }
+type Call = { url: string; body: unknown; token: string | null }
 
 let calls: Call[]
 /** A string body is sent as-is, unparsed — Next answers a 500 with HTML. */
@@ -73,7 +73,25 @@ let respond: (call: Call) => { status: number; body: unknown }
 /** Set to hold every action response open until the test lets it go. */
 let holdActions: Promise<void> | null
 
-const created = () => createApplication('app-1', PROFILE)
+const OWNER = 'owner-token-1'
+
+/** The creation response — the only one that carries the token. */
+const started = () => createApplication('app-1', PROFILE, OWNER)
+
+/** The same application as every later response shows it: token stripped. */
+const created = (): ApplicationState => ({ ...started(), ownerToken: null })
+
+/** A server that hands the token out once and expects it back after that. */
+const asServer = (call: Call) => ({
+  status: 200,
+  body: call.url === '/api/application' ? started() : created(),
+})
+
+/** The same, for a server that answers with one particular application. */
+const serving = (state: ApplicationState) => (call: Call) => ({
+  status: 200,
+  body: call.url === '/api/application' ? { ...state, ownerToken: OWNER } : state,
+})
 
 /** Everything the engine asks of this profile, answered and confirmed. */
 function completed(): ApplicationState {
@@ -97,12 +115,26 @@ beforeEach(() => {
   calls = []
   holdActions = null
   decoder.next = PREPARED
-  respond = () => ({ status: 200, body: created() })
+  respond = asServer
 
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
-    const call = { url, body: init.body ? JSON.parse(String(init.body)) : undefined }
+    const call = {
+      url,
+      body: init.body ? JSON.parse(String(init.body)) : undefined,
+      token: new Headers(init.headers).get('x-owner-token'),
+    }
     calls.push(call)
     if (holdActions && url.endsWith('/actions')) await holdActions
+
+    // What the real server does with a caller who cannot produce the token:
+    // 404, the same answer an id that does not exist gets. Every test below
+    // therefore only passes while the page presents it.
+    if (url !== '/api/application' && call.token !== OWNER) {
+      return new Response(JSON.stringify({ error: 'unknown application' }), {
+        status: 404, headers: { 'content-type': 'application/json' },
+      })
+    }
+
     // Throwing here is a request that never reached a server.
     const { status, body } = respond(call)
     const html = typeof body === 'string'
@@ -173,7 +205,7 @@ describe('the page', () => {
             status: 200,
             body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
           }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -198,7 +230,7 @@ describe('the page', () => {
             status: 200,
             body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
           }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -219,7 +251,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 500, body: { error: 'OCR_ENDPOINT and OCR_MODEL must both be set' } }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -246,7 +278,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 500, body: '<!DOCTYPE html><html><body>Internal Server Error</body></html>' }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -263,7 +295,7 @@ describe('the page', () => {
     // are one story to the applicant, and both leave the form to them.
     respond = (call) => {
       if (call.url.endsWith('/documents')) throw new TypeError('Failed to fetch')
-      return { status: 200, body: created() }
+      return asServer(call)
     }
 
     render(<Page />)
@@ -279,7 +311,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 422, body: { error: 'That photo is too small to read.' } }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -293,7 +325,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 200, body: { band: 'full', filled: [], state: created() } }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -317,7 +349,7 @@ describe('the page', () => {
               state: withDlNumber(created(), false),
             },
           }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -334,7 +366,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 500, body: { error: 'boom' } }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -372,7 +404,7 @@ describe('the page', () => {
     respond = (call) =>
       call.url.endsWith('/actions')
         ? { status: 422, body: { error: 'refused' } }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -403,7 +435,7 @@ describe('the page', () => {
             status: 200,
             body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
           }
-        : { status: 200, body: created() }
+        : asServer(call)
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })
@@ -447,7 +479,7 @@ describe('the page', () => {
 
 describe('an application that has been sent for review', () => {
   it('offers no more edits, and says why', async () => {
-    respond = () => ({ status: 200, body: { ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' } })
+    respond = serving({ ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' })
 
     render(<Page />)
 
@@ -462,7 +494,7 @@ describe('an application that has been sent for review', () => {
   })
 
   it('stops taking documents, which the route would refuse anyway', async () => {
-    respond = () => ({ status: 200, body: { ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' } })
+    respond = serving({ ...completed(), submittedAt: '2026-08-03T00:00:00.000Z' })
 
     render(<Page />)
     await screen.findByText(/sent for review/i)
@@ -473,7 +505,7 @@ describe('an application that has been sent for review', () => {
 
 describe('sending the application', () => {
   it('sends a complete application and tells the server, once', async () => {
-    respond = () => ({ status: 200, body: completed() })
+    respond = serving(completed())
 
     render(<Page />)
     await screen.findByRole('region', { name: /your application/i })

@@ -42,19 +42,31 @@ function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
 }
 
+/** Every application this file created, against the token it was handed. */
+const tokens = new Map<string, string>()
+
+/** What the owner of `id` presents. Nothing, for an id nobody was given. */
+function asOwner(id: string): Record<string, string> {
+  const token = tokens.get(id)
+  return token === undefined ? {} : { 'x-owner-token': token }
+}
+
 async function upload(id: string, body: unknown) {
   return POST(
     new Request(`http://localhost/api/application/${id}/documents`, {
       method: 'POST',
       body: typeof body === 'string' ? body : JSON.stringify(body),
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...asOwner(id) },
     }),
     ctx(id),
   )
 }
 
 async function newApp(): Promise<string> {
-  return ((await (await CREATE()).json()) as ApplicationState).id
+  const body = (await (await CREATE()).json()) as ApplicationState
+  if (body.ownerToken === null) throw new Error('creation handed out no owner token')
+  tokens.set(body.id, body.ownerToken)
+  return body.id
 }
 
 async function action(id: string, body: unknown) {
@@ -62,7 +74,7 @@ async function action(id: string, body: unknown) {
     new Request(`http://localhost/api/application/${id}/actions`, {
       method: 'POST',
       body: JSON.stringify({ action: body }),
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...asOwner(id) },
     }),
     ctx(id),
   )
@@ -90,6 +102,7 @@ async function submittedApp(): Promise<string> {
 beforeEach(() => {
   __resetStoreForTests()
   __resetAuditLogForTests()
+  tokens.clear()
   vi.unstubAllEnvs()
 })
 

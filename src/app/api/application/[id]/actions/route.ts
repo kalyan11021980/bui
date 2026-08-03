@@ -4,6 +4,7 @@ import {
 } from '@/domain/application/action-schema'
 import { applyAction } from '@/server/application-service'
 import { failure, jsonError } from '@/server/http'
+import { ownerTokenOf } from '@/server/ownership'
 
 type Context = { params: Promise<{ id: string }> }
 
@@ -22,6 +23,6 @@ export async function POST(request: Request, context: Context) {
     return jsonError(failure('malformed', describeZodError(parsed.error)))
   }
 
-  const result = applyAction(id, toAction(parsed.data.action))
+  const result = applyAction(id, ownerTokenOf(request), toAction(parsed.data.action))
   return result.ok ? NextResponse.json(result.value) : jsonError(result.failure)
 }

@@ -11,6 +11,9 @@ import type { Action, ApplicationState } from '@/domain/application/state'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
+/** The domain does not check it; the server does. */
+const OWNER = 'owner-token-1'
+
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
@@ -40,7 +43,7 @@ function Harness({
   profile?: ApplicantProfile
   onState?: (s: ApplicationState) => void
 }) {
-  const [state, setState] = useState(() => createApplication('app-1', profile))
+  const [state, setState] = useState(() => createApplication('app-1', profile, OWNER))
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
   const at = '2026-08-01T12:00:00.000Z'

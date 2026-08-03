@@ -4,6 +4,7 @@ import { ALL_DOC_TYPES } from '@/domain/field-id'
 import { ingestDocument } from '@/server/document-service'
 import { failure, jsonError } from '@/server/http'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
+import { ownerTokenOf } from '@/server/ownership'
 
 type Context = { params: Promise<{ id: string }> }
 
@@ -40,6 +41,7 @@ export async function POST(request: Request, context: Context) {
   // The image is never written anywhere. It lives for this call.
   const result = await ingestDocument({
     applicationId: id,
+    ownerToken: ownerTokenOf(request),
     docType: parsed.data.docType,
     imageBase64: parsed.data.imageBase64,
     at: new Date().toISOString(),

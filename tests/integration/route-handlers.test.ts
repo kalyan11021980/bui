@@ -19,11 +19,20 @@ function req(url: string, init?: RequestInit): Request {
   return new Request(url, init)
 }
 
-function postBody(action: unknown): RequestInit {
+/** Every application this file created, against the token it was handed. */
+const tokens = new Map<string, string>()
+
+/** What the owner of `id` presents. Nothing, for an id nobody was given. */
+function asOwner(id: string): Record<string, string> {
+  const token = tokens.get(id)
+  return token === undefined ? {} : { 'x-owner-token': token }
+}
+
+function postBody(id: string, action: unknown): RequestInit {
   return {
     method: 'POST',
     body: JSON.stringify({ action }),
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...asOwner(id) },
   }
 }
 
@@ -39,18 +48,21 @@ function ctx(id: string) {
  */
 async function newApp(): Promise<string> {
   const res = await CREATE()
-  return ((await res.json()) as ApplicationState).id
+  const body = (await res.json()) as ApplicationState
+  if (body.ownerToken === null) throw new Error('creation handed out no owner token')
+  tokens.set(body.id, body.ownerToken)
+  return body.id
 }
 
 async function post(id: string, action: unknown) {
   return POST(
-    req(`http://localhost/api/application/${id}/actions`, postBody(action)),
+    req(`http://localhost/api/application/${id}/actions`, postBody(id, action)),
     ctx(id),
   )
 }
 
-async function read(id: string) {
-  return GET(req(`http://localhost/api/application/${id}`), ctx(id))
+async function read(id: string, headers: Record<string, string> = asOwner(id)) {
+  return GET(req(`http://localhost/api/application/${id}`, { headers }), ctx(id))
 }
 
 async function stateOf(id: string): Promise<ApplicationState> {
@@ -69,6 +81,7 @@ async function newBusiness(): Promise<string> {
 beforeEach(() => {
   __resetStoreForTests()
   __resetAuditLogForTests()
+  tokens.clear()
 })
 
 describe('POST /api/application — creation', () => {

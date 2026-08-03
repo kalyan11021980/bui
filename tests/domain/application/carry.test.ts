@@ -6,6 +6,9 @@ import {
 import { requiredFields } from '@/domain/requirements/engine'
 import type { ApplicantProfile, LicenseType } from '@/domain/requirements/rules'
 
+/** The domain does not check it; the server does. */
+const OWNER = 'owner-token-1'
+
 const AT = '2026-08-01T12:00:00.000Z'
 const business: ApplicantProfile = {
   applicantType: 'business',
@@ -18,7 +21,7 @@ const business: ApplicantProfile = {
 }
 
 function withAddress() {
-  let s = createApplication('app-1', business)
+  let s = createApplication('app-1', business, OWNER)
   for (const [id, v] of [
     ['addr_line1', '2345 Anywhere St'],
     ['addr_city', 'Atlanta'],
@@ -64,7 +67,7 @@ describe('applyCarry', () => {
   })
 
   it('does nothing when the source field is empty', () => {
-    const s = applyCarry(createApplication('app-1', business), AT).state
+    const s = applyCarry(createApplication('app-1', business, OWNER), AT).state
     expect(s.fields.biz_addr_line1).toBeUndefined()
   })
 
@@ -90,7 +93,7 @@ describe('applyCarry', () => {
   })
 
   it('reports nothing applied when there was nothing to carry', () => {
-    expect(applyCarry(createApplication('app-1', business), AT).applied).toEqual([])
+    expect(applyCarry(createApplication('app-1', business, OWNER), AT).applied).toEqual([])
   })
 
   it('never carries into a field this applicant is not asked for', () => {
@@ -98,7 +101,7 @@ describe('applyCarry', () => {
     // anyway puts fields in the record that the panel cannot show and the
     // route's requirements check would refuse.
     const individual: ApplicantProfile = { ...business, applicantType: 'individual' }
-    let s = createApplication('app-1', individual)
+    let s = createApplication('app-1', individual, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'addr_line1', value: '2345 Anywhere St',
       source: 'user', at: AT,
@@ -184,7 +187,7 @@ describe('CARRY_RULES agree with the requirements engine', () => {
   it('carries the mobile phone into the business phone — the redundancy the spec names', () => {
     // biz_phone is required of every business and had no working carry: the
     // rule pointed at phone_primary, which is never collected.
-    let s = createApplication('app-1', business)
+    let s = createApplication('app-1', business, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'phone_mobile', value: '4045551234',
       source: 'user', at: AT,
@@ -207,7 +210,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
     // Found by driving the real UI: typing an address a character at a time
     // carried the first keystroke and never refreshed, leaving the applicant
     // with a business address reading "2".
-    let s = setAddress(createApplication('app-1', business), '2')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2')
     s = applyCarry(s, AT).state
     expect(s.fields.biz_addr_line1?.value).toBe('2')
 
@@ -220,7 +223,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
     // The quieter version of the same bug over the API: correcting a home
     // address left the old one mirrored into the business address, and a
     // plausible stale value is exactly what gets rubber-stamped.
-    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2345 Anywhere St')
     s = applyCarry(s, AT).state
     s = setAddress(s, '99 Other Rd')
     s = applyCarry(s, AT).state
@@ -228,7 +231,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
   })
 
   it('stops refreshing once the applicant has confirmed the carried value', () => {
-    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2345 Anywhere St')
     s = applyCarry(s, AT).state
     s = applicationReducer(s, {
       type: 'CONFIRM', fieldId: 'biz_addr_line1', at: AT, shownCopyHash: 'c1',
@@ -241,7 +244,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
   })
 
   it('stops refreshing once the applicant has typed their own value', () => {
-    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2345 Anywhere St')
     s = applyCarry(s, AT).state
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: '1 Dealership Way',
@@ -254,7 +257,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
   })
 
   it('does nothing when the source has not changed', () => {
-    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2345 Anywhere St')
     s = applyCarry(s, AT).state
     const second = applyCarry(s, AT)
     expect(second.applied).toEqual([])
@@ -262,7 +265,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
   })
 
   it('still refuses to overwrite a value OCR supplied', () => {
-    let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
+    let s = setAddress(createApplication('app-1', business, OWNER), '2345 Anywhere St')
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'biz_addr_line1', value: 'Macon Rd',
       source: 'ocr', at: AT, confidence: 0.94,

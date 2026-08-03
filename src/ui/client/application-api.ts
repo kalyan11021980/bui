@@ -5,9 +5,15 @@ import type { RequirementKey } from '@/domain/requirements/key'
 
 /**
  * Every call the browser makes to the application API, and the only place a
- * request is built — the ownership header the next task adds goes on once,
- * here, rather than on each call site.
+ * request is built — the ownership header goes on once, here, rather than on
+ * each call site.
  */
+
+/**
+ * Kept in step with OWNER_TOKEN_HEADER in @/server/ownership by a test. It
+ * cannot be imported from there: that module reads node:crypto.
+ */
+export const OWNER_TOKEN_HEADER = 'x-owner-token'
 
 export type ApiResult<T> =
   | { ok: true; value: T }
@@ -20,15 +26,17 @@ export type UploadOutcome = {
   readonly state: ApplicationState
 }
 
+/** The one response that carries an owner token. Every later call presents it. */
 export function startApplication(): Promise<ApiResult<ApplicationState>> {
-  return post<ApplicationState>('/api/application')
+  return post<ApplicationState>('/api/application', null)
 }
 
 export function sendAction(
   id: string,
+  ownerToken: string | null,
   action: Action,
 ): Promise<ApiResult<ApplicationState>> {
-  return post<ApplicationState>(`/api/application/${id}/actions`, { action })
+  return post<ApplicationState>(`/api/application/${id}/actions`, ownerToken, { action })
 }
 
 /**
@@ -38,18 +46,28 @@ export function sendAction(
  */
 export function sendDocument(
   id: string,
+  ownerToken: string | null,
   docType: DocType,
   imageBase64: string,
 ): Promise<ApiResult<UploadOutcome>> {
-  return post<UploadOutcome>(`/api/application/${id}/documents`, { docType, imageBase64 })
+  return post<UploadOutcome>(
+    `/api/application/${id}/documents`, ownerToken, { docType, imageBase64 },
+  )
 }
 
-async function post<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
+async function post<T>(
+  path: string,
+  ownerToken: string | null,
+  body?: unknown,
+): Promise<ApiResult<T>> {
   let response: Response
   try {
     response = await fetch(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(ownerToken !== null && { [OWNER_TOKEN_HEADER]: ownerToken }),
+      },
       ...(body !== undefined && { body: JSON.stringify(body) }),
     })
   } catch {
