@@ -99,6 +99,20 @@ describe('extractLabelled', () => {
     expect(out.find((c) => c.key === 'license_number#0')).toBeUndefined()
   })
 
+  it('excludes a digit-bearing label from being read as a business name', () => {
+    // The other "does not pair a label" test above also has a digit
+    // in its wrong neighbour's absence to fall back on ("LICENSE TYPE" has
+    // no digit either, so the license_number shape check alone would catch
+    // it). biz_legal_name has no shape check, so this isolates isLabel
+    // specifically: without it, a digit-bearing label neighbour has nothing
+    // else standing in its way.
+    const out = extractLabelled([
+      at('BUSINESS NAME', [90, 465, 223, 489]),
+      at('EXPIRATION DATE 2027', [91, 494, 424, 522]),
+    ], '')
+    expect(out.find((c) => c.key === 'biz_legal_name')).toBeUndefined()
+  })
+
   it('rejects an inline remainder that is itself a label word, on a field with no date safety net', () => {
     // license_effective/expiry are protected twice over: a bad inline match
     // also has to survive isoFrom. biz_legal_name has no such second check,
