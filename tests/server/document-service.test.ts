@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { applyAction, createApplication } from '@/server/application-service'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
 import { ingestDocument, type IngestOutcome } from '@/server/document-service'
+import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
 import { __resetStoreForTests } from '@/server/store'
 import type { Detection } from '@/domain/ocr/grounding'
 import type { OcrProvider } from '@/server/ocr/service'
@@ -53,6 +54,25 @@ function unwrap(result: Result<IngestOutcome>): IngestOutcome {
     throw new Error(`ingest failed: ${result.failure.kind} — ${result.failure.message}`)
   }
   return result.value
+}
+
+/** Answers everything an individual owes, then sends it for review. */
+function submit(applicationId: string): void {
+  const answers: [string, unknown][] = [
+    ['primary_activity', 'dealer'], ['preferred_language', 'English'],
+    ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
+    ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'], ['id_images', ['front.png']],
+    ['id_country', 'US'], ['id_state', 'GA'],
+    ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
+    ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
+  ]
+  for (const [fieldId, value] of answers) {
+    const result = applyAction(applicationId, {
+      type: 'SET_VALUE', fieldId, value, source: 'user', at: AT,
+    })
+    expect(result.ok, fieldId).toBe(true)
+  }
+  expect(applyAction(applicationId, { type: 'SUBMIT', at: AT }).ok).toBe(true)
 }
 
 function ingest(
@@ -164,6 +184,47 @@ describe('ingestDocument', () => {
     expect(result.failure.kind).toBe('rejected')
     expect(result.failure.message).toMatch(/too small/i)
     expect(getAuditLog().sizeFor(app.id)).toBe(0)
+  })
+
+  it('refuses an upload to an application already sent for review', async () => {
+    // Every other write path answers 409 once submittedAt is set. Taking a
+    // document here, filling nothing and answering 200 tells an applicant
+    // their ID was accepted onto a record that cannot change.
+    let called = false
+    const app = createApplication()
+    submit(app.id)
+
+    const result = await ingest(app.id, FULL, async () => {
+      called = true
+      return { text: '', detections: [] }
+    })
+
+    expect(called).toBe(false)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.failure.kind).toBe('submitted')
+    expect(result.failure.message).toMatch(/sent for review/i)
+  })
+
+  it('refuses a data: URL rather than reading it as a broken image', async () => {
+    // canvas.toDataURL() hands the client one of these. The message has to
+    // name the prefix, or a perfectly good PNG reads as "not an image".
+    const app = createApplication()
+    const result = await ingest(app.id, `data:image/png;base64,${FULL}`)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.failure.kind).toBe('malformed')
+    expect(result.failure.message).toMatch(/data:/)
+  })
+
+  it('refuses an oversized payload before allocating it', async () => {
+    const app = createApplication()
+    const result = await ingest(app.id, 'A'.repeat(MAX_IMAGE_BASE64_CHARS + 4))
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.failure.message).toMatch(/too large/i)
   })
 
   it('refuses a payload that is not an image it can measure', async () => {
@@ -302,6 +363,23 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
     // The whole chain in one number: PNG header to 1560x1006, grounded box
     // 339-694 of 1000, stretched. Nothing else in the suite crosses all of it.
     expect(box?.map(Math.round)).toEqual([529, 242, 1083, 292])
+  })
+
+  it('reads the same card from a JPEG re-encode, which is what a phone sends', async () => {
+    // Same pixels, a different container. Nothing downstream of the header
+    // read should be able to tell, and every specimen in the corpus is a PNG.
+    const jpeg = readFileSync('sample/licenses/encodings/wa_enhanced.jpg').toString('base64')
+    const app = createApplication()
+    const fromJpeg = unwrap(await ingest(app.id, jpeg, recorded))
+
+    __resetStoreForTests()
+    const other = createApplication()
+    const fromPng = unwrap(await ingest(other.id, realImage, recorded))
+
+    expect(fromJpeg.band).toBe(fromPng.band)
+    expect(fromJpeg.filled).toEqual(fromPng.filled)
+    expect(fromJpeg.state.fields.dl_number?.provenance?.box)
+      .toEqual(fromPng.state.fields.dl_number?.provenance?.box)
   })
 
   it('places every recorded box inside the image it came from', async () => {

@@ -23,10 +23,31 @@ const SOF_MARKERS = new Set([
 /** Standalone markers: no length field follows, so nothing to skip over. */
 const STANDALONE = new Set([0x01, 0xd8, 0xd9, 0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7])
 
+/**
+ * The largest payload accepted, ~8MB of image. A 12MP phone JPEG is well under
+ * it, and the route has no ownership check until phase 2's auth task, so the
+ * bound is what stands between an anonymous caller and an arbitrary allocation.
+ */
+export const MAX_IMAGE_BASE64_CHARS = base64CharsFor(8 * 1024 * 1024)
+
+/**
+ * Only the front of the payload is decoded. A PNG needs 24 bytes; a JPEG needs
+ * everything before its frame header, which is EXIF and ICC and rarely more
+ * than a few tens of KB. A file that hides its frame header past this is
+ * refused rather than fully decoded to find out.
+ */
+const HEADER_CHARS = base64CharsFor(256 * 1024)
+
 /** The dimensions of a PNG or JPEG payload, or null for anything else. */
 export function imageSizeOf(imageBase64: string): ImageSize | null {
-  const bytes = Buffer.from(imageBase64, 'base64')
+  if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) return null
+  const bytes = Buffer.from(imageBase64.slice(0, HEADER_CHARS), 'base64')
   return pngSize(bytes) ?? jpegSize(bytes)
+}
+
+/** Rounded up to a whole base64 group, so a slice never cuts one in half. */
+function base64CharsFor(bytes: number): number {
+  return Math.ceil(bytes / 3) * 4
 }
 
 function pngSize(bytes: Buffer): ImageSize | null {
@@ -43,9 +64,11 @@ function jpegSize(bytes: Buffer): ImageSize | null {
 
   let at = 2
   while (at + 3 < bytes.length) {
-    // Fill bytes: any number of 0xFF may pad the gap before a marker.
+    // Every segment must land on a marker. Anything else means the walk lost
+    // its place, and a length read from the wrong offset is a wrong size.
     if (bytes[at] !== 0xff) return null
     const marker = bytes[at + 1] as number
+    // Fill bytes: any number of 0xFF may pad the gap before a marker.
     if (marker === 0xff) { at += 1; continue }
     if (STANDALONE.has(marker)) { at += 2; continue }
 

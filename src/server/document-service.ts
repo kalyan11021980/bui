@@ -5,13 +5,14 @@ import '@/domain/ocr/extract/labelled'
 import '@/domain/ocr/extract/mrz'
 
 import { randomUUID } from 'node:crypto'
+import { submittedRefusal } from '@/domain/application/guards'
 import { scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
 import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
 import { bandForWidth, demoteForCardExtent, type QualityBand } from '@/domain/ocr/quality'
 import { applyAction, getApplication, type Result } from './application-service'
 import { failure } from './http'
-import { imageSizeOf } from './image-size'
+import { imageSizeOf, MAX_IMAGE_BASE64_CHARS } from './image-size'
 import { readDocument, type OcrProvider } from './ocr/service'
 import type { ApplicationState } from '@/domain/application/state'
 import type { Box } from '@/domain/ocr/grounding'
@@ -36,14 +37,31 @@ export type IngestOutcome = {
 const TOO_SMALL =
   'That photo is too small to read. Take another with the document filling the frame.'
 const UNREADABLE = 'Upload a PNG or JPEG photo of the document.'
+const TOO_LARGE = 'That image is too large. Send one under 8 MB.'
+const DATA_URL =
+  'Send the base64 payload on its own, without the data: prefix a canvas puts in front of it.'
 
 export async function ingestDocument(
   input: IngestInput,
 ): Promise<Result<IngestOutcome>> {
-  // Before the read: an application that does not exist cannot be told
-  // anything, and a two-pass OCR call on its behalf is spent for nothing.
+  // Before the read: an application that does not exist, or one already sent
+  // for review, cannot be told anything — and a two-pass OCR call on its
+  // behalf is spent for nothing.
   const existing = getApplication(input.applicationId)
   if (!existing.ok) return existing
+
+  // Every other write path refuses a submitted application. Accepting an
+  // upload here, filling nothing and answering 200 would tell an applicant
+  // their document was taken when the record cannot change.
+  const closed = submittedRefusal(existing.value)
+  if (closed !== null) return { ok: false, failure: failure('submitted', closed) }
+
+  if (input.imageBase64.startsWith('data:')) {
+    return { ok: false, failure: failure('malformed', DATA_URL) }
+  }
+  if (input.imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
+    return { ok: false, failure: failure('malformed', TOO_LARGE) }
+  }
 
   const imageSize = imageSizeOf(input.imageBase64)
   if (!imageSize) return { ok: false, failure: failure('malformed', UNREADABLE) }

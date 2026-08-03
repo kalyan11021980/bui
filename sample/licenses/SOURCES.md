@@ -180,3 +180,21 @@ All files are `.png`. The four original cards were converted from `.webp` and
   cropped, resampled to 1500px wide.
 - `va_2023.png`, `va_id_2023.png`, `ca_id_2010.png`, `md_1977.png`,
   `bank_statement_2003.png` — format conversion only, dimensions unchanged.
+
+## One JPEG, because phones do not send PNGs
+
+`encodings/wa_enhanced.jpg` — `specimens/wa_enhanced.png` re-encoded by
+`sips -s format jpeg -s formatOptions 30`, same 1560×1006, 190 KB. Same source
+and licence as the PNG it came from (Wikimedia Commons, CC BY-SA 4.0); it adds
+no new material and is not in `manifest.json`, because it is not a new specimen
+and has no recorded read of its own.
+
+It exists because every other image in the corpus is a PNG while the actual
+upload path is a phone camera, and `src/server/image-size.ts` has to walk JPEG
+segment markers to find the frame header. Written by a real encoder, it carries
+the APP0, APP1 (EXIF) and APP13 blocks that a hand-built test header does not —
+`tests/server/image-size.test.ts` asserts those segments are present, so the
+file cannot quietly be replaced by something stripped bare.
+
+Not a substitute for a genuine phone capture, which would also bring glare,
+skew and an EXIF orientation flag. It is the container, not the photograph.
