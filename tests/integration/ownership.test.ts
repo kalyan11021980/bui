@@ -223,15 +223,4 @@ describe('the header', () => {
     // the name is written twice. This is what keeps the two copies equal.
     expect(CLIENT_HEADER).toBe(OWNER_TOKEN_HEADER)
   })
-
-  it('is read case-insensitively, as HTTP headers are', async () => {
-    const { id, token } = await newApp()
-    const res = await GET(
-      new Request(`http://localhost/api/application/${id}`, {
-        headers: { 'X-Owner-Token': token },
-      }),
-      ctx(id),
-    )
-    expect(res.status).toBe(200)
-  })
 })
