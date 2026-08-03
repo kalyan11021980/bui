@@ -6,10 +6,10 @@ import type { ImageSize } from '@/domain/ocr/geometry'
  * client-supplied size is both a silent way to misplace every crop and a way to
  * talk a 300px photo past the read floor.
  *
- * TODO(phase-2): EXIF orientation is not read. A phone photo with a rotation
- * flag decodes to swapped dimensions, which moves every box. The fix belongs in
- * the upload control — it should re-encode to the orientation it displays, so
- * the browser and the server share one coordinate space.
+ * EXIF orientation is not read here, and does not need to be: the upload
+ * control re-encodes every photo to the orientation it displays, so the flag is
+ * gone by the time these bytes arrive. A caller that skips that step and sends
+ * a rotated original gets the stored dimensions, and boxes to match them.
  */
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
