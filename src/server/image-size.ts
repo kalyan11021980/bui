@@ -72,9 +72,10 @@ function jpegSize(bytes: Buffer): ImageSize | null {
     if (marker === 0xff) { at += 1; continue }
     if (STANDALONE.has(marker)) { at += 2; continue }
 
+    // A length below 2 is malformed — it counts its own two bytes — and needs
+    // no check of its own: it lands the next step on the length field's high
+    // byte, which is 0x00, and the marker check above refuses it there.
     const length = bytes.readUInt16BE(at + 2)
-    // A segment shorter than its own length field would not advance the walk.
-    if (length < 2) return null
     if (!SOF_MARKERS.has(marker)) { at += 2 + length; continue }
 
     // SOF payload: precision, height, width.

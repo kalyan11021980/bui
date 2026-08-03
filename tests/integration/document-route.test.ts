@@ -178,9 +178,14 @@ describe('POST /api/application/[id]/documents', () => {
 
   it('400s a payload past the size cap at the schema, before it is decoded', async () => {
     const res = await upload(await newApp(), {
-      docType: 'drivers_license', imageBase64: 'A'.repeat(MAX_IMAGE_BASE64_CHARS + 4),
+      docType: 'drivers_license',
+      imageBase64: pngBase64(1600, 1000) + 'A'.repeat(MAX_IMAGE_BASE64_CHARS),
     })
+
     expect(res.status).toBe(400)
+    // The schema's message, not the service's: refused at the wire, so the
+    // oversized string is never handed on.
+    expect(await res.json()).toMatchObject({ error: 'Malformed document upload' })
   })
 
   it('400s a payload that is not an image', async () => {

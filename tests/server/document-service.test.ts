@@ -219,8 +219,10 @@ describe('ingestDocument', () => {
   })
 
   it('refuses an oversized payload before allocating it', async () => {
+    // A payload that would otherwise read fine: the cap is what refuses it,
+    // not the header parser giving up on garbage.
     const app = createApplication()
-    const result = await ingest(app.id, 'A'.repeat(MAX_IMAGE_BASE64_CHARS + 4))
+    const result = await ingest(app.id, FULL + 'A'.repeat(MAX_IMAGE_BASE64_CHARS))
 
     expect(result.ok).toBe(false)
     if (result.ok) return

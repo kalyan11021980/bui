@@ -102,20 +102,31 @@ describe('imageSizeOf — what it refuses', () => {
     expect(imageSizeOf(bytes.subarray(0, 25).toString('base64'))).toBeNull()
   })
 
-  it('refuses a segment whose length would not advance the walk', () => {
-    // A zero length reads as "this segment ends before its own header", which
-    // would walk backwards forever.
-    const bytes = jpegBytes(APP0, sof(800, 600))
-    bytes.writeUInt16BE(0, 4)
-    expect(imageSizeOf(bytes.toString('base64'))).toBeNull()
+  it('refuses a segment claiming to end before its own header', () => {
+    // A length below 2 counts fewer bytes than the length field itself. Both
+    // values of it land the next step on that field's 0x00 high byte, where
+    // the marker check refuses it.
+    for (const length of [0, 1]) {
+      const bytes = jpegBytes(APP0, sof(800, 600))
+      bytes.writeUInt16BE(length, 4)
+      expect(imageSizeOf(bytes.toString('base64')), String(length)).toBeNull()
+    }
   })
 
   it('refuses a walk that has lost its place rather than reading a size anyway', () => {
-    // The APP0 length is overstated by one, so the next read lands inside the
-    // frame header instead of on its marker. Everything after that is
-    // misaligned, and a size read from there is a plausible wrong number.
-    const bytes = jpegBytes(APP0, sof(800, 600))
-    bytes.writeUInt16BE(bytes.readUInt16BE(4) + 1, 4)
+    // An app segment carrying what looks like a frame header — a thumbnail
+    // does — and a length that stops one byte short of it. Resuming the walk
+    // from a byte that is not a marker finds the planted header and reports
+    // 111x222 for an 800x600 image: a plausible wrong number, which is worse
+    // than no number.
+    const planted = sof(111, 222)
+    const payload = Buffer.concat([Buffer.alloc(8), Buffer.from([0x2a]), planted])
+    const bytes = jpegBytes(segment(0xe0, payload), sof(800, 600))
+
+    const at = bytes.indexOf(planted)
+    expect(bytes[at - 1]).toBe(0x2a)
+    bytes.writeUInt16BE(at - 5, 4)
+
     expect(imageSizeOf(bytes.toString('base64'))).toBeNull()
   })
 
@@ -125,7 +136,11 @@ describe('imageSizeOf — what it refuses', () => {
   })
 
   it('refuses a payload past the size cap without decoding it', () => {
-    expect(imageSizeOf('A'.repeat(MAX_IMAGE_BASE64_CHARS + 4))).toBeNull()
+    // A real PNG header with megabytes bolted on behind it. The header alone
+    // would parse, so the cap is the only thing refusing this.
+    const oversized = pngBase64(1600, 1000) + 'A'.repeat(MAX_IMAGE_BASE64_CHARS)
+    expect(oversized.length).toBeGreaterThan(MAX_IMAGE_BASE64_CHARS)
+    expect(imageSizeOf(oversized)).toBeNull()
   })
 
   it('refuses a file that hides its frame header past the header window', () => {
