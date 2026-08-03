@@ -94,3 +94,80 @@ describe('field sections', () => {
     expect(home?.label).toBe('State requirements')
   })
 })
+
+/**
+ * Every profile the engine can be given. `proof_of_residency` sat in the
+ * identification section but was pushed on after address and contact, so the
+ * panel rendered it among the identity rows while the validated list had it
+ * last. Nothing caught it because both round-trip tests above happen to use
+ * profiles where the condition is off — an invariant asserted only where it
+ * cannot fail.
+ */
+function everyProfile(): ApplicantProfile[] {
+  const out: ApplicantProfile[] = []
+  for (const applicantType of ['individual', 'business'] as const) {
+    for (const wantsGsa of [false, true]) {
+      for (const state of [null, 'GA', 'OH', 'ZZ']) {
+        for (const licenses of [[], ['dealer'], ['dealer', 'salvage']] as const) {
+          for (const idForm of ['drivers_license', 'state_id', 'passport'] as const) {
+            for (const addressDiffersFromId of [false, true]) {
+              out.push({
+                applicantType, country: 'US', state, wantsGsa, licenses,
+                idForm, addressDiffersFromId,
+              })
+            }
+          }
+        }
+      }
+    }
+  }
+  return out
+}
+
+/** Names the profile in a failure message, so a sweep failure is actionable. */
+const describeProfile = (p: ApplicantProfile) =>
+  `${p.applicantType}/${p.idForm}/state=${p.state}/gsa=${p.wantsGsa}`
+  + `/licences=${p.licenses.length}/addressDiffers=${p.addressDiffersFromId}`
+
+describe('the panel and the engine agree, for every profile', () => {
+  it('sweeps a corpus of profiles rather than a convenient few', () => {
+    // Guards every loop below: a sweep that built nothing would pass them all.
+    const profiles = everyProfile()
+    expect(profiles).toHaveLength(288)
+    expect(new Set(profiles.map(describeProfile)).size).toBe(profiles.length)
+  })
+
+  it('emits every section as one unbroken run', () => {
+    for (const profile of everyProfile()) {
+      const sections = requiredFields(profile).map((key) => {
+        const { fieldId, instance } = parseReqKey(key)
+        const section = fieldDef(fieldId).section
+        return instance === null ? section : `${section}#${instance}`
+      })
+      const runs = sections.filter((s, i) => s !== sections[i - 1])
+      expect(new Set(runs).size, describeProfile(profile)).toBe(runs.length)
+    }
+  })
+
+  it('flattens back to the engine list exactly, in the same order', () => {
+    // The claim the panel rests on: what is shown is what is validated.
+    for (const profile of everyProfile()) {
+      const keys = requiredFields(profile)
+      const flat = groupIntoSections(keys).flatMap((g) => g.fields)
+      expect(flat, describeProfile(profile)).toEqual(keys)
+    }
+  })
+
+  it('reaches the conditional fields, so the sweep is worth running', () => {
+    // Guards the two above: a corpus that never turned a condition on would
+    // pass them while testing nothing that was ever broken.
+    const seen = new Set(everyProfile().flatMap((p) => requiredFields(p)))
+    for (const key of [
+      'proof_of_residency', 'tax_id', 'gsa_bidder_number',
+      'oh_foreign_buyer_form', 'license_number#1',
+      'dl_number', 'id_number', 'passport_number',
+    ]) {
+      expect(seen.has(key), `no profile in the sweep asks for ${key}`).toBe(true)
+    }
+  })
+})

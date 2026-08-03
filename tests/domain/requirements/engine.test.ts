@@ -178,8 +178,11 @@ describe('the declared ID form decides which number is owed', () => {
     // The number belongs beside the other document fields. Appended after
     // id_images instead, the panel asks for photographs of the ID before the
     // number printed on it, and section order is not enough to catch that.
-    const identity = (idForm: ApplicantProfile['idForm']) =>
-      requiredFields({ ...base, idForm })
+    const identity = (
+      idForm: ApplicantProfile['idForm'],
+      addressDiffersFromId = false,
+    ) =>
+      requiredFields({ ...base, idForm, addressDiffersFromId })
         .filter((k) => CATALOG.get(parseReqKey(k).fieldId)?.section === 'identification')
 
     expect(identity('drivers_license')).toEqual([
@@ -194,17 +197,34 @@ describe('the declared ID form decides which number is owed', () => {
       'first_name', 'last_name', 'passport_number', 'dl_expiry',
       'id_country', 'dob', 'id_images',
     ])
+
+    // Proof of residency is an identity field by its own section, so it is
+    // emitted with identity. Pushed on where the condition is read, it lands
+    // after address and contact and the panel and the engine disagree.
+    expect(identity('drivers_license', true)).toEqual([
+      'first_name', 'last_name', 'dl_number', 'dl_expiry',
+      'id_country', 'id_state', 'dob', 'id_images', 'proof_of_residency',
+    ])
+    expect(identity('passport', true)).toEqual([
+      'first_name', 'last_name', 'passport_number', 'dl_expiry',
+      'id_country', 'dob', 'id_images', 'proof_of_residency',
+    ])
   })
 
-  it('keeps each section contiguous, so the panel groups it as one block', () => {
-    // Identity is composed in one place; emitting the document-dependent part
-    // after contact would split identification in two, and the panel would
-    // show a different order from the one the engine validates.
+  it('keeps each section contiguous, whatever the applicant declares', () => {
+    // Identity is composed in one place; emitting any conditional part of it
+    // later would split identification in two, and the panel would show a
+    // different order from the one the engine validates. Both declarations
+    // are swept: asserting this only for addressDiffersFromId: false tested
+    // it exactly where it could not fail.
     for (const idForm of ID_FORMS) {
-      const sections = requiredFields({ ...base, idForm })
-        .map((k) => CATALOG.get(parseReqKey(k).fieldId)?.section)
-      const runs = sections.filter((s, i) => s !== sections[i - 1])
-      expect(new Set(runs).size, idForm).toBe(runs.length)
+      for (const addressDiffersFromId of [false, true]) {
+        const where = `${idForm}, addressDiffers=${addressDiffersFromId}`
+        const sections = requiredFields({ ...base, idForm, addressDiffersFromId })
+          .map((k) => CATALOG.get(parseReqKey(k).fieldId)?.section)
+        const runs = sections.filter((s, i) => s !== sections[i - 1])
+        expect(new Set(runs).size, where).toBe(runs.length)
+      }
     }
   })
 })

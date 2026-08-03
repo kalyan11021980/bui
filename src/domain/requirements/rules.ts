@@ -59,9 +59,15 @@ export const CORE_PROFILE: readonly FieldId[] = [
 
 /**
  * Identity, in the order the panel asks it. A function rather than a list
- * because the declared document decides two of the entries — and their place
+ * because the declared document decides three of the entries — and their place
  * in the order matters: the number printed on the ID belongs beside the other
  * document fields, not after the request for photographs of it.
+ *
+ * Every conditional identity field is emitted from here. Pushed on later, at
+ * the point the condition is read, it lands after address and contact and
+ * splits the section: the panel shows it among the identity rows while the
+ * validated list has it last, and the two disagree about what the applicant
+ * is looking at.
  */
 export function identityFields(profile: ApplicantProfile): readonly FieldId[] {
   return [
@@ -71,6 +77,7 @@ export function identityFields(profile: ApplicantProfile): readonly FieldId[] {
     // A passport has no issuing state, so asking for one has no answer.
     ...(profile.idForm === 'passport' ? [] : ['id_state' as const]),
     'dob', 'id_images',
+    ...(profile.addressDiffersFromId ? ['proof_of_residency' as const] : []),
   ]
 }
 

@@ -11,8 +11,6 @@ export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
     ...CORE_ADDRESS, ...CORE_CONTACT,
   ].map((id) => reqKey(id))
 
-  if (profile.addressDiffersFromId) out.push(reqKey('proof_of_residency'))
-
   if (profile.applicantType === 'business') {
     for (const id of BUSINESS_CORE) out.push(reqKey(id))
     out.push(reqKey('tax_id'))
