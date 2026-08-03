@@ -60,17 +60,21 @@ type Call = { url: string; body: unknown }
 
 let calls: Call[]
 let respond: (call: Call) => { status: number; body: unknown }
+/** Set to hold every action response open until the test lets it go. */
+let holdActions: Promise<void> | null
 
 const created = () => createApplication('app-1', PROFILE)
 
 beforeEach(() => {
   calls = []
+  holdActions = null
   decoder.next = PREPARED
   respond = () => ({ status: 200, body: created() })
 
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
     const call = { url, body: init.body ? JSON.parse(String(init.body)) : undefined }
     calls.push(call)
+    if (holdActions && url.endsWith('/actions')) await holdActions
     const { status, body } = respond(call)
     return new Response(JSON.stringify(body), {
       status, headers: { 'content-type': 'application/json' },
@@ -281,7 +285,13 @@ describe('the page', () => {
     })).toHaveValue('Ada')
   })
 
-  it('sends the answers before the photo, so the reply cannot undo them', async () => {
+  it('waits for the answers to land before sending the photo', async () => {
+    // The reply is adopted whole. Sent while an answer is still in flight, it
+    // would be built from an application that had not heard about it yet, and
+    // the applicant would watch their own typing disappear.
+    let release = () => undefined as void
+    holdActions = new Promise<void>((resolve) => { release = () => resolve() })
+
     respond = (call) =>
       call.url.endsWith('/documents')
         ? {
@@ -298,6 +308,12 @@ describe('the page', () => {
       'Ada',
     )
     await uploadPhoto()
+
+    // The answers are still open, so the photo has not gone anywhere.
+    expect(actions()).not.toHaveLength(0)
+    expect(uploads()).toHaveLength(0)
+
+    release()
 
     await waitFor(() => expect(uploads()).toHaveLength(1))
     expect(calls.map((c) => c.url.replace('/api/application/app-1', ''))).toEqual([

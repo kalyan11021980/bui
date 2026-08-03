@@ -60,9 +60,8 @@ export function DocumentUpload({
       return
     }
 
-    // Replaced, never left standing: a notice about the previous photo
-    // describes something no longer on offer.
-    setNotice(band === 'text-only' ? TEXT_ONLY : null)
+    // Nothing to clear: choosing a file took the last verdict down.
+    if (band === 'text-only') setNotice(TEXT_ONLY)
     onRead(image)
   }
 
