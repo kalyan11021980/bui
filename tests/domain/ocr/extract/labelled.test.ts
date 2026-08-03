@@ -39,4 +39,15 @@ describe('extractLabelled', () => {
     expect(first?.evidence.labelAnchored).toBe(true)
     expect(first?.evidence.checksumValid).toBeNull()
   })
+
+  it('flags a licence number as glyph-ambiguous when it carries a confusable character', () => {
+    // license_number is identifier-shaped; I0123 mixes a capital I with 0 and 1.
+    const out = extractLabelled([det('License No. I0123')], '')
+    expect(out.find((c) => c.key === 'license_number#0')?.evidence.glyphAmbiguous).toBe(true)
+  })
+
+  it('does not flag a licence number free of confusable characters', () => {
+    const out = extractLabelled([det('License No. XYZ-9992')], '')
+    expect(out.find((c) => c.key === 'license_number#0')?.evidence.glyphAmbiguous).toBe(false)
+  })
 })
