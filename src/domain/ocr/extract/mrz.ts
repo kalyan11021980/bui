@@ -63,11 +63,14 @@ export const extractMrz: ExtractStrategy = (detections) => {
   const [line1, line2] = lines
 
   const out: Candidate[] = []
-  const emit = (key: string, raw: string | null, checksumValid: boolean | null) => {
+  const emit = (
+    key: string, raw: string | null, checksumValid: boolean | null, asRead?: string,
+  ) => {
     if (!raw) return
     out.push({
       key,
       raw,
+      ...(asRead !== undefined && { asRead }),
       evidence: { ...NO_EVIDENCE, checksumValid, glyphAmbiguous: glyphAmbiguity(key, raw) },
     })
   }
@@ -89,10 +92,12 @@ export const extractMrz: ExtractStrategy = (detections) => {
   if (checkDigit(line2.slice(0, 9)) === line2[9]) emit('passport_number', number, true)
 
   const dob = line2.slice(13, 19)
-  if (checkDigit(dob) === line2[19]) emit('dob', toIsoDate(dob, 'past'), true)
+  if (checkDigit(dob) === line2[19]) emit('dob', toIsoDate(dob, 'past'), true, dob)
 
   const expiry = line2.slice(21, 27)
-  if (checkDigit(expiry) === line2[27]) emit('dl_expiry', toIsoDate(expiry, 'future'), true)
+  if (checkDigit(expiry) === line2[27]) {
+    emit('dl_expiry', toIsoDate(expiry, 'future'), true, expiry)
+  }
 
   return out
 }

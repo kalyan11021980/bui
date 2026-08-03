@@ -9,7 +9,12 @@ import {
 } from './types'
 
 /** A read value, before it is told which field it answers. */
-type Found = { readonly raw: string; readonly box: Box; readonly evidence: Evidence }
+type Found = {
+  readonly raw: string
+  readonly box: Box
+  readonly evidence: Evidence
+  readonly asRead?: string
+}
 
 const US_DATE = /(\d{2})[/-](\d{2})[/-](\d{4})/
 const CITY_STATE_ZIP = /^(.*?)[,.\s]*([A-Z]{2})[,.\s]*(\d{5}(?:-\d{4})?)$/
@@ -39,13 +44,15 @@ function clean(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toUpperCase()
 }
 
+type IsoDate = { readonly iso: string; readonly asRead: string }
+
 /** Cards print MM/DD/YYYY; every field schema wants ISO. */
-function toIsoDate(raw: string): string | null {
+function toIsoDate(raw: string): IsoDate | null {
   const match = US_DATE.exec(raw)
   if (!match) return null
-  const [, month, day, year] = match
+  const [asRead, month, day, year] = match
   const iso = `${year}-${month}-${day}`
-  return isRealCalendarDate(iso) ? iso : null
+  return isRealCalendarDate(iso) ? { iso, asRead } : null
 }
 
 type Tail = { readonly city: string; readonly state: string; readonly zip: string }
@@ -254,14 +261,17 @@ function dateField(detections: readonly Detection[], hit: Hit): Found | null {
   const inline = toIsoDate(hit.detection.text)
   if (inline) {
     const box = hit.detection.box
-    return { raw: inline, box, evidence: evidenceFor(box, true) }
+    return { raw: inline.iso, asRead: inline.asRead, box, evidence: evidenceFor(box, true) }
   }
   if (hit.remainder !== '') return null
 
   const found = nearestValue(detections, hit.detection, hasDate)
-  const raw = found && toIsoDate(found.text)
-  if (!found || !raw) return null
-  return { raw, box: found.box, evidence: evidenceFor(found.box, true) }
+  const parsed = found && toIsoDate(found.text)
+  if (!found || !parsed) return null
+  return {
+    raw: parsed.iso, asRead: parsed.asRead, box: found.box,
+    evidence: evidenceFor(found.box, true),
+  }
 }
 
 /** `1,2 Name`: surname on the first line, given names on the second. */

@@ -92,6 +92,16 @@ describe('scoreEvidence', () => {
     expect(score).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
   })
 
+  it('keeps a checksum-validated identifier quiet with no label, the real MRZ shape', () => {
+    // aamva.ts and labelled.ts never set checksumValid; mrz.ts never sets
+    // labelAnchored. The combination above never comes off a real document —
+    // this one, checksum alone, is what an actual MRZ field scores.
+    const score = scoreEvidence(evidence({
+      schemaParsed: true, checksumValid: true, glyphAmbiguous: true,
+    }))
+    expect(score).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+  })
+
   it('does not punish a signal that does not apply', () => {
     const noChecksum = scoreEvidence(evidence({ schemaParsed: true, labelAnchored: true }))
     const failedChecksum = scoreEvidence(evidence({
@@ -100,14 +110,56 @@ describe('scoreEvidence', () => {
     expect(noChecksum).toBeGreaterThan(failedChecksum)
   })
 
-  it('treats a null signal identically across all three nullable fields', () => {
-    // The three-signal loop above proves ordering; this proves the null
-    // baseline is the same fixed point regardless of which signal is unset,
-    // not a fluke of the base score alone matching one particular case.
+  it('does not score a null signal as failure, for each nullable signal individually', () => {
+    // A single test comparing two already-null defaults would pass whether
+    // or not null is scored as failure, as long as both sides are null the
+    // same way — it proves nothing. This sets each of the three nullable
+    // signals to false and to null in turn and checks null never scores
+    // below the untouched base, and specifically is not equal to false.
     const base = scoreEvidence(evidence({ schemaParsed: true }))
-    expect(scoreEvidence(evidence({ schemaParsed: true, checksumValid: null }))).toBe(base)
-    expect(scoreEvidence(evidence({ schemaParsed: true, crossPassAgreed: null }))).toBe(base)
-    expect(scoreEvidence(evidence({ schemaParsed: true, boxPlausible: null }))).toBe(base)
+    for (const signal of ['checksumValid', 'crossPassAgreed', 'boxPlausible'] as const) {
+      const withNull = scoreEvidence(evidence({ schemaParsed: true, [signal]: null }))
+      const withFalse = scoreEvidence(evidence({ schemaParsed: true, [signal]: false }))
+      expect(withNull, signal).toBe(base)
+      expect(withNull, signal).toBeGreaterThan(withFalse)
+    }
+  })
+
+  it('keeps a value noisy on cross-pass disagreement even when checksum-validated', () => {
+    // A disagreement between the two OCR passes must not be out-voted by a
+    // checksum, a label anchor and a plausible box acting together.
+    const score = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true, checksumValid: true,
+      boxPlausible: true, crossPassAgreed: false,
+    }))
+    expect(score).toBeLessThan(QUIET_THRESHOLD)
+  })
+
+  it('never goes quiet on cross-pass disagreement, across every other combination', () => {
+    // The exhaustive version of the test above: crossPassAgreed: false must
+    // dominate regardless of what else is true, not just in the one
+    // hand-picked worst case.
+    const flags = [true, false, null] as const
+    for (const checksumValid of flags) {
+      for (const boxPlausible of flags) {
+        for (const glyphAmbiguous of flags) {
+          for (const labelAnchored of [true, false]) {
+            const score = scoreEvidence(evidence({
+              schemaParsed: true, labelAnchored, checksumValid, boxPlausible,
+              glyphAmbiguous, crossPassAgreed: false,
+            }))
+            expect(score).toBeLessThan(QUIET_THRESHOLD)
+          }
+        }
+      }
+    }
+  })
+
+  it('rounds away floating-point noise instead of leaking it into a displayed score', () => {
+    // 0.3 + 0.6 is 0.8999999999999999 in IEEE 754. Without the toFixed(3)
+    // step this returns that value verbatim.
+    const score = scoreEvidence(evidence({ schemaParsed: true, crossPassAgreed: true }))
+    expect(score).toBe(0.9)
   })
 })
 
@@ -130,35 +182,61 @@ describe('withCrossPass', () => {
     expect(out?.evidence.crossPassAgreed).toBeNull()
   })
 
-  it('leaves a one-character value unset rather than crediting it with agreement', () => {
-    // A sex marker or a licence class is a substring of almost any haystack:
-    // 'SEX M DOB 1990' contains 'M' by construction, not by corroboration.
-    // Scoring that as agreement is the false-confidence bug this module
-    // exists to prevent, just one level up from the glyph signal.
+  it('credits a standalone one-character value with genuine agreement', () => {
     const single: Candidate = {
       key: 'sex', raw: 'M', evidence: { ...NO_EVIDENCE, schemaParsed: true },
     }
     const [out] = withCrossPass([single], 'SEX M DOB 1990')
-    expect(out?.evidence.crossPassAgreed).toBeNull()
+    expect(out?.evidence.crossPassAgreed).toBe(true)
   })
 
-  it('still scores a genuine one-character disagreement as absent, not false', () => {
-    // The guard is length-based, not "look up the value" — a one-character
-    // value gets null even when the haystack plainly lacks it too.
+  it('does not credit a one-character value embedded inside a longer word', () => {
+    // A naive substring match finds 'M' inside 'MARIA'. A name that starts
+    // with the same letter as a sex marker is not corroboration of it.
     const single: Candidate = {
       key: 'sex', raw: 'M', evidence: { ...NO_EVIDENCE, schemaParsed: true },
     }
-    const [out] = withCrossPass([single], 'SEX F DOB 1990')
-    expect(out?.evidence.crossPassAgreed).toBeNull()
+    const [out] = withCrossPass([single], 'PATIENT NAME MARIA SMITH')
+    expect(out?.evidence.crossPassAgreed).toBe(false)
   })
 
-  it('still evaluates a genuine two-character value normally', () => {
+  it('credits a standalone two-character state code with genuine agreement', () => {
     const two: Candidate = {
       key: 'addr_state', raw: 'CA', evidence: { ...NO_EVIDENCE, schemaParsed: true },
     }
-    const [agrees] = withCrossPass([two], 'ADDRESS SACRAMENTO CA 95814')
-    expect(agrees?.evidence.crossPassAgreed).toBe(true)
-    const [disagrees] = withCrossPass([two], 'ADDRESS SEATTLE WA 98101')
-    expect(disagrees?.evidence.crossPassAgreed).toBe(false)
+    const [out] = withCrossPass([two], 'ADDRESS SACRAMENTO CA 95814')
+    expect(out?.evidence.crossPassAgreed).toBe(true)
+  })
+
+  it('does not credit a two-character state code embedded inside a longer word', () => {
+    // 'CA' is a substring of 'CALIFORNIA'; 'WA' is a substring of
+    // 'WASHINGTON'. Deliberately wrong two-character codes against real
+    // plain passes were the reviewer's own counterexample for this.
+    const two: Candidate = {
+      key: 'addr_state', raw: 'CA', evidence: { ...NO_EVIDENCE, schemaParsed: true },
+    }
+    const [out] = withCrossPass([two], 'ADDRESS SACRAMENTO CALIFORNIA 95814')
+    expect(out?.evidence.crossPassAgreed).toBe(false)
+  })
+
+  it('compares asRead, not the ISO-converted raw, when a candidate carries one', () => {
+    // A date candidate's raw is ISO (1977-08-31); the plain pass only ever
+    // saw the printed form. Comparing raw here would manufacture a
+    // disagreement out of a formatting choice, not a misread.
+    const dateCandidate: Candidate = {
+      key: 'dob', raw: '1977-08-31', asRead: '08/31/1977',
+      evidence: { ...NO_EVIDENCE, schemaParsed: true },
+    }
+    const [out] = withCrossPass([dateCandidate], 'DOB 08/31/1977')
+    expect(out?.evidence.crossPassAgreed).toBe(true)
+  })
+
+  it('still detects a genuine disagreement on the as-read form', () => {
+    const dateCandidate: Candidate = {
+      key: 'dob', raw: '1977-08-31', asRead: '08/31/1977',
+      evidence: { ...NO_EVIDENCE, schemaParsed: true },
+    }
+    const [out] = withCrossPass([dateCandidate], 'DOB 08/13/1977')
+    expect(out?.evidence.crossPassAgreed).toBe(false)
   })
 })

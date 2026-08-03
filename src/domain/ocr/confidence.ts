@@ -1,26 +1,20 @@
-import { normalizeText } from './grounding'
 import type { Candidate, Evidence } from './extract/types'
 
 /** At or above this a row goes quiet. Below it, the crop comes out. */
 export const QUIET_THRESHOLD = 0.8
 
 /**
- * Weights over observable signals. Nothing here is the model's opinion of
- * itself: the failure that matters — a capital I read as a digit 1 — is a
- * high-probability substitution, so logprobs would rate it certain.
- *
- * checksumValid is 0.5, not the 0.45 first drafted: schemaParsed +
- * labelAnchored + checksumValid - glyphAmbiguous landed exactly on
- * QUIET_THRESHOLD at 0.45, which is the one case (an MRZ number, glyph-
- * ambiguous but checksum-proven) that most needs to stay quiet. Sitting
- * precisely on the boundary means the next unrelated weight change flips it
- * with no warning; 0.5 buys that case real margin (0.85) without changing
- * any ordering the other tests rely on.
+ * Weights over observable signals, not the model's self-belief. Two
+ * invariants constrain these numbers, both pinned in confidence.test.ts:
+ * a checksum alone (no label — that combination never occurs in real
+ * extractor output) must reach quiet even with a glyph-ambiguous read, and a
+ * cross-pass disagreement must keep a value noisy no matter what else is
+ * true, checksum included.
  */
 const WEIGHT = {
   labelAnchored: 0.25,
-  checksumValid: 0.5,
-  crossPassAgreed: 0.25,
+  checksumValid: 0.75,
+  crossPassAgreed: 0.6,
   boxPlausible: 0.05,
   /**
    * Only ever subtracts. An identifier holding 0/O, 1/I, 5/S or 8/B is the
@@ -51,35 +45,66 @@ export function scoreEvidence(evidence: Evidence): number {
   // has merely avoided the one failure we cannot otherwise see.
   if (evidence.glyphAmbiguous === true) score -= WEIGHT.glyphAmbiguous
 
+  // toFixed(3) isn't cosmetic: 0.3 + 0.6 is 0.8999999999999999 in float, and
+  // that noise would otherwise leak straight into a displayed score.
   return Math.min(1, Math.max(0, Number(score.toFixed(3))))
 }
 
-/** Below this, a substring match is coincidence rather than corroboration. */
-const MIN_CROSSPASS_LENGTH = 2
+const WORD_CHAR = /[A-Z0-9]/
+
+/**
+ * True where `needle` occurs in `haystack` as a whole token — not merely a
+ * substring. Grounded text has its whitespace stripped and cannot support
+ * this (`normalizeText` in `./grounding` exists for that reason and is
+ * deliberately not used here); `plainText`, the second OCR pass this
+ * compares against, keeps its natural spacing and punctuation, so the
+ * characters immediately before and after a match can be checked.
+ *
+ * Without this, a one-character value (a sex marker `M`) or a two-character
+ * one (a state code `CA`) matches almost any haystack that merely contains
+ * those letters as part of a longer word (`MARIA`, `CALIFORNIA`) — agreement
+ * that has not been earned. A length cutoff would dodge that by refusing to
+ * ever check short values at all, silently discarding the ones that *do*
+ * appear as their own token.
+ */
+function isWholeWordMatch(haystack: string, needle: string): boolean {
+  if (needle === '') return false
+  let from = 0
+  for (;;) {
+    const at = haystack.indexOf(needle, from)
+    if (at === -1) return false
+    const before = haystack[at - 1]
+    const after = haystack[at + needle.length]
+    if (!(before && WORD_CHAR.test(before)) && !(after && WORD_CHAR.test(after))) return true
+    from = at + 1
+  }
+}
 
 /**
  * Neither prompt mode dominates — measured 2026-08-02, grounded won 34/36
  * overall and lost 7/9 to 8/9 on one card. Disagreement between them is the
  * cheapest signal we have for a misread identifier.
+ *
+ * Compares `asRead` when a candidate has one, not `raw`: dates are converted
+ * to ISO before they ever reach here, and the plain pass only ever saw the
+ * printed `MM/DD/YYYY` — comparing the ISO form manufactures a disagreement
+ * out of a formatting choice, not a misread.
  */
 export function withCrossPass(
   candidates: readonly Candidate[],
   plainText: string,
 ): readonly Candidate[] {
   if (plainText.trim() === '') return candidates
-  const haystack = normalizeText(plainText)
+  const haystack = plainText.toUpperCase()
 
   return candidates.map((candidate) => {
-    const needle = normalizeText(candidate.raw)
-    // `includes` matches by substring: a sex marker 'M' or a licence class
-    // 'D' is a substring of almost any haystack, which is agreement it has
-    // not earned. Leave the signal as-is (null, "does not apply") rather
-    // than credit a match that proves nothing.
-    if (needle.length < MIN_CROSSPASS_LENGTH) return candidate
-
+    const needle = (candidate.asRead ?? candidate.raw).toUpperCase()
     return {
       ...candidate,
-      evidence: { ...candidate.evidence, crossPassAgreed: haystack.includes(needle) },
+      evidence: {
+        ...candidate.evidence,
+        crossPassAgreed: isWholeWordMatch(haystack, needle),
+      },
     }
   })
 }

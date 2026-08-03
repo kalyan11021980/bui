@@ -20,6 +20,10 @@ export type Candidate = {
   readonly key: RequirementKey
   readonly raw: string
   readonly box?: Box
+  /** The as-printed text `raw` was parsed from, e.g. `08/31/1977` for a
+   * `raw` of `1977-08-31`. Cross-pass compares this when present — the
+   * plain OCR pass never saw the ISO conversion, only the print. */
+  readonly asRead?: string
   readonly evidence: Evidence
 }
 

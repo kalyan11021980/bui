@@ -28,13 +28,15 @@ function bareKey(text: string): string {
   return normalizeText(text).replace(/[^A-Z0-9#]/g, '')
 }
 
+type IsoDate = { readonly iso: string; readonly asRead: string }
+
 /** Cards print MM/DD/YYYY; every field schema wants ISO. */
-function isoFrom(raw: string): string | null {
+function isoFrom(raw: string): IsoDate | null {
   const match = US_DATE.exec(raw)
   if (!match) return null
-  const [, month, day, year] = match
+  const [asRead, month, day, year] = match
   const iso = `${year}-${month}-${day}`
-  return isRealCalendarDate(iso) ? iso : null
+  return isRealCalendarDate(iso) ? { iso, asRead } : null
 }
 
 /**
@@ -136,13 +138,16 @@ export const extractLabelled: ExtractStrategy = (detections) => {
     const found = findLabelled(detections, anchors, accepts(field))
     if (!found) continue
 
-    const raw = DATE_FIELDS.has(field) ? isoFrom(found.raw) : found.raw
-    if (!raw) continue
+    const parsed: IsoDate | { iso: string; asRead?: undefined } | null =
+      DATE_FIELDS.has(field) ? isoFrom(found.raw) : { iso: found.raw }
+    if (!parsed) continue
+    const raw = parsed.iso
 
     const key = INSTANCED.has(field) ? reqKey(field as FieldId, 0) : field
     out.push({
       key,
       raw,
+      ...(parsed.asRead !== undefined && { asRead: parsed.asRead }),
       box: found.box,
       evidence: {
         ...NO_EVIDENCE,
