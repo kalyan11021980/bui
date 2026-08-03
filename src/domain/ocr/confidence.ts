@@ -15,7 +15,11 @@ const WEIGHT = {
   labelAnchored: 0.12,
   checksumValid: 0.73,
   crossPassAgreed: 0.42,
-  boxPlausible: 0.04,
+  // 0.05, not 0.04: label+null-checksum+agreed+failed-box landed exactly on
+  // QUIET_THRESHOLD at 0.04 — a reachable shape (extractAamva/extractLabelled
+  // both emit boxPlausible unfiltered). 0.05 clears it with margin; pinned
+  // by the exhaustive no-exact-tie test below.
+  boxPlausible: 0.05,
   /**
    * Only ever subtracts. An identifier holding 0/O, 1/I, 5/S or 8/B is the
    * case that produced `11234568` from `I1234568` — plausible, wrong, and
@@ -65,8 +69,11 @@ const WORD_CHAR = /[A-Z0-9]/
  * `normalizeText` (whitespace-stripped, for grounded text) is not used. */
 function isWholeWordMatch(haystack: string, needle: string): boolean {
   if (needle === '') return false
+  // Bounded so an empty needle (or any other stalled search) cannot spin
+  // forever — indexOf('', n) clamps n to haystack.length and never returns
+  // -1, so an unbounded loop would never terminate on it.
   let from = 0
-  for (;;) {
+  while (from <= haystack.length) {
     const at = haystack.indexOf(needle, from)
     if (at === -1) return false
     const before = haystack[at - 1]
@@ -74,6 +81,7 @@ function isWholeWordMatch(haystack: string, needle: string): boolean {
     if (!(before && WORD_CHAR.test(before)) && !(after && WORD_CHAR.test(after))) return true
     from = at + 1
   }
+  return false
 }
 
 /**
@@ -85,6 +93,13 @@ function isWholeWordMatch(haystack: string, needle: string): boolean {
  * to ISO before they ever reach here, and the plain pass only ever saw the
  * printed `MM/DD/YYYY` — comparing the ISO form manufactures a disagreement
  * out of a formatting choice, not a misread.
+ *
+ * Not attempted here: MRZ dates' `asRead` (raw `YYMMDD`) still won't match a
+ * passport's visual date, which national data pages print in whatever order
+ * and language that issuer chose (`10 MAA/MAR 1965`, not one fixed pattern
+ * like a US card). Parsing that generically means guessing a format per
+ * issuer; matching only the year risks false agreement against an unrelated
+ * year on the same page. Left conservative on purpose — see confidence.test.ts.
  */
 export function withCrossPass(
   candidates: readonly Candidate[],

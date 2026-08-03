@@ -188,6 +188,31 @@ describe('scoreEvidence', () => {
     }))
     expect(score).toBe(0.83)
   })
+
+  it('never lands exactly on the quiet threshold, for any reachable combination', () => {
+    // labelAnchored: true, checksumValid: null, crossPassAgreed: true,
+    // boxPlausible: false used to land exactly on 0.80 — reachable, since
+    // both aamva and labelled emit boxPlausible unfiltered alongside a
+    // label anchor and no checksum. An exact tie is one weight nudge away
+    // from silently flipping; this pins "never exactly", not just that one
+    // case.
+    const flags = [true, false, null] as const
+    for (const labelAnchored of [true, false]) {
+      for (const checksumValid of flags) {
+        for (const crossPassAgreed of flags) {
+          for (const boxPlausible of flags) {
+            for (const glyphAmbiguous of flags) {
+              const score = scoreEvidence(evidence({
+                schemaParsed: true, labelAnchored, checksumValid,
+                crossPassAgreed, boxPlausible, glyphAmbiguous,
+              }))
+              expect(score).not.toBe(QUIET_THRESHOLD)
+            }
+          }
+        }
+      }
+    }
+  })
 })
 
 describe('withCrossPass', () => {
@@ -261,7 +286,11 @@ describe('withCrossPass', () => {
     const empty: Candidate = {
       key: 'sex', raw: '', evidence: { ...NO_EVIDENCE, schemaParsed: true },
     }
-    const [out] = withCrossPass([empty], 'SEX M DOB 1990')
+    // 'SEX M DOB 1990' has no two adjacent non-word characters, so it would
+    // pass even with the empty-needle guard gone — this haystack (colon
+    // then space, real markdown OCR shape) does have such a pair, and is
+    // what actually exercises the guard.
+    const [out] = withCrossPass([empty], 'SEX: M\nDOB 1990')
     expect(out?.evidence.crossPassAgreed).toBe(false)
   })
 
