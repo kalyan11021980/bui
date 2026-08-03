@@ -12,6 +12,7 @@ const profile: ApplicantProfile = {
   wantsGsa: false,
   licenses: [],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -299,6 +300,7 @@ describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)',
   const twoLicences: ApplicantProfile = {
     applicantType: 'business', country: 'US', state: 'GA',
     wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
+    idForm: 'drivers_license',
   }
 
   function withTwoLicenceNumbers() {
@@ -456,5 +458,78 @@ describe('CLEAR_VALUE — the record must not outlive what is on screen', () => 
     expect(() =>
       applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'first_name', at: AT }),
     ).toThrow(ApplicationSubmittedError)
+  })
+})
+
+describe('changing the declared ID form swaps which number is required', () => {
+  /** A licence holder who has answered the licence number and issuing state. */
+  function withLicenceNumber() {
+    let s = createApplication('app-1', profile)
+    for (const [id, value] of [['dl_number', 'D1234567'], ['id_state', 'GA']] as const) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value, source: 'user', at: AT,
+      })
+    }
+    return s
+  }
+
+  const toStateId = (s: ReturnType<typeof withLicenceNumber>) =>
+    applicationReducer(s, { type: 'UPDATE_PROFILE', patch: { idForm: 'state_id' }, at: AT })
+
+  it('supersedes the licence number and asks for the ID card number instead', () => {
+    const s = toStateId(withLicenceNumber())
+    expect(s.fields.dl_number?.status).toBe('superseded')
+    expect(outstandingFields(s)).toContain('id_number')
+    expect(outstandingFields(s)).not.toContain('dl_number')
+  })
+
+  it('keeps the superseded licence number rather than deleting it', () => {
+    // A number the applicant typed is evidence of what they said, whichever
+    // document they went on to declare.
+    expect(toStateId(withLicenceNumber()).fields.dl_number?.value).toBe('D1234567')
+  })
+
+  it('revives the licence number, unconfirmed, if they switch back', () => {
+    let s = toStateId(withLicenceNumber())
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { idForm: 'drivers_license' }, at: AT,
+    })
+    // `derived`, not `confirmed`: the value survived, the confirmation did not.
+    expect(s.fields.dl_number?.status).toBe('derived')
+    expect(s.fields.dl_number?.value).toBe('D1234567')
+    expect(outstandingFields(s)).toContain('dl_number')
+  })
+
+  it('supersedes the issuing state when they declare a passport', () => {
+    const s = applicationReducer(withLicenceNumber(), {
+      type: 'UPDATE_PROFILE', patch: { idForm: 'passport' }, at: AT,
+    })
+    expect(s.fields.id_state?.status).toBe('superseded')
+    expect(outstandingFields(s)).not.toContain('id_state')
+    expect(outstandingFields(s)).toContain('passport_number')
+  })
+
+  it('leaves the identity fields common to every document alone', () => {
+    // Guards the negatives above: a resync that superseded everything would
+    // pass them all.
+    let s = applicationReducer(createApplication('app-1', profile), {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'Ada', source: 'user', at: AT,
+    })
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', patch: { idForm: 'passport' }, at: AT,
+    })
+    expect(s.fields.first_name?.status).toBe('confirmed')
+  })
+
+  it('still completes after the switch, with the new number answered', () => {
+    let s = toStateId(withLicenceNumber())
+    for (const id of outstandingFields(s)) {
+      s = applicationReducer(s, {
+        type: 'SET_VALUE', fieldId: id, value: 'x1234', source: 'user', at: AT,
+      })
+    }
+    expect(isComplete(s)).toBe(true)
+    // The orphaned licence number must not block it, nor count towards it.
+    expect(s.fields.dl_number?.status).toBe('superseded')
   })
 })

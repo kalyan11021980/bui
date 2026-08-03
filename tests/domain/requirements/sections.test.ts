@@ -9,11 +9,13 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 const twoLicences: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'OH',
   wantsGsa: true, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 describe('field sections', () => {

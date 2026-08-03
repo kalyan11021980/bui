@@ -10,11 +10,20 @@
  * `name_block` is the `1,2 Name` stack Virginia and Oregon print: surname on
  * the first line, given names on the second, under one code.
  */
+/**
+ * A licence and an ID card print the number under the same codes — CA under
+ * `ID`, VA under `4d Customer number` — so both fields anchor on all of them
+ * and `extractFor` picks one from `derivableFrom`. Two lists would also strip
+ * unevenly: the shorter one leaves `LIC#` on the front of the value.
+ */
+const DOCUMENT_NUMBER: readonly string[] = [
+  '4D', 'LIC#', 'DLN', 'CUSTOMERNUMBER', 'LICENSENO', 'LICNO', 'DLNO',
+  'NUMBER', 'NO', 'DL', 'ID',
+]
+
 export const AAMVA_ANCHORS: Readonly<Record<string, readonly string[]>> = {
-  dl_number: [
-    '4D', 'LIC#', 'DLN', 'CUSTOMERNUMBER', 'LICENSENO', 'LICNO', 'DLNO',
-    'NUMBER', 'NO', 'DL', 'ID',
-  ],
+  dl_number: DOCUMENT_NUMBER,
+  id_number: DOCUMENT_NUMBER,
   dob: ['3', 'DOB', 'DATEOFBIRTH', 'BIRTHDATE'],
   dl_expiry: ['4B', 'EXP', 'EPX', 'EXPIRES'],
   last_name: ['1', 'LN', 'FAMILYNAME'],

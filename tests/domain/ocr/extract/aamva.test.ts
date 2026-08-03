@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { extractAamva, splitAddressBlock } from '@/domain/ocr/extract/aamva'
-import { extractFor } from '@/domain/ocr/extract'
+import { extractFor, parseCandidates } from '@/domain/ocr/extract'
 import type { Detection } from '@/domain/ocr/grounding'
 
 const det = (text: string, box: [number, number, number, number]): Detection =>
@@ -221,6 +221,70 @@ describe('extractAamva', () => {
   })
 })
 
+describe('an ID card carries a number of its own', () => {
+  it('reads it from the `ID` code California prints', () => {
+    // The card prints `ID  I1234561`; OCR returns the pair as one detection.
+    expect(read([det('ID11234561', [347, 192, 588, 255])], 'id_number')?.raw)
+      .toBe('11234561')
+  })
+
+  it('reads it from the `4d Customer number` Virginia spells out', () => {
+    const found = read([
+      det('4dCustomer number', [332, 230, 514, 261]),
+      det('T16700487', [364, 257, 536, 299]),
+    ], 'id_number')
+    expect(found?.raw).toBe('T16700487')
+    expect(found?.evidence.labelAnchored).toBe(true)
+  })
+
+  it('does not read the IDENTIFICATION heading as an ID number', () => {
+    // `ID` opens the word, and the card title sits above the number.
+    expect(read([
+      det('IDENTIFICATION', [584, 48, 840, 96]),
+      det('CARD', [664, 98, 764, 140]),
+    ], 'id_number')).toBeUndefined()
+  })
+})
+
+describe('glyph ambiguity is recorded, never used to filter', () => {
+  it('flags an identifier holding a mutually confusable glyph', () => {
+    // The acceptance gate's worst finding: I1234568 read as 11234568, a
+    // plausible wrong value with every other signal green.
+    expect(read([det('DL11234568', [329, 214, 560, 284])], 'dl_number')
+      ?.evidence.glyphAmbiguous).toBe(true)
+  })
+
+  it('does not flag an identifier with no confusable glyph in it', () => {
+    // Without this the signal could be a constant and still look like it works.
+    const found = read([det('4dLIC#A9999999', [100, 200, 400, 230])], 'dl_number')
+    expect(found?.raw).toBe('A9999999')
+    expect(found?.evidence.glyphAmbiguous).toBe(false)
+  })
+
+  it('leaves it null on a name, a date and an address', () => {
+    const detections = [
+      det('1,2 Name', [320, 312, 404, 343]),
+      det('REYES', [360, 341, 447, 379]),
+      det('RICHARD BENJAMIN', [360, 377, 570, 408]),
+      det('3 DOB 04/17/1982', [100, 500, 400, 530]),
+      det('8123STREETADDRESS', [339, 599, 656, 640]),
+      det('YOURCITYWA99999-0000', [353, 640, 713, 675]),
+    ]
+    for (const field of ['last_name', 'first_name', 'dob', 'addr_line1', 'addr_city']) {
+      expect(read(detections, field)?.evidence.glyphAmbiguous, field).toBeNull()
+    }
+  })
+
+  it('still emits the ambiguous value, all the way through parsing', () => {
+    // Subtract-only. A value we are less sure of is not a malformed one, and
+    // dropping it would leave the field blank with no record of why.
+    const detections = [det('DL11234568', [329, 214, 560, 284])]
+    const kept = parseCandidates(extractFor('drivers_license', detections, ''))
+    expect(kept.map((c) => c.raw)).toEqual(['11234568'])
+    expect(kept[0]?.evidence.glyphAmbiguous).toBe(true)
+  })
+})
+
 describe('the catalog decides what a document may prove', () => {
   const detections = [det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])]
 
@@ -233,6 +297,15 @@ describe('the catalog decides what a document may prove', () => {
     expect(read(detections, 'dl_number')?.raw).toBe('WDLJK00580GF')
     const keys = extractFor('state_id', detections, '').map((c) => c.key)
     expect(keys).not.toContain('dl_number')
+  })
+
+  it('files the same number under id_number when the card is a state ID', () => {
+    // The strategy reads both and is never told which document it is looking
+    // at; `derivableFrom` is what picks one.
+    expect(extractFor('state_id', detections, '').map((c) => c.key))
+      .toEqual(['id_number'])
+    expect(extractFor('drivers_license', detections, '').map((c) => c.key))
+      .toEqual(['dl_number'])
   })
 })
 

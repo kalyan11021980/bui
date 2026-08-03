@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { extractFor, parseCandidates, registerStrategy } from '@/domain/ocr/extract'
+import { glyphAmbiguity, NO_EVIDENCE } from '@/domain/ocr/extract/types'
 import type { Candidate, Evidence } from '@/domain/ocr/extract/types'
 
 const noEvidence: Evidence = {
   schemaParsed: false, labelAnchored: false,
   checksumValid: null, crossPassAgreed: null, boxPlausible: null,
+  glyphAmbiguous: null,
 }
 
 const candidate = (key: string, raw: string): Candidate =>
@@ -63,6 +65,7 @@ describe('parseCandidates', () => {
         checksumValid: null,
         crossPassAgreed: false,
         boxPlausible: false,
+        glyphAmbiguous: true,
       },
     }
     const [kept] = parseCandidates([withEvidence])
@@ -72,6 +75,43 @@ describe('parseCandidates', () => {
       checksumValid: null,
       crossPassAgreed: false,
       boxPlausible: false,
+      glyphAmbiguous: true,
     })
+  })
+})
+
+describe('glyphAmbiguity', () => {
+  it('flags an identifier containing any of the confusable glyphs', () => {
+    for (const raw of ['I1234568', 'A0000', 'SB5', 'x8x']) {
+      expect(glyphAmbiguity('dl_number', raw), raw).toBe(true)
+    }
+  })
+
+  it('does not flag an identifier made only of unambiguous characters', () => {
+    for (const raw of ['A9999999', 'WDJK4267', '243-79']) {
+      expect(glyphAmbiguity('dl_number', raw), raw).toBe(false)
+    }
+  })
+
+  it('applies to every identifier-shaped field, instanced or not', () => {
+    for (const key of ['id_number', 'passport_number', 'license_number#0']) {
+      expect(glyphAmbiguity(key, 'I0'), key).toBe(true)
+    }
+  })
+
+  it('is null where the confusion cannot arise or does not change the meaning', () => {
+    // A surname read SAMPLE for 5AMPLE is a misread we catch elsewhere; a
+    // date is validated; an address is checked against a real one.
+    for (const key of ['first_name', 'last_name', 'dob', 'dl_expiry', 'addr_line1']) {
+      expect(glyphAmbiguity(key, 'SB1050'), key).toBeNull()
+    }
+  })
+
+  it('is null for a key that is not a field at all', () => {
+    expect(glyphAmbiguity('license_number#nope', 'I0')).toBeNull()
+  })
+
+  it('leaves NO_EVIDENCE saying the signal has not been assessed', () => {
+    expect(NO_EVIDENCE.glyphAmbiguous).toBeNull()
   })
 })

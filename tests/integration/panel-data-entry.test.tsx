@@ -14,11 +14,13 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
   wantsGsa: false, licenses: ['dealer'], addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 /** Scoped to the form element — the row wrapper carries an aria-label too. */
@@ -107,9 +109,6 @@ describe('completing an application through the panel', () => {
     for (const [label, value] of answers) {
       await userEvent.type(control(label), value)
     }
-    await userEvent.selectOptions(
-      control(/form of identification/i), 'drivers_license',
-    )
     await userEvent.upload(
       control(/photos of your id/i),
       new File(['x'], 'licence-front.png', { type: 'image/png' }),
@@ -233,5 +232,45 @@ describe('completing an application through the panel', () => {
     expect(latest?.fields.addr_zip).toBeUndefined()
     expect(screen.getByText(/^0 of \d+ done$/)).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent(/ZIP/i)
+  })
+})
+
+describe('the panel asks for the number the declared ID actually carries', () => {
+  const queryControl = (label: RegExp) =>
+    screen.queryByLabelText(label, { selector: 'input, select, textarea' })
+
+  const LICENCE = /driver's license number/i
+  const ID_CARD = /id card number/i
+  const PASSPORT = /passport number/i
+  const ISSUING_STATE = /state that issued/i
+
+  it('asks a licence holder for a licence number', () => {
+    render(<Harness profile={{ ...individual, idForm: 'drivers_license' }} />)
+    expect(control(LICENCE)).toBeInTheDocument()
+    expect(queryControl(ID_CARD)).not.toBeInTheDocument()
+    expect(queryControl(PASSPORT)).not.toBeInTheDocument()
+  })
+
+  it('asks a state ID holder for an ID card number instead', () => {
+    render(<Harness profile={{ ...individual, idForm: 'state_id' }} />)
+    expect(control(ID_CARD)).toBeInTheDocument()
+    expect(queryControl(LICENCE)).not.toBeInTheDocument()
+  })
+
+  it('asks a passport holder for a passport number, and no issuing state', () => {
+    render(<Harness profile={{ ...individual, idForm: 'passport' }} />)
+    expect(control(PASSPORT)).toBeInTheDocument()
+    expect(queryControl(LICENCE)).not.toBeInTheDocument()
+    expect(queryControl(ISSUING_STATE)).not.toBeInTheDocument()
+    // Guards the negatives: the rest of identification is still on screen.
+    expect(control(/country that issued/i)).toBeInTheDocument()
+  })
+
+  it('asks a licence and ID card holder which state issued it', () => {
+    for (const idForm of ['drivers_license', 'state_id'] as const) {
+      const { unmount } = render(<Harness profile={{ ...individual, idForm }} />)
+      expect(control(ISSUING_STATE), idForm).toBeInTheDocument()
+      unmount()
+    }
   })
 })

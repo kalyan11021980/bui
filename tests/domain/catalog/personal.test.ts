@@ -18,6 +18,38 @@ describe('personal catalog', () => {
     expect(dl?.derivableFrom).toContain('drivers_license')
   })
 
+  it('gives each document its own number field, derivable only from itself', () => {
+    // Widening dl_number to state_id would file an ID card number under
+    // "Driver's license number" in a record a human reviewer reads.
+    for (const [id, docType] of [
+      ['dl_number', 'drivers_license'], ['id_number', 'state_id'],
+      ['passport_number', 'passport'],
+    ] as const) {
+      const def = IDENTITY_FIELDS.find((f) => f.id === id)
+      expect(def?.derivableFrom, id).toEqual([docType])
+    }
+  })
+
+  it('labels each number after the document it is printed on', () => {
+    const label = (id: string) => IDENTITY_FIELDS.find((f) => f.id === id)?.label
+    expect(label('dl_number')).toMatch(/driver/i)
+    expect(label('id_number')).toMatch(/id card/i)
+    expect(label('passport_number')).toMatch(/passport/i)
+  })
+
+  it('treats every document number as sensitive', () => {
+    for (const id of ['dl_number', 'id_number', 'passport_number']) {
+      const def = IDENTITY_FIELDS.find((f) => f.id === id)
+      expect(def?.sensitive, id).toBe(true)
+      expect(def?.handling?.trim(), id).toBeTruthy()
+    }
+  })
+
+  it('no longer carries a form-of-ID field, which the profile now declares', () => {
+    // Two representations of one fact drift; ApplicantProfile.idForm is the one.
+    expect(IDENTITY_FIELDS.map((f) => f.id)).not.toContain('id_form')
+  })
+
   it('validates a date of birth as an ISO date', () => {
     const dob = IDENTITY_FIELDS.find((f) => f.id === 'dob')
     expect(dob?.validation.safeParse('1982-08-31').success).toBe(true)

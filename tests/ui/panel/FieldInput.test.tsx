@@ -54,10 +54,10 @@ describe('FieldInput — the panel accepts data', () => {
   })
 
   it('renders a select populated from the field\'s own enum', () => {
-    render(<FieldRow fieldId="id_form" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
-    const select = control(/form of identification/i)
+    render(<FieldRow fieldId="license_type" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    const select = control(/license type/i)
     expect(select.tagName).toBe('SELECT')
-    for (const option of ['drivers_license', 'state_id', 'passport']) {
+    for (const option of ['dealer', 'dismantler', 'exporter', 'salvage']) {
       expect(screen.getByRole('option', { name: option })).toBeInTheDocument()
     }
   })

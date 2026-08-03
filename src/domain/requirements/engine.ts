@@ -1,13 +1,22 @@
 import {
   BUSINESS_CORE, CORE_ADDRESS, CORE_CONTACT, CORE_IDENTITY, CORE_PROFILE,
-  GSA_CORE, LICENSE_GROUP, STATE_RULES, type ApplicantProfile,
+  GSA_CORE, ID_NUMBER, LICENSE_GROUP, STATE_RULES, type ApplicantProfile,
 } from './rules'
 import { reqKey, type RequirementKey } from './key'
+import type { FieldId } from '../field-id'
+
+/** The identity fields that depend on which document the applicant declared. */
+function identityDocument(profile: ApplicantProfile): FieldId[] {
+  const number = ID_NUMBER[profile.idForm]
+  // A passport has no issuing state, so asking for one has no answer.
+  return profile.idForm === 'passport' ? [number] : [number, 'id_state']
+}
 
 /** The single authority on what an applicant owes. Pure — no LLM, no I/O. */
 export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
   const out: RequirementKey[] = [
-    ...CORE_PROFILE, ...CORE_IDENTITY, ...CORE_ADDRESS, ...CORE_CONTACT,
+    ...CORE_PROFILE, ...CORE_IDENTITY, ...identityDocument(profile),
+    ...CORE_ADDRESS, ...CORE_CONTACT,
   ].map((id) => reqKey(id))
 
   if (profile.addressDiffersFromId) out.push(reqKey('proof_of_residency'))

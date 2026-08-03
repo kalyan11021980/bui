@@ -3,7 +3,8 @@ import { normalizeText, type Box, type Detection } from '../grounding'
 import { registerStrategy } from './index'
 import { AAMVA_ANCHORS, LABEL_CODES, LABEL_WORDS } from './synonyms'
 import {
-  NO_EVIDENCE, type Candidate, type Evidence, type ExtractStrategy,
+  glyphAmbiguity, NO_EVIDENCE,
+  type Candidate, type Evidence, type ExtractStrategy,
 } from './types'
 
 /** A read value, before it is told which field it answers. */
@@ -187,6 +188,9 @@ function nearestValue(
   if (right[0]) return right[0]
   return usable.filter((d) => isBelow(anchor.box, d.box)).sort(byDistance)[0] ?? null
 }
+
+const DATE_FIELDS = new Set(['dob', 'dl_expiry'])
+const NUMBER_FIELDS = new Set(['dl_number', 'id_number'])
 
 function isNumber(text: string): boolean {
   return NUMBER_VALUE.test(text) && /\d/.test(text) && !LABEL_WORDS.includes(text)
@@ -400,7 +404,15 @@ export const extractAamva: ExtractStrategy = (detections) => {
   const out: Candidate[] = []
   const push = (candidate: Candidate | null): boolean => {
     if (!candidate || out.some((c) => c.key === candidate.key)) return false
-    out.push(candidate)
+    // Set here rather than per branch, so no field can be given the signal by
+    // accident or left without it by omission.
+    out.push({
+      ...candidate,
+      evidence: {
+        ...candidate.evidence,
+        glyphAmbiguous: glyphAmbiguity(candidate.key, candidate.raw),
+      },
+    })
     return true
   }
 
@@ -414,9 +426,9 @@ export const extractAamva: ExtractStrategy = (detections) => {
         continue
       }
 
-      const found = field === 'dob' || field === 'dl_expiry'
+      const found = DATE_FIELDS.has(field)
         ? dateField(detections, hit)
-        : simpleField(detections, hit, field === 'dl_number' ? isNumber : isName)
+        : simpleField(detections, hit, NUMBER_FIELDS.has(field) ? isNumber : isName)
       if (!found) continue
 
       const raw = field === 'first_name' ? firstGivenName(found.raw) : found.raw

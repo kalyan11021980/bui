@@ -2,15 +2,15 @@
  * A runtime array rather than a bare type union, so a test can check that every
  * declared id has a catalog entry. It did not, for five ids, for all of phase 1.
  *
- * Applicant type, country and state are NOT here — they live on
+ * Applicant type, country, state and form of ID are NOT here — they live on
  * `ApplicantProfile` as engine inputs. Two representations of one fact drift.
  */
 export const ALL_FIELD_IDS = [
   // preferences
   'primary_activity', 'preferred_language',
   // identity
-  'first_name', 'last_name', 'id_form', 'dl_number', 'dl_expiry',
-  'id_country', 'id_state', 'dob', 'id_images', 'proof_of_residency',
+  'first_name', 'last_name', 'dl_number', 'id_number', 'passport_number',
+  'dl_expiry', 'id_country', 'id_state', 'dob', 'id_images', 'proof_of_residency',
   // personal address
   'addr_line1', 'addr_line2', 'addr_city', 'addr_state', 'addr_zip',
   // contact

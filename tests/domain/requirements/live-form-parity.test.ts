@@ -16,6 +16,7 @@ const individual: ApplicantProfile = {
   wantsGsa: false,
   licenses: [],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 const business: ApplicantProfile = {

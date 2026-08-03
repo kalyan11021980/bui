@@ -68,11 +68,13 @@ function readCard(card: Fixture): Map<string, string> {
  * the card. Locked rather than counted, so an anchor that stops firing fails
  * here instead of quietly lowering a number nobody reads.
  */
-const ALL = [
-  'dl_number', 'dob', 'dl_expiry', 'last_name', 'first_name',
+const COMMON = [
+  'dob', 'dl_expiry', 'last_name', 'first_name',
   'addr_line1', 'addr_city', 'addr_state', 'addr_zip',
 ]
-const NO_NUMBER = ALL.filter((f) => f !== 'dl_number')
+/** Each document type owes its own number field, under its own name. */
+const ALL = ['dl_number', ...COMMON]
+const ID_ALL = ['id_number', ...COMMON]
 
 const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string, string> }> = {
   'wa_enhanced.png': { reads: ALL, wrong: {} },
@@ -96,15 +98,18 @@ const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string,
   },
   // Pre-AAMVA, 1977: no numbered codes to anchor to at all.
   'md_1977.png': { reads: [], wrong: {} },
-  'ca_id_2010.png': { reads: NO_NUMBER, wrong: {} },
+  'ca_id_2010.png': {
+    reads: ID_ALL,
+    wrong: { id_number: 'OCR read the leading I as a 1, as on the CA licence' },
+  },
   'va_id_2023.png': {
-    reads: NO_NUMBER,
+    reads: ID_ALL,
     wrong: { first_name: 'OCR returned JAMES ALAN with no space, so the middle name cannot be split off' },
   },
 }
 
 /** Recall, stated as a number so a change to it has to be argued for. */
-const TOTALS = { read: 64, correct: 60, fields: 79 }
+const TOTALS = { read: 66, correct: 61, fields: 81 }
 
 describe('AAMVA recall against recorded specimens', () => {
   it('has the corpus it thinks it has', () => {
@@ -156,13 +161,13 @@ describe('AAMVA recall against recorded specimens', () => {
     })
   }
 
-  it('reads 64 of 79 fields, 60 of them right', () => {
+  it('reads 66 of 81 fields, 61 of them right', () => {
     let read = 0
     let correct = 0
     let fields = 0
 
     for (const card of cards) {
-      fields += card.docType === 'drivers_license' ? ALL.length : NO_NUMBER.length
+      fields += card.docType === 'drivers_license' ? ALL.length : ID_ALL.length
       for (const [field, value] of readCard(card)) {
         read += 1
         if (matches(value, expected(card, field) ?? '')) correct += 1

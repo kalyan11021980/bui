@@ -11,6 +11,7 @@ const base: ApplicantProfile = {
   wantsGsa: false,
   licenses: [],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 describe('requiredFields', () => {
@@ -94,7 +95,7 @@ describe('requiredFields', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
       'dl_expiry', 'dl_number', 'dob', 'first_name',
-      'id_country', 'id_form', 'id_images', 'id_state',
+      'id_country', 'id_images', 'id_state',
       'last_name', 'phone_mobile', 'preferred_language', 'primary_activity',
     ])
   })
@@ -105,6 +106,8 @@ describe('requiredFields', () => {
       { ...base, applicantType: 'business', licenses: ['dealer'] },
       { ...base, wantsGsa: true },
       { ...base, state: null },
+      { ...base, idForm: 'state_id' },
+      { ...base, idForm: 'passport' },
       { ...base, state: 'OH', applicantType: 'business', licenses: ['dealer', 'salvage'] },
     ]
     for (const p of profiles) {
@@ -112,6 +115,62 @@ describe('requiredFields', () => {
         const { fieldId } = parseReqKey(key)
         expect(CATALOG.has(fieldId), `catalog is missing ${fieldId}`).toBe(true)
       }
+    }
+  })
+})
+
+describe('the declared ID form decides which number is owed', () => {
+  const NUMBERS = ['dl_number', 'id_number', 'passport_number'] as const
+
+  /** Exactly one, never two, never none — asserted as a set, not a contains. */
+  const numbersAsked = (profile: ApplicantProfile) =>
+    NUMBERS.filter((n) => requiredFields(profile).includes(n))
+
+  it('asks a licence holder for the licence number and nothing else', () => {
+    expect(numbersAsked({ ...base, idForm: 'drivers_license' })).toEqual(['dl_number'])
+  })
+
+  it('asks a state ID holder for the ID card number, not a licence number', () => {
+    // The state ID prints a number; before this it had nowhere to land.
+    expect(numbersAsked({ ...base, idForm: 'state_id' })).toEqual(['id_number'])
+  })
+
+  it('asks a passport holder for the passport number, not a licence number', () => {
+    // Pre-existing defect: every applicant owed a driver's licence number.
+    expect(numbersAsked({ ...base, idForm: 'passport' })).toEqual(['passport_number'])
+  })
+
+  it('asks which state issued a licence or an ID card', () => {
+    expect(requiredFields({ ...base, idForm: 'drivers_license' })).toContain('id_state')
+    expect(requiredFields({ ...base, idForm: 'state_id' })).toContain('id_state')
+  })
+
+  it('does not ask a passport holder for an issuing state, which it has none of', () => {
+    const keys = requiredFields({ ...base, idForm: 'passport' })
+    expect(keys).not.toContain('id_state')
+    // Guards the negative: the rest of identity is still asked for.
+    expect(keys).toContain('id_country')
+    expect(keys).toContain('id_images')
+  })
+
+  it('returns the exact expected set for a passport holder', () => {
+    expect([...requiredFields({ ...base, idForm: 'passport' })].sort()).toEqual([
+      'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'dl_expiry', 'dob', 'first_name',
+      'id_country', 'id_images', 'last_name', 'passport_number',
+      'phone_mobile', 'preferred_language', 'primary_activity',
+    ])
+  })
+
+  it('keeps each section contiguous, so the panel groups it as one block', () => {
+    // The number and issuing state are appended by the engine rather than by
+    // CORE_IDENTITY; appending them after contact would split identification
+    // in two and the panel would show a different order from the engine's.
+    for (const idForm of ['drivers_license', 'state_id', 'passport'] as const) {
+      const sections = requiredFields({ ...base, idForm })
+        .map((k) => CATALOG.get(parseReqKey(k).fieldId)?.section)
+      const runs = sections.filter((s, i) => s !== sections[i - 1])
+      expect(new Set(runs).size, idForm).toBe(runs.length)
     }
   })
 })

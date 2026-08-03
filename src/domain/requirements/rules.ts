@@ -2,6 +2,8 @@ import type { FieldId } from '../field-id'
 
 export type LicenseType = 'dealer' | 'dismantler' | 'exporter' | 'salvage'
 
+export type IdForm = 'drivers_license' | 'state_id' | 'passport'
+
 export type ApplicantProfile = {
   applicantType: 'business' | 'individual'
   country: string
@@ -15,6 +17,20 @@ export type ApplicantProfile = {
    * outright, and an address that does not match the ID needs separate proof.
    */
   addressDiffersFromId: boolean
+  /**
+   * Which document they are proving identity with. Declared, like the address
+   * question above, because it decides which number they owe — filing an ID
+   * card number under "Driver's license number" misdescribes it to the human
+   * who later reads the record.
+   */
+  idForm: IdForm
+}
+
+/** Each document carries its own number, under its own name. */
+export const ID_NUMBER: Readonly<Record<IdForm, FieldId>> = {
+  drivers_license: 'dl_number',
+  state_id: 'id_number',
+  passport: 'passport_number',
 }
 
 /** Asked of everyone, on the first screen. */
@@ -22,9 +38,9 @@ export const CORE_PROFILE: readonly FieldId[] = [
   'primary_activity', 'preferred_language',
 ]
 
+/** Common to every document. The number and issuing state depend on `idForm`. */
 export const CORE_IDENTITY: readonly FieldId[] = [
-  'first_name', 'last_name', 'id_form', 'dl_number', 'dl_expiry',
-  'id_country', 'id_state', 'dob', 'id_images',
+  'first_name', 'last_name', 'dl_expiry', 'id_country', 'dob', 'id_images',
 ]
 
 export const CORE_ADDRESS: readonly FieldId[] = [

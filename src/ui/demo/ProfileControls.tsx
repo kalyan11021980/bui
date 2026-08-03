@@ -1,7 +1,7 @@
 'use client'
 
 import { COLOR } from '@/ui/theme/tokens'
-import type { ApplicantProfile, LicenseType } from '@/domain/requirements/rules'
+import type { ApplicantProfile, IdForm, LicenseType } from '@/domain/requirements/rules'
 
 /**
  * Demo scaffolding. A real applicant never sets these — the profile is an
@@ -18,6 +18,13 @@ const STATES = [
 ]
 
 const LICENCE_COUNTS = [0, 1, 2, 3]
+
+/** Each asks for a different number field, and a passport has no issuing state. */
+const ID_FORMS: { value: IdForm; label: string }[] = [
+  { value: 'drivers_license', label: "Driver's license" },
+  { value: 'state_id', label: 'State ID card' },
+  { value: 'passport', label: 'Passport' },
+]
 
 const DEFAULT_LICENCE: LicenseType = 'dealer'
 
@@ -57,6 +64,19 @@ export function ProfileControls({ profile, onChange, disabled }: ProfileControls
         >
           <option value="individual">Individual</option>
           <option value="business">Business</option>
+        </select>
+      </label>
+
+      <label style={row}>
+        ID form
+        <select
+          value={profile.idForm}
+          disabled={disabled}
+          onChange={(e) => onChange({ idForm: e.target.value as IdForm })}
+        >
+          {ID_FORMS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
         </select>
       </label>
 

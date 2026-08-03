@@ -11,6 +11,7 @@ const business: ApplicantProfile = {
   wantsGsa: false,
   licenses: ['dealer'],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 const individual: ApplicantProfile = { ...business, applicantType: 'individual', licenses: [] }
@@ -50,6 +51,13 @@ describe('ProfileControls', () => {
     expect(onChange).toHaveBeenCalledWith({ wantsGsa: true })
   })
 
+  it('reports a change of ID form', async () => {
+    const { onChange, user } = setup(business)
+    expect(screen.getByLabelText(/id form/i)).toHaveValue('drivers_license')
+    await user.selectOptions(screen.getByLabelText(/id form/i), 'passport')
+    expect(onChange).toHaveBeenCalledWith({ idForm: 'passport' })
+  })
+
   it('toggles the address-differs-from-ID declaration', async () => {
     // Drives the proof-of-residency requirement.
     const { onChange, user } = setup(business)
@@ -71,6 +79,7 @@ describe('ProfileControls', () => {
   it('disables every control once the application is closed', () => {
     setup(business, true)
     expect(screen.getByLabelText(/applicant/i)).toBeDisabled()
+    expect(screen.getByLabelText(/id form/i)).toBeDisabled()
     expect(screen.getByLabelText(/state/i)).toBeDisabled()
     expect(screen.getByLabelText(/gsa/i)).toBeDisabled()
     expect(screen.getByLabelText(/licence/i)).toBeDisabled()

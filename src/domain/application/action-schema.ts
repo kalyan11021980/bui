@@ -78,6 +78,8 @@ const profilePatch = z
     state: z.string().nullable().optional(),
     wantsGsa: z.boolean().optional(),
     licenses: z.array(licenseType).optional(),
+    addressDiffersFromId: z.boolean().optional(),
+    idForm: z.enum(['drivers_license', 'state_id', 'passport']).optional(),
   })
   .strict()
 
@@ -158,6 +160,9 @@ export function toAction(parsed: ParsedAction): Action {
           ...(p.state !== undefined && { state: p.state }),
           ...(p.wantsGsa !== undefined && { wantsGsa: p.wantsGsa }),
           ...(p.licenses !== undefined && { licenses: p.licenses }),
+          ...(p.addressDiffersFromId !== undefined
+            && { addressDiffersFromId: p.addressDiffersFromId }),
+          ...(p.idForm !== undefined && { idForm: p.idForm }),
         },
       }
     }

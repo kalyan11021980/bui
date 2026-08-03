@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { STATE_RULES } from '@/domain/requirements/rules'
+import { ID_NUMBER, STATE_RULES } from '@/domain/requirements/rules'
+import { RULES_VERSION } from '@/domain/requirements/version'
 import { CATALOG } from '@/domain/catalog'
 
 /**
@@ -12,6 +13,24 @@ import { CATALOG } from '@/domain/catalog'
  * rule or signed one off. Edit the list — deliberately.
  */
 const UNSIGNED_STATE_RULES: readonly string[] = ['GA', 'OH']
+
+describe('what an applicant owes, by document', () => {
+  it('gives each form of ID exactly one number field, and no two the same', () => {
+    const fields = Object.values(ID_NUMBER)
+    expect(new Set(fields).size).toBe(fields.length)
+    expect(ID_NUMBER).toEqual({
+      drivers_license: 'dl_number',
+      state_id: 'id_number',
+      passport: 'passport_number',
+    })
+  })
+
+  it('is at the rules version these rules were last changed under', () => {
+    // If you are here because this failed, `rules.ts` changed what an
+    // applicant owes and the version has to move with it — deliberately.
+    expect(RULES_VERSION).toBe(3)
+  })
+})
 
 describe('STATE_RULES sign-off (spec §10.3)', () => {
   it('has exactly these rules still awaiting a compliance sign-off', () => {

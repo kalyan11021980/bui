@@ -26,6 +26,7 @@ const STARTING_PROFILE: ApplicantProfile = {
   wantsGsa: false,
   licenses: [],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 /**

@@ -18,6 +18,7 @@ const initialProfile: ApplicantProfile = {
   wantsGsa: false,
   licenses: ['dealer'],
   addressDiffersFromId: false,
+  idForm: 'drivers_license',
 }
 
 export default function Page() {

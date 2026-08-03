@@ -362,7 +362,7 @@ describe('POST /api/application/[id]/actions — enforcement', () => {
     const answers: Array<[string, unknown]> = [
       ['primary_activity', 'dealer'], ['preferred_language', 'English'],
       ['first_name', 'Ada'], ['last_name', 'Lovelace'],
-      ['id_form', 'drivers_license'], ['dl_number', 'D1234567'],
+      ['dl_number', 'D1234567'],
       ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'],
       ['id_images', ['front.png']],
       ['id_country', 'US'], ['id_state', 'GA'],
@@ -409,7 +409,7 @@ describe('POST /api/application/[id]/actions — a submitted application is clos
     const answers: Array<[string, unknown]> = [
       ['primary_activity', 'dealer'], ['preferred_language', 'English'],
       ['first_name', 'Ada'], ['last_name', 'Lovelace'],
-      ['id_form', 'drivers_license'], ['dl_number', 'D1234567'],
+      ['dl_number', 'D1234567'],
       ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'],
       ['id_images', ['front.png']],
       ['id_country', 'US'], ['id_state', 'GA'],

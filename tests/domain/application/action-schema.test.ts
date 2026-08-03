@@ -90,6 +90,25 @@ describe('toAction', () => {
     expect(Object.keys(action.patch)).toEqual(['wantsGsa'])
   })
 
+  it('carries every declared part of the profile, not just the first four', () => {
+    // The profile is the only input to the requirements engine: a key the wire
+    // schema cannot express is a rule no caller can reach.
+    const parsed = actionSchema.parse({
+      type: 'UPDATE_PROFILE',
+      patch: { idForm: 'passport', addressDiffersFromId: true },
+      at: AT,
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
+    expect(action.patch).toEqual({ idForm: 'passport', addressDiffersFromId: true })
+  })
+
+  it('rejects a form of ID that is not one of the three', () => {
+    expect(actionSchema.safeParse({
+      type: 'UPDATE_PROFILE', patch: { idForm: 'library_card' }, at: AT,
+    }).success).toBe(false)
+  })
+
   it('allows state to be set back to null', () => {
     const parsed = actionSchema.parse({
       type: 'UPDATE_PROFILE', patch: { state: null }, at: AT,
