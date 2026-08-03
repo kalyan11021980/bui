@@ -13,6 +13,13 @@ export type PixelBox = {
  */
 export type FitModel = 'stretch' | 'pad'
 
+/**
+ * Measured 2026-08-02 against markers at known pixel positions; see the
+ * fit-model decision record. Both models agree on a square, so only the
+ * non-square renders decide it.
+ */
+export const FIT_MODEL: FitModel = 'stretch'
+
 const SCALE = 1000
 
 export function toPixels(box: Box, size: ImageSize, fit: FitModel): PixelBox {

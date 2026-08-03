@@ -1,13 +1,17 @@
 """Render synthetic licence cards with exact ground-truth boxes.
 
-Two assets:
-  card_<dpi>.png   an AAMVA-ish licence at a real physical size, so every
-                   point size on it corresponds to real printed type.
-  ladder_<dpi>.png a point-size ladder, 5pt to 12pt, to find the size at
-                   which DeepSeek-OCR stops reading after the 500px resize.
+Three assets:
+  card_<dpi>.png    an AAMVA-ish licence at a real physical size, so every
+                    point size on it corresponds to real printed type.
+  ladder_<dpi>.png  a point-size ladder, 5pt to 12pt, to find the size at
+                    which DeepSeek-OCR stops reading after the 500px resize.
+  <ratio>.png       calibration cards carrying four edge markers, rendered at
+                    three aspect ratios to separate the two fit models.
 
-Ground truth is emitted as JSON with boxes normalised 0-1000 (DeepSeek-OCR's
-own grounding scale), so a returned box can be compared without rescaling.
+The card and ladder emit boxes normalised 0-1000 (DeepSeek-OCR's own grounding
+scale), so a returned box compares without rescaling. The calibration cards
+emit TRUE PIXEL boxes instead: the mapping back into pixel space is the thing
+under test, so normalising the truth would assume the answer.
 """
 
 import json
@@ -17,6 +21,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path(__file__).resolve().parents[2] / "sample" / "licenses" / "synthetic"
 OUT.mkdir(parents=True, exist_ok=True)
+
+CALIB_OUT = Path(__file__).resolve().parents[2] / "sample" / "licenses" / "calibration"
+CALIB_OUT.mkdir(parents=True, exist_ok=True)
 
 # A US licence card is 3.375in x 2.125in (ID-1, ISO/IEC 7810).
 CARD_W_IN, CARD_H_IN = 3.375, 2.125
@@ -30,6 +37,15 @@ FONT_DIRS = [
 def font(name: str, pt: float, dpi: int) -> ImageFont.FreeTypeFont:
     """Load a font at a size that is physically correct for `dpi`."""
     px = round(pt * dpi / 72)
+    for d in FONT_DIRS:
+        p = Path(d) / name
+        if p.exists():
+            return ImageFont.truetype(str(p), px)
+    raise FileNotFoundError(f"no font {name}")
+
+
+def font_px(name: str, px: int) -> ImageFont.FreeTypeFont:
+    """Load a font at an exact pixel size, for assets with no physical size."""
     for d in FONT_DIRS:
         p = Path(d) / name
         if p.exists():
@@ -165,7 +181,60 @@ def render_ladder(dpi: int) -> dict:
     }
 
 
+# Long, alphabetic, mutually dissimilar: `findValue` matches by containment, so
+# a shared prefix would let one marker claim another's box.
+CALIB_RATIOS = {
+    "square": (1200, 1200),
+    "landscape_16x10": (1600, 1000),
+    "portrait_3x4": (900, 1200),
+}
+
+
+def render_calibration(name: str, W: int, H: int) -> dict:
+    """Four markers at known pixel positions, one near each edge.
+
+    The vertical pair is what separates the fit models: a letterbox band moves
+    y and leaves x alone.
+    """
+    img = Image.new("RGB", (W, H), "#f4f6f8")
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, W - 1, H - 1], outline="#9aa6b2", width=max(2, W // 400))
+
+    f = font_px(BOLD, round(min(W, H) * 0.05))
+    inset = round(min(W, H) * 0.03)
+
+    placements = [
+        ("MARKERNORTH", (W / 2, H * 0.05), "mm"),
+        ("MARKERSOUTH", (W / 2, H * 0.95), "mm"),
+        ("MARKERWEST", (inset, H / 2), "lm"),
+        ("MARKEREAST", (W - inset, H / 2), "rm"),
+    ]
+
+    markers: dict[str, list[int]] = {}
+    for text, xy, anchor in placements:
+        d.text(xy, text, font=f, fill="#101418", anchor=anchor)
+        x0, y0, x1, y1 = d.textbbox(xy, text, font=f, anchor=anchor)
+        markers[text] = [round(x0), round(y0), round(x1), round(y1)]
+
+    path = CALIB_OUT / f"{name}.png"
+    img.save(path)
+    return {
+        "image": f"sample/licenses/calibration/{name}.png",
+        "size": {"width": W, "height": H},
+        "markers": markers,
+    }
+
+
 if __name__ == "__main__":
+    calibration = [
+        render_calibration(name, w, h) for name, (w, h) in CALIB_RATIOS.items()
+    ]
+    (CALIB_OUT / "truth.json").write_text(json.dumps(calibration, indent=2))
+    for c in calibration:
+        print(f"{Path(c['image']).name:22s} "
+              f"{c['size']['width']}x{c['size']['height']}px  "
+              f"{len(c['markers'])} markers")
+
     manifest = []
     # A sweep, not a sample. 600dpi is a generous scan; 150dpi is roughly a
     # 500px capture. Below that the card is smaller than anything the server

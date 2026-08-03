@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { isPlausibleBox, toPixels } from '@/domain/ocr/geometry'
-import type { Box } from '@/domain/ocr/grounding'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
+import { intersectionOverUnion, type Box } from '@/domain/ocr/grounding'
 
 describe('toPixels — stretch', () => {
   it('maps a full-extent box to the whole image', () => {
@@ -77,6 +79,43 @@ describe('round-trip', () => {
       }
     }
   })
+})
+
+describe('FIT_MODEL', () => {
+  const CALIB = join(process.cwd(), 'sample', 'licenses', 'calibration')
+  const read = <T,>(name: string): T =>
+    JSON.parse(readFileSync(join(CALIB, name), 'utf8')) as T
+
+  type Truth = {
+    image: string
+    size: ImageSize
+    markers: Record<string, [number, number, number, number]>
+  }
+
+  const truths = read<Truth[]>('truth.json')
+  const observed = read<Record<string, Record<string, Box>>>('observed.json')
+
+  // Asserting FIT_MODEL is one of two strings would pass whichever we picked.
+  // This asserts the mapping lands on the markers, which is the thing at stake.
+  // Every aspect ratio matters: the square scores the same either way, so a
+  // test that only checked it would prove nothing.
+  it.each(truths.map((t) => [t.image, t] as const))(
+    'maps measured markers back onto where they were printed — %s',
+    (_image, truth) => {
+      let checked = 0
+      for (const [marker, trueBox] of Object.entries(truth.markers)) {
+        const box = observed[truth.image]?.[marker]
+        expect(box, `${truth.image} ${marker} missing from observed.json`).toBeDefined()
+        const m = toPixels(box!, truth.size, FIT_MODEL)
+        const iou = intersectionOverUnion(
+          [m.x, m.y, m.x + m.width, m.y + m.height], trueBox,
+        )
+        expect(iou, `${marker} IoU`).toBeGreaterThan(0.5)
+        checked += 1
+      }
+      expect(checked).toBe(4)
+    },
+  )
 })
 
 describe('isPlausibleBox', () => {

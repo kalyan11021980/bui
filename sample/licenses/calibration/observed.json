@@ -1,0 +1,80 @@
+{
+  "sample/licenses/calibration/square.png": {
+    "MARKERNORTH": [
+      306,
+      30,
+      694,
+      65
+    ],
+    "MARKERSOUTH": [
+      306,
+      930,
+      694,
+      965
+    ],
+    "MARKERWEST": [
+      31,
+      485,
+      401,
+      520
+    ],
+    "MARKEREAST": [
+      618,
+      486,
+      965,
+      519
+    ]
+  },
+  "sample/licenses/calibration/landscape_16x10.png": {
+    "MARKERNORTH": [
+      375,
+      27,
+      621,
+      65
+    ],
+    "MARKERSOUTH": [
+      375,
+      928,
+      621,
+      966
+    ],
+    "MARKERWEST": [
+      18,
+      481,
+      243,
+      520
+    ],
+    "MARKEREAST": [
+      760,
+      483,
+      976,
+      522
+    ]
+  },
+  "sample/licenses/calibration/portrait_3x4.png": {
+    "MARKERNORTH": [
+      303,
+      33,
+      694,
+      64
+    ],
+    "MARKERSOUTH": [
+      303,
+      933,
+      694,
+      964
+    ],
+    "MARKERWEST": [
+      35,
+      485,
+      388,
+      516
+    ],
+    "MARKEREAST": [
+      618,
+      486,
+      965,
+      517
+    ]
+  }
+}

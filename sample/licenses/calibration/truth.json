@@ -1,0 +1,101 @@
+[
+  {
+    "image": "sample/licenses/calibration/square.png",
+    "size": {
+      "width": 1200,
+      "height": 1200
+    },
+    "markers": {
+      "MARKERNORTH": [
+        362,
+        37,
+        839,
+        82
+      ],
+      "MARKERSOUTH": [
+        363,
+        1117,
+        836,
+        1162
+      ],
+      "MARKERWEST": [
+        36,
+        577,
+        472,
+        622
+      ],
+      "MARKEREAST": [
+        741,
+        577,
+        1164,
+        622
+      ]
+    }
+  },
+  {
+    "image": "sample/licenses/calibration/landscape_16x10.png",
+    "size": {
+      "width": 1600,
+      "height": 1000
+    },
+    "markers": {
+      "MARKERNORTH": [
+        601,
+        31,
+        998,
+        69
+      ],
+      "MARKERSOUTH": [
+        603,
+        931,
+        997,
+        969
+      ],
+      "MARKERWEST": [
+        30,
+        481,
+        393,
+        519
+      ],
+      "MARKEREAST": [
+        1217,
+        481,
+        1570,
+        519
+      ]
+    }
+  },
+  {
+    "image": "sample/licenses/calibration/portrait_3x4.png",
+    "size": {
+      "width": 900,
+      "height": 1200
+    },
+    "markers": {
+      "MARKERNORTH": [
+        271,
+        44,
+        628,
+        76
+      ],
+      "MARKERSOUTH": [
+        272,
+        1124,
+        627,
+        1156
+      ],
+      "MARKERWEST": [
+        27,
+        584,
+        354,
+        616
+      ],
+      "MARKEREAST": [
+        555,
+        584,
+        873,
+        616
+      ]
+    }
+  }
+]

@@ -1,7 +1,9 @@
 # `tools/ocr-gate/`
 
-The OCR acceptance gate. Offline research tooling — nothing in `src/` imports it.
-Result: `docs/superpowers/decisions/2026-08-02-ocr-acceptance-gate.md`.
+The OCR acceptance gate and the fit-model calibration. Offline research tooling
+— nothing in `src/` imports it. Results:
+`docs/superpowers/decisions/2026-08-02-ocr-acceptance-gate.md` and
+`docs/superpowers/decisions/2026-08-02-ocr-fit-model.md`.
 
 The client and grounding parser are **not** here: they live in
 `src/server/ocr/client.ts` and `src/domain/ocr/grounding.ts`, because that is
@@ -20,7 +22,19 @@ OCR_ENDPOINT=http://<host>:<port> OCR_MODEL=<model-id> pnpm vitest run tools/ocr
 
 `score.test.ts` runs without either var, and does not touch the network.
 
-## Regenerating the synthetic cards
+## Fit-model calibration
+
+`calibrate.test.ts` reads markers printed at known pixel positions on cards of
+three aspect ratios and scores both fit models, settling `FIT_MODEL` in
+`src/domain/ocr/geometry.ts`. The 1:1 card is a control — both models are
+identical on a square, so if it scores badly the harness is wrong, not the
+server.
+
+It rewrites `sample/licenses/calibration/observed.json`, which is **committed**:
+`tests/domain/ocr/geometry.test.ts` replays it to re-verify the mapping with no
+server present.
+
+## Regenerating the synthetic and calibration cards
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -30,7 +44,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 Python is used for this one script and nowhere else in the repo — PIL was the
 shortest path to rendering cards at exact physical sizes. Regenerating
 invalidates comparison against previously recorded results, so only do it when
-the renderer itself changes.
+the renderer itself changes — and if the calibration cards move, `truth.json`
+and `observed.json` must be regenerated together or the geometry test is
+scoring one against the other's markers.
 
 ## Two traps, both already paid for
 
