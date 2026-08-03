@@ -2,11 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { DocType } from '@/domain/field-id'
 
-/**
- * Guards the recorded corpus. Every extraction test in phase 2 reads these
- * files instead of a server, so a corpus that quietly lost a document type — or
- * recorded an empty read — has to fail here rather than three tasks later.
- */
+// Guards the recorded corpus that later extraction tests read instead of a server.
 
 type Entry = {
   image: string
@@ -44,6 +40,12 @@ const REQUIRED: DocType[] = [
   'drivers_license', 'state_id', 'passport', 'dealer_license', 'proof_of_residency',
 ]
 
+// PNG width/height are big-endian uint32 in the IHDR chunk, at byte offsets 16 and 20.
+function pngDimensions(path: string): { width: number; height: number } {
+  const buf = readFileSync(path)
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) }
+}
+
 describe('fixture corpus', () => {
   it('has one fixture per manifest entry and no orphans', () => {
     expect([...fixtures.keys()].sort()).toEqual(manifest.map((e) => e.slug).sort())
@@ -55,8 +57,9 @@ describe('fixture corpus', () => {
   })
 
   it('reads more than one issuer per card type, so a layout quirk cannot pass for a rule', () => {
+    const recorded = [...fixtures.values()]
     const issuers = (docType: DocType) =>
-      new Set(manifest.filter((e) => e.docType === docType).map((e) => e.issuer))
+      new Set(recorded.filter((f) => f.docType === docType).map((f) => f.issuer))
 
     expect(issuers('drivers_license').size).toBeGreaterThanOrEqual(4)
     expect(issuers('state_id').size).toBeGreaterThanOrEqual(2)
@@ -82,6 +85,12 @@ describe('fixture corpus', () => {
       expect(f.image, entry.slug).toBe(entry.image)
       expect(f.imageSize, entry.slug).toEqual(entry.size)
       expect(entry.size.width, entry.slug).toBeGreaterThan(0)
+    }
+  })
+
+  it('agrees with the actual PNG dimensions, not just its own claim', () => {
+    for (const entry of manifest) {
+      expect(pngDimensions(entry.image), entry.slug).toEqual(entry.size)
     }
   })
 

@@ -36,6 +36,14 @@ residences. DMV publishes both as card-design graphics on its press page.
 standard. It is in the corpus for exactly that reason — a legacy layout the
 label-driven extractor has to fail gracefully on, not silently mis-parse.
 
+### State ID cards (`docType: state_id`)
+
+Two of the rows above are state ID cards, not driver's licences:
+`ca_id_2010.png` and `va_id_2023.png`. Both print a full address, which is
+why `addr_line1`, `addr_city`, `addr_state` and `addr_zip` in
+`src/domain/catalog/address.ts` declare `state_id` as a `derivableFrom`
+source alongside `drivers_license`.
+
 ## Passport
 
 | File | Source title | Source | Size | Licence |
@@ -72,6 +80,10 @@ It is issued by the `STATE OF FRANKLIN`, which is not a state, to
 say nothing about real dealer licences** — it was laid out by us, so an
 extractor tuned to it is tuned to our own guess at the layout.
 
+`dealer_license_truth.json`'s boxes are the rendering script's own layout
+math, unverified against the rendered image and read by no test. Treat it as
+forward material for extractor tasks, not validated ground truth.
+
 ## Proof of residency
 
 | File | Source title | Source | Size | Licence |
@@ -79,7 +91,11 @@ extractor tuned to it is tuned to our own guess at the layout.
 | `specimens/chicago_utility_bill_2016.png` | *Sample metered bill* | [City of Chicago Department of Finance](https://www.chicago.gov/content/dam/city/depts/fin/garbagefee/sample-metered-bill.pdf) | 1500×1893 | **Chicago municipal work, no explicit grant** |
 | `specimens/bank_statement_2003.png` | *BankStatementChequing.png* | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:BankStatementChequing.png) | 690×533 | **CC BY-SA 3.0**, Sergio Ortega |
 
-The Chicago bill bills `SAM SAMPLE` at `123 MAIN ST, CHICAGO, IL 60622-3208`.
+The Chicago bill's residency evidence is the printed **Utility Service
+Address**: `SAM SAMPLE` at `456 BROADWAY AVE, CHICAGO, IL 60622-3208`.
+`123 MAIN ST, CHICAGO, IL 60622-3208` is the mailing address on the payment
+remittance stub, not the residence — the fixture records both as separate
+detections. A proof-of-residency extractor wants the Utility Service Address.
 The bank statement is a fictional `FIRST BANK OF WIKI` statement for
 `JOHN JONES` in Toronto — a Canadian address, so it exercises a non-US postal
 format rather than a ZIP.
