@@ -32,9 +32,9 @@ export const ALL_FIELD_IDS = [
 
 export type FieldId = (typeof ALL_FIELD_IDS)[number]
 
-export type DocType =
-  | 'drivers_license'
-  | 'state_id'
-  | 'passport'
-  | 'dealer_license'
-  | 'proof_of_residency'
+/** Runtime list, so the upload route's wire schema cannot drift from the type. */
+export const ALL_DOC_TYPES = [
+  'drivers_license', 'state_id', 'passport', 'dealer_license', 'proof_of_residency',
+] as const
+
+export type DocType = (typeof ALL_DOC_TYPES)[number]
