@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { extractLabelled } from '@/domain/ocr/extract/labelled'
-import type { Detection } from '@/domain/ocr/grounding'
+import type { Box, Detection } from '@/domain/ocr/grounding'
 
 const det = (text: string): Detection => ({ text, box: [100, 100, 400, 130] })
+const at = (text: string, box: Box): Detection => ({ text, box })
 
 describe('extractLabelled', () => {
   it('reads a licence number from its label', () => {
@@ -49,5 +50,41 @@ describe('extractLabelled', () => {
   it('does not flag a licence number free of confusable characters', () => {
     const out = extractLabelled([det('License No. XYZ-9992')], '')
     expect(out.find((c) => c.key === 'license_number#0')?.evidence.glyphAmbiguous).toBe(false)
+  })
+
+  it('reads a merged label and value that starts with a letter', () => {
+    // Real DeepSeek behaviour: label and value can arrive as one detection
+    // with no separator at all (`4dLIC#WDLJK00580GF` in the acceptance gate
+    // record). A blanket "next character is a letter" guard would drop this.
+    const out = extractLabelled([det('LIC# WDLJK00580GF')], '')
+    expect(out.find((c) => c.key === 'license_number#0')?.raw).toBe('WDLJK00580GF')
+  })
+
+  it('still yields nothing for a label-only detection with no neighbour at all', () => {
+    // Regression guard for the fix above: "EFFECTIVE DATE" alone must not
+    // read "DATE" as the effective date just because letter-leading merged
+    // values are now accepted.
+    expect(extractLabelled([det('EFFECTIVE DATE')], '')).toEqual([])
+  })
+
+  it('does not pair a label with a neighbouring label when the real value is missing', () => {
+    // OCR can lose a value while keeping its label — the acceptance gate
+    // documents this happening for real (a ZIP came back as a fragment of
+    // the surrounding text). Without a same-document label filter, the
+    // nearest surviving detection below "LICENSE NUMBER" would be the next
+    // label down the page, "LICENSE TYPE", and it would be read as if it
+    // were the licence number.
+    const out = extractLabelled([
+      at('LICENSE NUMBER', [91, 320, 233, 344]),
+      at('LICENSE TYPE', [90, 392, 205, 416]),
+      at('USED MOTOR VEHICLE DEALER', [91, 425, 462, 453]),
+    ], '')
+    expect(out.find((c) => c.key === 'license_number#0')).toBeUndefined()
+  })
+
+  it('rejects a date that is not a real calendar date', () => {
+    // isRealCalendarDate round-trips through the calendar; February has no
+    // 30th, so this must be dropped rather than normalised to March.
+    expect(extractLabelled([det('Expires 02/30/2027')], '')).toEqual([])
   })
 })

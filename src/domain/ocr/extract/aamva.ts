@@ -2,7 +2,7 @@ import { isRealCalendarDate } from '@/domain/calendar'
 import { isPlausibleBox } from '../geometry'
 import { normalizeText, type Box, type Detection } from '../grounding'
 import { registerStrategy } from './index'
-import { AAMVA_ANCHORS, LABEL_CODES, LABEL_WORDS } from './synonyms'
+import { AAMVA_ANCHORS, isLabel, LABEL_CODES, LABEL_WORDS } from './synonyms'
 import {
   glyphAmbiguity, NO_EVIDENCE,
   type Candidate, type Evidence, type ExtractStrategy,
@@ -67,19 +67,6 @@ export function splitAddressBlock(raw: string): {
   if (!tail) return {}
 
   return { line1: lines.slice(0, -1).join(' '), ...tail }
-}
-
-/** A code followed by more digits is a longer number, not that code. */
-function codeAt(text: string, code: string): boolean {
-  if (!text.startsWith(code)) return false
-  if (!/^\d+$/.test(code)) return true
-  return !/\d/.test(text.charAt(code.length))
-}
-
-/** A detection that opens with a printed label is never the value beside it. */
-function isLabel(text: string): boolean {
-  return LABEL_CODES.some((c) => codeAt(text, c))
-    || LABEL_WORDS.some((w) => text.startsWith(w))
 }
 
 /**

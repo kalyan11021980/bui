@@ -54,11 +54,34 @@ export const LABEL_WORDS: readonly string[] = [
   'DONOR', 'VETERAN', 'USA', 'SIGNATURE',
 ]
 
+/** A code followed by more digits is a longer number, not that code. */
+function codeAt(text: string, code: string): boolean {
+  if (!text.startsWith(code)) return false
+  if (!/^\d+$/.test(code)) return true
+  return !/\d/.test(text.charAt(code.length))
+}
+
 /**
- * `LICENCENUMBER` (British spelling, spelled-out "Number") added for
- * `tests/domain/ocr/extract/labelled.test.ts`'s "accepts a spelling variant"
- * case — `LICENCENO` alone does not cover it, since it is the "-CE" letters
- * that vary, not the "No." abbreviation.
+ * A detection that opens with a printed label is never the value beside it.
+ * Shared rather than reimplemented per strategy, but each caller supplies its
+ * own vocabulary: `LABEL_WORDS` carries AAMVA's short card codes (`DL`,
+ * `ID`, `LN`...), and those are dangerous prefixes for a labelled document's
+ * free-form identifiers — a dealer licence number like `DLR-0000-4471`
+ * starts with `DL` too. `LABELLED_LABEL_WORDS` below is deliberately a
+ * separate, shorter list for exactly that reason.
+ */
+export function isLabel(
+  text: string,
+  words: readonly string[] = LABEL_WORDS,
+  codes: readonly string[] = LABEL_CODES,
+): boolean {
+  return codes.some((c) => codeAt(text, c)) || words.some((w) => text.startsWith(w))
+}
+
+/**
+ * `LICENCENUMBER` (British spelling, spelled-out "Number") covers a spelling
+ * variant `LICENCENO` alone does not — it is the "-CE" letters that vary,
+ * not the "No." abbreviation.
  */
 export const LABELLED_ANCHORS: Readonly<Record<string, readonly string[]>> = {
   license_number: ['LICENSENO', 'LICENSENUMBER', 'LIC#', 'LICENCENO', 'LICENCENUMBER', 'DEALERNO'],
@@ -66,3 +89,15 @@ export const LABELLED_ANCHORS: Readonly<Record<string, readonly string[]>> = {
   license_expiry: ['EXPIRES', 'EXPIRATION', 'VALIDTHROUGH', 'VALIDUNTIL'],
   biz_legal_name: ['LEGALNAME', 'BUSINESSNAME', 'ENTITYNAME', 'DBA'],
 }
+
+/**
+ * The labels a dealer licence or proof-of-residency document prints,
+ * spelled out in full English words rather than AAMVA's short card codes.
+ * `LABEL_WORDS`' two-letter codes (`DL`, `ID`, `LN`...) are exactly the kind
+ * of prefix a licence number collides with by coincidence — this list stays
+ * free of anything shorter than a real English word for that reason.
+ */
+export const LABELLED_LABEL_WORDS: readonly string[] = [
+  'LICENSE', 'BUSINESS', 'DOING', 'TYPE', 'DATE',
+  'NUMBER', 'NAME', 'ADDRESS', 'EFFECTIVE', 'EXPIRATION',
+]

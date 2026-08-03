@@ -39,10 +39,11 @@ to bottom: `LICENSE NUMBER` / `DLR-0000-4471`, `LICENSE TYPE` / `USED MOTOR
 VEHICLE DEALER`, `BUSINESS NAME` / `SPECIMEN AUTO SALES LLC`, `DOING BUSINESS
 AS` / `SAMPLE MOTORS`, `BUSINESS ADDRESS` / `100 SPECIMEN ROAD` / `FRANKLIN
 CITY, FR 00000`, `EFFECTIVE DATE` / `03/01/2025`, `EXPIRATION DATE` /
-`02/28/2027`. This matches `synthetic/dealer_license_truth.json` field for
-field — that file is documented in `sample/licenses/SOURCES.md` as "unverified
-against the rendered image," and this is that verification. It now stands as
-checked, for the eight values above, not merely generated.
+`02/28/2027`. This matches `synthetic/dealer_license_truth.json`'s eight field
+*values* exactly — `sample/licenses/SOURCES.md` has been updated to record
+that verification. Its box *coordinates* are a separate claim this does not
+verify: no test reads that file, and the labelled extractor's own tests use
+`fixtures/dealer_license.json`'s detections and boxes instead.
 
 The strategy reads 4 of the 8 printed pairs: the licence number, both dates,
 and — mapped through the existing `BUSINESSNAME` anchor — the field the
@@ -89,6 +90,62 @@ document would answer) declare `derivableFrom: ['drivers_license',
 ID, and `proof_of_residency` exists to confirm it when the two disagree, not
 to originate it. Whether that is still the right call once OCR exists is the
 open question.
+
+## Robustness fixes from review
+
+Review reproduced the measurement and found it honest — removing the one
+added synonym (`LICENCENUMBER`) drops the "spelling variant" unit test but
+leaves corpus recall at 4/4, confirming that synonym is not propping the
+number up — but surfaced two real correctness gaps in `adjacentValue`, the
+box-adjacency search that stands in for `LICENSE NUMBER` -> `DLR-0000-4471`
+where no printed field code exists to anchor on. Both are fixed; neither
+changes the recorded numbers above.
+
+**A label could be paired with another label.** `adjacentValue` filtered
+candidates on box geometry alone. Removing the `DLR-0000-4471` detection from
+the fixture — reproducing the acceptance gate's documented failure mode of
+OCR losing a value while keeping its label — made `LICENSE TYPE` the nearest
+surviving detection below `LICENSE NUMBER`, and the strategy read
+`license_number#0 = "LICENSE TYPE"`. It passed `parseCandidates`
+(`z.string().min(3)`) and `derivable()` both, and would have reached the
+applicant as a label-anchored value.
+
+Fixed two ways, mirroring `aamva.ts`'s existing defence rather than adding a
+third implementation of it: `adjacentValue` now excludes any candidate
+`isLabel` recognises, and `license_number` gained a shape check requiring a
+digit (`aamva.ts`'s `isNumber` does the same for `dl_number`/`id_number`, for
+the identical reason). `isLabel` itself moved from `aamva.ts` to `synonyms.ts`
+and took a caller-supplied word list — reusing it with `aamva.ts`'s own
+`LABEL_WORDS` unchanged would have been wrong, not just redundant.
+`LABEL_WORDS` carries two-letter AAMVA card codes (`DL`, `ID`...), and
+`"DLR-0000-4471"` starts with `DL`; applying that list here would have
+excluded the correct value as a false positive. `LABELLED_LABEL_WORDS` is a
+separate, shorter list of whole English words for exactly that reason.
+`tests/domain/ocr/extract/labelled-recall.test.ts` now reproduces the
+reviewer's exact scenario (the real fixture, minus the `DLR-0000-4471`
+detection) and asserts `license_number#0` is absent, not wrong.
+
+**The letter-continuation guard was overbroad.** The original guard rejected
+any inline match where the character after the anchor was a letter, to stop
+`EFFECTIVE` reading `DATE` out of a label-only `EFFECTIVE DATE` detection.
+Since `normalizeText` strips all whitespace, that guard could not tell a
+label spelled across two words from a genuinely merged label and value —
+`LIC# WDLJK00580GF`, real DeepSeek behaviour per the acceptance gate record —
+and silently dropped every merged value starting with a letter. This was a
+real hole in a document whose purpose is measuring recall, undisclosed in the
+first draft.
+
+Fixed by checking whether the *remainder itself* is one whole word from
+`LABELLED_LABEL_WORDS`, rather than whether it merely starts with a letter —
+`"DATE"` matches exactly and is still rejected; `"WDLJK00580GF"` does not and
+is now accepted. Covered by two tests: a merged letter-leading value is now
+read, and the original `EFFECTIVE DATE`-alone case still yields nothing.
+
+This does not fully close the hole. The new guard rejects a remainder that
+*is* one label word; a remainder built from two label words glued together
+with no separator (`DATEISSUED`, say) would still slip through and be read as
+a value. No fixture in this corpus exercises that shape, so its cost is
+undemonstrated rather than zero — disclosed here rather than left implicit.
 
 ## What this does not license
 

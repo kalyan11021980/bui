@@ -96,6 +96,23 @@ describe('labelled recall', () => {
     }
   })
 
+  it('reads nothing for license_number when OCR loses the value but keeps the label', () => {
+    // Reproduces a real corpus condition on the real fixture: the acceptance
+    // gate documents OCR losing a value while a neighbouring label survives
+    // (the CA card's ZIP came back as a fragment of surrounding text). With
+    // the DLR-0000-4471 detection removed, the nearest surviving detection
+    // below "LICENSE NUMBER" is the next label down the page, "LICENSE TYPE"
+    // — reading that as the licence number would be worse than reading
+    // nothing.
+    const dealer = docs.find((d) => d.slug === 'dealer_license')
+    expect(dealer).toBeDefined()
+    const withoutValue = dealer?.detections.filter((d) => d.text !== 'DLR-0000-4471') ?? []
+    expect(withoutValue.length).toBe((dealer?.detections.length ?? 0) - 1)
+
+    const out = parseCandidates(extractLabelled(withoutValue, ''))
+    expect(out.find((c) => c.key === 'license_number#0')).toBeUndefined()
+  })
+
   it('finds no text field the catalog lets a proof-of-residency document answer', () => {
     // The real ceiling, independent of the strategy. Even a perfect reader
     // could not carry a value out of a utility bill or bank statement: the

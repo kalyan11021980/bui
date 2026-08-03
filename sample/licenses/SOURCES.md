@@ -80,9 +80,16 @@ It is issued by the `STATE OF FRANKLIN`, which is not a state, to
 say nothing about real dealer licences** — it was laid out by us, so an
 extractor tuned to it is tuned to our own guess at the layout.
 
-`dealer_license_truth.json`'s boxes are the rendering script's own layout
-math, unverified against the rendered image and read by no test. Treat it as
-forward material for extractor tasks, not validated ground truth.
+The eight printed label/value pairs (`LICENSE NUMBER`, `LICENSE TYPE`,
+`BUSINESS NAME`, `DOING BUSINESS AS`, `BUSINESS ADDRESS` across two lines,
+`EFFECTIVE DATE`, `EXPIRATION DATE`) were read by eye off the rendered PNG in
+`docs/superpowers/decisions/2026-08-02-labelled-recall.md` and match
+`dealer_license_truth.json`'s field values exactly. `dealer_license_truth.json`'s
+**box coordinates** remain the rendering script's own layout math and are not
+part of that verification — no test reads that file at all; the labelled
+extractor's own recall tests use `fixtures/dealer_license.json`'s detections
+and boxes instead, which come from the same rendering pipeline but are a
+separate artifact.
 
 ## Proof of residency
 
