@@ -2929,6 +2929,74 @@ git commit -m "fix(api): stop an application id from being a password"
 
 ---
 
+### Task 15: Re-space extracted addresses
+
+Addresses reach the applicant space-stripped — `123STREETADDRESS`, `YOURCITY` — because
+grounded OCR output carries no spaces and the extractor emits the normalised form. It is
+the one place in the phase where a correct value looks broken.
+
+**Files:**
+- Modify: `src/domain/ocr/extract/aamva.ts`, `labelled.ts`
+- Test: `tests/domain/ocr/extract/aamva.test.ts`, `aamva-recall.test.ts`, and a new
+  confidence regression case
+
+**Interfaces:**
+- Consumes: `Candidate.asRead`, `withCrossPass`, `scoreEvidence`, `QUIET_THRESHOLD`
+- Produces: re-spaced `raw` on address fields; `asRead` unchanged
+
+- [ ] **Step 1: The safety condition, before any code**
+
+The re-spacer may **insert whitespace only**. It must never substitute a character sourced
+from the plain pass. Borrow the spacing, never the glyphs.
+
+The reason is measured, not theoretical. `va_2023` reads `5235J0HNTYLERHWY` — a zero where
+the card prints an `O`. The plain pass reads `5235 JOHN TYLER HWY`, with the correct
+letter. A re-spacer that took characters as well as positions would silently repair the
+value into something that looks right and is not the grounded read, destroying the
+cross-pass disagreement that is currently the only thing marking it as unsure.
+
+- [ ] **Step 2: Pin the property that must not change**
+
+```ts
+// tests/domain/ocr/extract/aamva-recall.test.ts
+it('leaves a misread address disagreeing, however it is spaced', () => {
+  const card = fixture('va_2023')
+  const [line1] = withCrossPass(
+    parseCandidates(extractAamva(card.detections, card.text)), card.plainText,
+  ).filter((c) => c.key === 'addr_line1')
+
+  // The zero-for-O survives re-spacing, so the passes still disagree.
+  expect(line1?.raw).toContain('0')
+  expect(scoreEvidence(line1!.evidence)).toBeLessThan(QUIET_THRESHOLD)
+})
+```
+
+Write this test first and watch it pass before the change, so it is pinning the property
+rather than describing the outcome.
+
+- [ ] **Step 3: Re-space, and update the recall expectations**
+
+Ground truth already carries real spacing, so `aamva-recall.test.ts`'s locked values change
+from stripped to spaced. That is the point — but restate `TOTALS` honestly rather than
+adjusting expectations until the old number returns.
+
+- [ ] **Step 4: Report the distribution shift**
+
+Re-spacing flips genuinely correct addresses from a spacing-artefact disagreement to
+agreement, so they go quiet and lose their crops. Measure the corpus before and after and
+report both numbers. Today every space-stripped address scores 0.47, which means the
+cross-pass signal is currently worthless for addresses — `YOURCITY` is flagged hard-to-read
+for a spacing artefact, not a misread.
+
+- [ ] **Step 5: Run and commit**
+
+```bash
+pnpm test && pnpm typecheck && pnpm build
+git commit -m "fix(ocr): give an address back its spaces, not its letters"
+```
+
+---
+
 ## Closeout
 
 - [ ] **Full verification**
