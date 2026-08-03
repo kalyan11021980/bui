@@ -323,7 +323,7 @@ function anchoredAddress(
   if (hit.remainder !== '') lines.push({ raw: hit.remainder, box: hit.detection.box })
 
   const below = detections
-    .filter((d) => d !== hit.detection && isBelow(hit.detection.box, d.box))
+    .filter((d) => d !== hit.detection && isBelow(hit.detection.box, d.box) && !hasDate(d))
     .sort((a, b) => a.box[1] - b.box[1])
 
   for (const d of below.slice(0, 3)) {
@@ -349,7 +349,8 @@ function streetAbove(
   for (let i = 0; i < 3; i += 1) {
     const above = detections
       .filter((d) => d !== tail && !lines.includes(d))
-      .filter((d) => !isLabel(key(d.text)) && !isCityStateZip(d))
+      // A date opens with a digit, which is otherwise how a street opens.
+      .filter((d) => !isLabel(key(d.text)) && !isCityStateZip(d) && !hasDate(d))
       .filter((d) => isBelow(d.box, from) && from[1] - d.box[3] <= MAX_GAP)
       .sort((a, b) => b.box[1] - a.box[1])[0]
     if (!above) break

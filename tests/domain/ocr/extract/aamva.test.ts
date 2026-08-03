@@ -168,6 +168,32 @@ describe('extractAamva', () => {
     expect(read(detections, 'addr_line1')?.raw).toBe('123NORTHMAINSTREET APT.1')
   })
 
+  it('does not take a date line as the start of a street', () => {
+    // A street opens with a house number, and so does 01/12/2016.
+    const detections = [
+      det('01/12/2016', [401, 600, 704, 640]),
+      det('MAIN STREET', [401, 644, 704, 688]),
+      det('NORTHQUINCY,MA02171-1748', [425, 727, 796, 769]),
+    ]
+    expect(read(detections, 'addr_line1')?.raw).toBe('MAIN STREET')
+  })
+
+  it('does not reach across the card for a value', () => {
+    // A tall ghost column to the right overlaps the label's row without ever
+    // being beside it — ma_2016 prints exactly such a band.
+    expect(read([
+      det('3DOB', [600, 800, 660, 830]),
+      det('01/12/2016', [700, 100, 860, 820]),
+    ], 'dob')).toBeUndefined()
+
+    // A full-width line under a right-hand label overlaps its column without
+    // being under it.
+    expect(read([
+      det('4bEXP', [800, 500, 860, 530]),
+      det('01/12/2021', [100, 560, 850, 600]),
+    ], 'dl_expiry')).toBeUndefined()
+  })
+
   it('does not take two letters of a city as the state', () => {
     // `ANYTOWN95818` would otherwise split into ANYTO / WN / 95818, and
     // addr_state validation is only "two characters".
