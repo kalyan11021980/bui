@@ -52,4 +52,26 @@ describe('parseCandidates', () => {
   it('drops a candidate for a field that is not in the catalog', () => {
     expect(parseCandidates([candidate('not_a_field', 'x')])).toEqual([])
   })
+
+  it('carries the rest of the evidence through untouched, only flipping schemaParsed', () => {
+    const withEvidence: Candidate = {
+      key: 'dob',
+      raw: '1982-04-17',
+      evidence: {
+        schemaParsed: false,
+        labelAnchored: true,
+        checksumValid: null,
+        crossPassAgreed: false,
+        boxPlausible: false,
+      },
+    }
+    const [kept] = parseCandidates([withEvidence])
+    expect(kept?.evidence).toEqual({
+      schemaParsed: true,
+      labelAnchored: true,
+      checksumValid: null,
+      crossPassAgreed: false,
+      boxPlausible: false,
+    })
+  })
 })
