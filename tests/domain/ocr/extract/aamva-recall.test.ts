@@ -42,8 +42,14 @@ function fixture(name: string): Fixture {
   return found
 }
 
-/** Grounded output has no spaces and OCR keeps or drops punctuation at whim. */
-const flat = (value: string): string => value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+/**
+ * Case and punctuation are OCR's to vary. Spacing is not: it is what the
+ * applicant reads on the row. Grading with spaces stripped is how a
+ * corpus-wide re-spacing regression stays invisible to the one number that
+ * decides whether the extractor works.
+ */
+const graded = (value: string): string =>
+  value.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim()
 
 const iso = (printed: string): string => {
   const [month, day, year] = printed.split(/[/-]/)
@@ -57,18 +63,25 @@ function expected(card: Fixture, field: string): string | null {
   if (field === 'dob' || field === 'dl_expiry') return iso(String(value))
   // A card that prints given names on one line answers first_name with the
   // first of them; a street printed over two lines answers with both.
-  if (Array.isArray(value)) return field === 'first_name' ? String(value[0]) : value.join('')
+  if (Array.isArray(value)) return field === 'first_name' ? String(value[0]) : value.join(' ')
   return String(value)
 }
 
 /**
- * Exact, once spacing and punctuation are off. A prefix rule here would pass
+ * Exact, once case and punctuation are off. A prefix rule here would pass
  * JANET for JANE, and pass any amount of trailing over-capture.
  */
-const matches = (read: string, want: string): boolean => flat(read) === flat(want)
+const matches = (read: string, want: string): boolean => graded(read) === graded(want)
 
+/**
+ * The whole chain, in the order document-service.ts composes it. Grading the
+ * bare extractor graded a value no applicant is ever shown: the re-spacer
+ * runs between the parse and the score in production, so a street it stopped
+ * spacing would not move this number at all.
+ */
 function readCard(card: Fixture): Map<string, string> {
-  const out = parseCandidates(extractFor(card.docType, card.detections, card.text))
+  const parsed = parseCandidates(extractFor(card.docType, card.detections, card.text))
+  const out = withCrossPass(respaceAddresses(parsed, card.plainText), card.plainText)
   return new Map(out.map((c) => [c.key, c.raw]))
 }
 
@@ -99,7 +112,10 @@ const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string,
   'ma_2016.png': {
     reads: ['dl_number', 'dob', 'dl_expiry', 'addr_line1', 'addr_city', 'addr_state', 'addr_zip'],
     // OCR dropped this card's 1, 2 and 8 codes; the card does print them.
-    wrong: {},
+    wrong: {
+      addr_line1: 'the plain pass printed the street without its house number, '
+        + 'so there was nothing to align 123NORTHMAINSTREET against and it kept its spacing',
+    },
   },
   'ca_2019.png': {
     reads: ['dl_number', 'dob', 'dl_expiry', 'last_name', 'first_name'],
@@ -130,7 +146,7 @@ const GRADED: Record<Fixture['docType'], readonly string[]> = {
  * them could not tell its own branches apart.
  */
 const TOTALS: Record<Fixture['docType'], { read: number; correct: number; fields: number }> = {
-  drivers_license: { read: 48, correct: 45, fields: 63 },
+  drivers_license: { read: 48, correct: 44, fields: 63 },
   state_id: { read: 18, correct: 16, fields: 18 },
 }
 
@@ -212,7 +228,7 @@ describe('AAMVA recall against recorded specimens', () => {
     expect(GRADED.state_id).not.toContain('dl_number')
   })
 
-  it('reads 48 of 63 fields off the licences, 45 of them right', () => {
+  it('reads 48 of 63 fields off the licences, 44 of them right', () => {
     expect(tally('drivers_license')).toEqual(TOTALS.drivers_license)
   })
 
@@ -222,13 +238,28 @@ describe('AAMVA recall against recorded specimens', () => {
     expect(tally('state_id')).toEqual(TOTALS.state_id)
   })
 
-  it('reads 66 of 81 fields across the corpus, 61 of them right', () => {
+  it('reads 66 of 81 fields across the corpus, 60 of them right', () => {
     const all = cards.map((c) => c.docType)
     // Guards the two above: a docType present in neither tally is ungraded.
     expect(new Set(all)).toEqual(new Set(Object.keys(TOTALS)))
     expect(tally()).toEqual({
       read: summed('read'), correct: summed('correct'), fields: summed('fields'),
     })
+  })
+
+  it('grades the spacing the applicant is shown, not the run of letters under it', () => {
+    // The comparator itself, pinned: stripping spaces here is what let a
+    // corpus-wide re-spacing regression through with every recall number
+    // unchanged.
+    expect(matches('123STREETADDRESS', '123 STREET ADDRESS')).toBe(false)
+    expect(matches('123 street address,', '123 STREET ADDRESS')).toBe(true)
+  })
+
+  it('re-spaces every address it grades, as the pipeline does before display', () => {
+    // Guards readCard's composition: dropping respaceAddresses from it would
+    // otherwise only lower a total, with no test naming the reason.
+    expect(readCard(fixture('wa_enhanced')).get('addr_line1')).toBe('123 STREET ADDRESS')
+    expect(readCard(fixture('ca_id_2010')).get('addr_line1')).toBe('2570 24TH STREET')
   })
 
   it('puts every value it reads in a plausible box', () => {
