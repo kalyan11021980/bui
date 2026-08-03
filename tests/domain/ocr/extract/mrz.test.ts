@@ -38,6 +38,16 @@ describe('findMrzLines', () => {
     expect(findMrzLines([det('PASSPORT'), det('PASSEPORT'), det('PASPOORT'), det(LINE2)]))
       .toBeNull()
   })
+
+  it('rejects a line 2 shifted out of alignment, not just one of the wrong length', () => {
+    // A length-only gate is what the CA card sweep broke: dropping one '<'
+    // from inside the document-number pad shifts every later field left by
+    // one character and still leaves a same-length string. A digit lands in
+    // the alphabetic nationality slot, so the structural template — not a
+    // length check — is what catches it.
+    const shifted = 'X1234<<<9USA8001014M30010199'
+    expect(findMrzLines([det(LINE1), det(shifted)])).toBeNull()
+  })
 })
 
 describe('extractMrz', () => {
