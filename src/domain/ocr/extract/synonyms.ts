@@ -54,8 +54,14 @@ export const LABEL_WORDS: readonly string[] = [
   'DONOR', 'VETERAN', 'USA', 'SIGNATURE',
 ]
 
+/**
+ * `LICENCENUMBER` (British spelling, spelled-out "Number") added for
+ * `tests/domain/ocr/extract/labelled.test.ts`'s "accepts a spelling variant"
+ * case — `LICENCENO` alone does not cover it, since it is the "-CE" letters
+ * that vary, not the "No." abbreviation.
+ */
 export const LABELLED_ANCHORS: Readonly<Record<string, readonly string[]>> = {
-  license_number: ['LICENSENO', 'LICENSENUMBER', 'LIC#', 'LICENCENO', 'DEALERNO'],
+  license_number: ['LICENSENO', 'LICENSENUMBER', 'LIC#', 'LICENCENO', 'LICENCENUMBER', 'DEALERNO'],
   license_effective: ['EFFECTIVE', 'ISSUED', 'ISSUEDATE', 'VALIDFROM'],
   license_expiry: ['EXPIRES', 'EXPIRATION', 'VALIDTHROUGH', 'VALIDUNTIL'],
   biz_legal_name: ['LEGALNAME', 'BUSINESSNAME', 'ENTITYNAME', 'DBA'],
