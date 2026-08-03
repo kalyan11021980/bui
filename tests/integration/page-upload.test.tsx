@@ -22,8 +22,16 @@ const PREPARED: PreparedImage = {
   imageSize: { width: 1560, height: 1006 },
 }
 
+/** Below the read floor: refused in the browser, never sent. */
+const TOO_SMALL: PreparedImage = {
+  imageBase64: 'dGlueQ==',
+  imageUrl: 'data:image/jpeg;base64,dGlueQ==',
+  imageSize: { width: 320, height: 206 },
+}
+
+const decoder = vi.hoisted(() => ({ next: null as unknown as { imageSize: unknown } }))
 vi.mock('@/ui/panel/prepare-image', () => ({
-  prepareImage: async (): Promise<PreparedImage> => PREPARED,
+  prepareImage: async () => decoder.next,
 }))
 
 const PROFILE: ApplicantProfile = {
@@ -57,6 +65,7 @@ const created = () => createApplication('app-1', PROFILE)
 
 beforeEach(() => {
   calls = []
+  decoder.next = PREPARED
   respond = () => ({ status: 200, body: created() })
 
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -208,6 +217,29 @@ describe('the page', () => {
     await uploadPhoto()
 
     expect(await screen.findByText(/too small to read/i)).toBeInTheDocument()
+  })
+
+  it('takes down what it said about the last photo when a new one is chosen', async () => {
+    // Seen in a browser: a failed read left its message standing under the
+    // next photo's refusal, describing one the applicant had moved on from.
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? { status: 500, body: { error: 'boom' } }
+        : { status: 200, body: created() }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+    await screen.findByText(/could not read your document/i)
+
+    // The next photo never reaches the server, so nothing else would clear it.
+    decoder.next = TOO_SMALL
+    await uploadPhoto()
+
+    expect(await screen.findByText(/too small to read/i)).toBeInTheDocument()
+    expect(screen.queryByText(/could not read your document/i)).toBeNull()
+    expect(uploads()).toHaveLength(1)
   })
 
   it('tells the server about a typed answer, and says so when it could not', async () => {

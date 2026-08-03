@@ -60,6 +60,7 @@ export default function Page() {
       <DocumentUpload
         docType={docType}
         onRead={(image) => app.readDocument(docType, image)}
+        onChoose={app.forgetDocumentNotice}
         disabled={closed}
       />
 

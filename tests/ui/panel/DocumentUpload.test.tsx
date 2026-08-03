@@ -95,6 +95,25 @@ describe('DocumentUpload', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
+  it('reports a new photo before judging it, so the page can drop the last verdict', async () => {
+    const onChoose = vi.fn()
+    render(
+      <DocumentUpload
+        docType="drivers_license"
+        onRead={vi.fn()}
+        onChoose={onChoose}
+        prepare={prepare(320, 200)}
+      />,
+    )
+
+    await userEvent.upload(screen.getByLabelText(/photo of your/i), photo())
+
+    // Refused here, and still reported: what was said about the last photo
+    // describes one the applicant has moved on from.
+    await vi.waitFor(() => expect(onChoose).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('status')).toHaveTextContent(/too small to read/i)
+  })
+
   it('says so plainly when the photo cannot be opened at all', async () => {
     const onRead = vi.fn()
     render(

@@ -25,17 +25,24 @@ const UNOPENABLE =
 type Props = {
   docType: DocType
   onRead: (image: PreparedImage) => void
+  /** Every choice of file, before it is judged — what was said about the last
+   * one describes a photo that is no longer on offer. */
+  onChoose?: () => void
   disabled?: boolean
   /** Injectable: jsdom decodes no images and has no canvas. */
   prepare?: (file: File) => Promise<PreparedImage>
 }
 
-export function DocumentUpload({ docType, onRead, disabled, prepare }: Props) {
+export function DocumentUpload({
+  docType, onRead, onChoose, disabled, prepare,
+}: Props) {
   const [notice, setNotice] = useState<string | null>(null)
   const inputId = `upload-${docType}`
 
   const handle = async (file: File | undefined) => {
     if (!file) return
+    setNotice(null)
+    onChoose?.()
 
     let image: PreparedImage
     try {

@@ -49,6 +49,8 @@ export type UseApplication = {
   updateProfile: (patch: Partial<ApplicantProfile>) => void
   submit: () => void
   readDocument: (docType: DocType, image: PreparedImage) => void
+  /** Drops what was said about the last photo, once there is a new one. */
+  forgetDocumentNotice: () => void
 }
 
 export function useApplication(): UseApplication {
@@ -142,6 +144,7 @@ export function useApplication(): UseApplication {
   return {
     state, document: docImage, notice, outOfStep, carry,
     confirm, change, clear, updateProfile, submit, readDocument,
+    forgetDocumentNotice: () => setNotice(null),
   }
 }
 

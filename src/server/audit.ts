@@ -31,23 +31,28 @@ function resolveSecret(): string {
   )
 }
 
-let instance: AuditLog | undefined
+type GlobalLog = typeof globalThis & { __buyersuiAuditLog?: AuditLog }
 
 /**
  * Lazy, because `next build` imports every route module to collect page data
  * and that import must not trip the production secret check.
  *
+ * On globalThis for the reason the store is: each route is bundled with its own
+ * copy of this module, and one trail split across two of them is not a trail.
+ *
  * TODO(phase-4): durable storage. In-memory, so entries are lost on restart
  * and not shared across processes.
  */
 export function getAuditLog(): AuditLog {
-  if (!instance) {
-    instance = new AuditLog(createDigester(resolveSecret()))
-  }
-  return instance
+  const existing = (globalThis as GlobalLog).__buyersuiAuditLog
+  if (existing) return existing
+
+  const created = new AuditLog(createDigester(resolveSecret()))
+  ;(globalThis as GlobalLog).__buyersuiAuditLog = created
+  return created
 }
 
 /** Test-only. Rebuilds the singleton on the next getAuditLog() call. */
 export function __resetAuditLogForTests(): void {
-  instance = undefined
+  delete (globalThis as GlobalLog).__buyersuiAuditLog
 }
