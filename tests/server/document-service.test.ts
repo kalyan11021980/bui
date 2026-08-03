@@ -124,6 +124,20 @@ describe('ingestDocument', () => {
     expect(new Set(ids).size).toBe(1)
   })
 
+  it('hands back the id it filed those fields under, not one of its own', async () => {
+    // The browser matches this against the photo it holds to decide whose
+    // pixels a crop is cut from. An id that matches nothing shows no crop; an
+    // id that matches the wrong photo shows the wrong document.
+    const app = createApplication()
+    const outcome = unwrap(await ingest(app, FULL))
+
+    expect(outcome.filled.length).toBeGreaterThan(0)
+    for (const key of outcome.filled) {
+      expect(outcome.state.fields[key]?.provenance?.documentId, key)
+        .toBe(outcome.documentId)
+    }
+  })
+
   it('records a box in original-image pixels when the band allows crops', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(app, FULL))
