@@ -30,6 +30,14 @@ describe('scoreEvidence', () => {
     expect(checksummed).toBeGreaterThan(anchored)
   })
 
+  it('gives a label-anchored value more confidence than a bare read', () => {
+    // Nothing else isolated labelAnchored's own contribution — every other
+    // test that sets it true also sets something else true alongside it.
+    const anchored = scoreEvidence(evidence({ schemaParsed: true, labelAnchored: true }))
+    const bare = scoreEvidence(evidence({ schemaParsed: true, labelAnchored: false }))
+    expect(anchored).toBeGreaterThan(bare)
+  })
+
   it('drops below the quiet threshold when the two passes disagree', () => {
     // The CA specimen: grounded read 11234568, plain read I1234568. A value
     // the two passes disagree on is exactly the one that must not go quiet.
@@ -110,19 +118,34 @@ describe('scoreEvidence', () => {
     expect(noChecksum).toBeGreaterThan(failedChecksum)
   })
 
-  it('does not score a null signal as failure, for each nullable signal individually', () => {
-    // A single test comparing two already-null defaults would pass whether
-    // or not null is scored as failure, as long as both sides are null the
-    // same way — it proves nothing. This sets each of the three nullable
-    // signals to false and to null in turn and checks null never scores
-    // below the untouched base, and specifically is not equal to false.
+  it('does not score a null signal as failure, for each linearly-weighted signal', () => {
+    // checksumValid and boxPlausible are still plain add/subtract, so a
+    // single loop covers both: null must land exactly on the untouched base,
+    // strictly above an explicit false. (crossPassAgreed is not linear any
+    // more — it is a veto, covered on its own below, because "null" and
+    // "false" only diverge for it once the pre-veto score would have
+    // cleared the cap.)
     const base = scoreEvidence(evidence({ schemaParsed: true }))
-    for (const signal of ['checksumValid', 'crossPassAgreed', 'boxPlausible'] as const) {
+    for (const signal of ['checksumValid', 'boxPlausible'] as const) {
       const withNull = scoreEvidence(evidence({ schemaParsed: true, [signal]: null }))
       const withFalse = scoreEvidence(evidence({ schemaParsed: true, [signal]: false }))
       expect(withNull, signal).toBe(base)
       expect(withNull, signal).toBeGreaterThan(withFalse)
     }
+  })
+
+  it('gates on an explicit cross-pass disagreement but not on a null one', () => {
+    // In a low-scoring context null and false both leave the score
+    // untouched, which could look like "null is treated as failure" by
+    // accident. This uses a context strong enough to clear the quiet
+    // threshold, where the veto actually has something to veto.
+    const strong = {
+      schemaParsed: true, labelAnchored: true, checksumValid: true, boxPlausible: true,
+    }
+    const withNull = scoreEvidence(evidence({ ...strong, crossPassAgreed: null }))
+    const withFalse = scoreEvidence(evidence({ ...strong, crossPassAgreed: false }))
+    expect(withNull).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+    expect(withFalse).toBeLessThan(QUIET_THRESHOLD)
   })
 
   it('keeps a value noisy on cross-pass disagreement even when checksum-validated', () => {
@@ -138,7 +161,9 @@ describe('scoreEvidence', () => {
   it('never goes quiet on cross-pass disagreement, across every other combination', () => {
     // The exhaustive version of the test above: crossPassAgreed: false must
     // dominate regardless of what else is true, not just in the one
-    // hand-picked worst case.
+    // hand-picked worst case. True by construction of the veto, not by
+    // tuning — this is what would catch the veto being removed or weakened
+    // back into a subtraction.
     const flags = [true, false, null] as const
     for (const checksumValid of flags) {
       for (const boxPlausible of flags) {
@@ -156,10 +181,12 @@ describe('scoreEvidence', () => {
   })
 
   it('rounds away floating-point noise instead of leaking it into a displayed score', () => {
-    // 0.3 + 0.6 is 0.8999999999999999 in IEEE 754. Without the toFixed(3)
-    // step this returns that value verbatim.
-    const score = scoreEvidence(evidence({ schemaParsed: true, crossPassAgreed: true }))
-    expect(score).toBe(0.9)
+    // 0.3 + 0.73 - 0.2 is 0.8300000000000001 in IEEE 754. Without the
+    // toFixed(3) step this returns that value verbatim.
+    const score = scoreEvidence(evidence({
+      schemaParsed: true, checksumValid: true, glyphAmbiguous: true,
+    }))
+    expect(score).toBe(0.83)
   })
 })
 
@@ -210,12 +237,31 @@ describe('withCrossPass', () => {
 
   it('does not credit a two-character state code embedded inside a longer word', () => {
     // 'CA' is a substring of 'CALIFORNIA'; 'WA' is a substring of
-    // 'WASHINGTON'. Deliberately wrong two-character codes against real
-    // plain passes were the reviewer's own counterexample for this.
+    // 'WASHINGTON'.
     const two: Candidate = {
       key: 'addr_state', raw: 'CA', evidence: { ...NO_EVIDENCE, schemaParsed: true },
     }
     const [out] = withCrossPass([two], 'ADDRESS SACRAMENTO CALIFORNIA 95814')
+    expect(out?.evidence.crossPassAgreed).toBe(false)
+  })
+
+  it('keeps scanning past an embedded false match to find the real standalone one', () => {
+    // 'CA' appears embedded in 'CALIFORNIA' before it appears on its own
+    // later in the same string. Stopping at the first occurrence — rather
+    // than continuing the scan — would report disagreement on a value that
+    // does, genuinely, appear as its own token.
+    const two: Candidate = {
+      key: 'addr_state', raw: 'CA', evidence: { ...NO_EVIDENCE, schemaParsed: true },
+    }
+    const [out] = withCrossPass([two], 'ADDRESS SACRAMENTO CALIFORNIA CA 95814')
+    expect(out?.evidence.crossPassAgreed).toBe(true)
+  })
+
+  it('never matches an empty value', () => {
+    const empty: Candidate = {
+      key: 'sex', raw: '', evidence: { ...NO_EVIDENCE, schemaParsed: true },
+    }
+    const [out] = withCrossPass([empty], 'SEX M DOB 1990')
     expect(out?.evidence.crossPassAgreed).toBe(false)
   })
 

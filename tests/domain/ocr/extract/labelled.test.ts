@@ -28,7 +28,11 @@ describe('extractLabelled', () => {
 
   it('reads an expiry into ISO form', () => {
     const out = extractLabelled([det('Expires 06/30/2027')], '')
-    expect(out.find((c) => c.key === 'license_expiry#0')?.raw).toBe('2027-06-30')
+    const found = out.find((c) => c.key === 'license_expiry#0')
+    expect(found?.raw).toBe('2027-06-30')
+    // Cross-pass compares this against the printed form; the plain OCR pass
+    // never saw the ISO conversion.
+    expect(found?.asRead).toBe('06/30/2027')
   })
 
   it('never claims a label it did not find', () => {

@@ -62,6 +62,14 @@ describe('extractMrz', () => {
     expect(value('id_country')).toBe('UTO')
   })
 
+  it('carries the pre-conversion MRZ digits as asRead on both dates', () => {
+    // Cross-pass compares this, not the ISO conversion — the plain OCR pass
+    // never reformats what it reads off the MRZ.
+    const out = extractMrz(MRZ_DETECTIONS, '')
+    expect(out.find((c) => c.key === 'dob')?.asRead).toBe('740812')
+    expect(out.find((c) => c.key === 'dl_expiry')?.asRead).toBe('120415')
+  })
+
   it('marks only the line-2 fields checksum-validated', () => {
     // Line 1 carries no check digit at all; names and country must not claim
     // arithmetic verification they never had.

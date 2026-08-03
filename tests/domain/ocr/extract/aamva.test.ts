@@ -39,7 +39,11 @@ describe('extractAamva', () => {
 
   it('reads dates into ISO form', () => {
     const detections = [det('3 DOB 04/17/1982', [100, 300, 400, 330])]
-    expect(read(detections, 'dob')?.raw).toBe('1982-04-17')
+    const found = read(detections, 'dob')
+    expect(found?.raw).toBe('1982-04-17')
+    // Cross-pass compares this against the printed form; the plain OCR pass
+    // never saw the ISO conversion.
+    expect(found?.asRead).toBe('04/17/1982')
   })
 
   it('rejects a calendar-invalid date, not just a badly shaped one', () => {
@@ -87,6 +91,7 @@ describe('extractAamva', () => {
       det('02/21/2018', [538, 250, 655, 284]),
     ], 'dl_expiry')
     expect(found?.raw).toBe('2018-02-21')
+    expect(found?.asRead).toBe('02/21/2018')
   })
 
   it('splits the 1,2 name stack into surname then given names', () => {
