@@ -8,7 +8,7 @@ import { z } from 'zod'
  * Round-tripping catches what the ISO parser silently normalises, so
  * 2026-02-30 cannot slip through as 2026-03-02.
  */
-function isRealCalendarDate(value: string): boolean {
+export function isRealCalendarDate(value: string): boolean {
   const parsed = new Date(`${value}T00:00:00.000Z`)
   if (Number.isNaN(parsed.getTime())) return false
   return parsed.toISOString().slice(0, 10) === value

@@ -29,6 +29,11 @@ const truth: Truth[] = JSON.parse(
 
 const slug = (path: string): string => path.split('/').pop() ?? path
 const expected = truth.find((t) => t.image === slug(card.image))?.fields
+const det = (text: string): Detection => ({ text, box: [0, 0, 0, 0] })
+
+// MRZ names are all-caps; ground truth is transcribed as printed.
+const upper = (field: 'last_name' | 'first_name'): string | undefined =>
+  expected?.[field]?.toUpperCase()
 
 // The specimen's own MRZ, character for character — verified by counting ink
 // columns in the image (44 per line, monospace), not eyeballed.
@@ -48,63 +53,62 @@ describe('MRZ recall against the recorded specimen', () => {
   it('reads every field once handed the passport’s actual 44-character MRZ', () => {
     // Both transcribed lines are internally consistent ICAO checksums — this
     // is the extractor's ceiling: what it gets right if nothing upstream
-    // mangles the zone.
-    const out = extractMrz([], `${TRUE_LINE1}\n${TRUE_LINE2}`)
+    // mangles the zone. Graded against ground truth, not hardcoded literals,
+    // so an edit to the specimen file cannot go unnoticed here.
+    const out = extractMrz([det(TRUE_LINE1), det(TRUE_LINE2)], '')
     const value = (key: string) => out.find((c) => c.key === key)?.raw
 
-    expect(value('last_name')).toBe('DE BRUIJN')
-    expect(value('first_name')).toBe('WILLEKE')
-    expect(value('id_country')).toBe('NLD')
-    expect(value('passport_number')).toBe('SPECI2014')
+    expect(value('last_name')).toBe(upper('last_name'))
+    expect(value('first_name')).toBe(upper('first_name'))
+    expect(value('id_country')).toBe(expected?.id_country)
+    expect(value('passport_number')).toBe(expected?.passport_number)
     expect(value('dob')).toBe(expected?.dob)
     expect(value('dl_expiry')).toBe(expected?.dl_expiry)
     expect(out).toHaveLength(6)
   })
 
-  it('reads nothing off the recorded OCR: the grounded pass truncated both MRZ lines', () => {
+  it('reads five of six fields off the recorded OCR, unpadded', () => {
     // The recorder captured the image faithfully enough for a human to read
-    // (verified above), but the grounded OCR pass dropped trailing filler off
-    // both lines: 41 characters where line 1 prints 44, 43 where line 2
-    // prints 44. findMrzLines' fixed-width gate is exact for a reason — a
-    // short line is not a line we can safely re-slice — so it declines both,
-    // and extraction yields nothing. A real OCR limitation, not a reason to
-    // loosen the gate.
-    expect(findMrzLines(card.text)).toBeNull()
-    expect(extractFor(card.docType, card.detections, card.text)).toEqual([])
+    // (verified above), but the grounded OCR pass truncated trailing filler
+    // off both MRZ lines: 41 characters where line 1 prints 44, 43 where
+    // line 2 prints 44. A length gate would decline both. The structural
+    // template `findMrzLines` actually uses only reads the first 28
+    // characters of line 2 and the first 5 of line 1 — well inside the
+    // truncation — so it finds both lines exactly as OCR recorded them, no
+    // padding needed.
+    const lines = findMrzLines(card.detections)
+    expect(lines?.[0]).toHaveLength(41)
+    expect(lines?.[1]).toHaveLength(43)
 
-    const asRead = card.detections.map((d) => d.text)
-    expect(asRead).toContain('P<NLDDE<BRUIJN<<WILLEKE<LISELOTTE<<<<<<<<')
-    expect(asRead).toContain('SPEC120142NLD6503101F24030969999999990<<<84')
-  })
-
-  it('would still have caught the misread document number on checksum alone', () => {
-    // What the checksums alone would have done if the two OCR lines had been
-    // 44 characters, using the OCR reading verbatim — not the ground truth —
-    // padded with trailing filler past the point this extractor ever reads
-    // (nothing past index 27 feeds a field). This isolates OCR's one real
-    // content error, distinct from the truncation above: a glyph swap, I for
-    // 1, inside the document number — exactly the CA card's failure class,
-    // caught here by arithmetic instead of a human skimming it.
-    // The visual `documentnummer` field is a shorter, separate detection that
-    // also starts `SPEC1` — match on length to land on the MRZ line, not it.
-    const ocrLine1 = card.detections.find((d) => d.text.startsWith('P<NLD'))?.text ?? ''
-    const ocrLine2 = card.detections.find((d) => d.text.startsWith('SPEC1') && d.text.length > 30)?.text ?? ''
-    expect(ocrLine1).toHaveLength(41)
-    expect(ocrLine2).toHaveLength(43)
-
-    const padded = `${ocrLine1.padEnd(44, '<')}\n${ocrLine2.padEnd(44, '<')}`
-    const out = extractMrz([], padded)
+    const out = extractFor(card.docType, card.detections, card.text)
     const value = (key: string) => out.find((c) => c.key === key)?.raw
 
-    // Names carry no check digit, so the glyph-clean parts of the zone still
-    // come through.
-    expect(value('last_name')).toBe('DE BRUIJN')
-    expect(value('first_name')).toBe('WILLEKE')
-    expect(value('id_country')).toBe('NLD')
+    // Names and country carry no check digit, so the glyph-clean parts of
+    // the zone come through even off the truncated OCR reading.
+    expect(value('last_name')).toBe(upper('last_name'))
+    expect(value('first_name')).toBe(upper('first_name'))
+    expect(value('id_country')).toBe(expected?.id_country)
     // Read correctly by OCR, so the checksum agrees and the value survives.
     expect(value('dob')).toBe(expected?.dob)
     expect(value('dl_expiry')).toBe(expected?.dl_expiry)
-    // OCR's I→1 misread inside the document number: the checksum catches it.
+    // OCR's I→1 misread inside the document number (SPECI2014 read as
+    // SPEC12014) fails the check digit — the exact failure class the CA card
+    // produced, caught here by arithmetic instead of a human skimming it.
     expect(value('passport_number')).toBeUndefined()
+    expect(out).toHaveLength(5)
+  })
+
+  it('would suppress dl_expiry alone if only its own check digit were misread', () => {
+    // The brief's suppression coverage corrupts the DOB digit and checks
+    // passport_number's recall — never dl_expiry's own guard. Corrupt only
+    // the expiry composite digit on the true 44-character lines and confirm
+    // nothing else is affected.
+    const corrupted = TRUE_LINE2.replace('2403096', '2403097')
+    const out = extractMrz([det(TRUE_LINE1), det(corrupted)], '')
+    const value = (key: string) => out.find((c) => c.key === key)?.raw
+
+    expect(out.find((c) => c.key === 'dl_expiry')).toBeUndefined()
+    expect(value('dob')).toBe(expected?.dob)
+    expect(value('passport_number')).toBe(expected?.passport_number)
   })
 })
