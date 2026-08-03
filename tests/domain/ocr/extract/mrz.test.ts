@@ -103,6 +103,25 @@ describe('extractMrz', () => {
     expect(out.find((c) => c.key === 'dob')).toBeDefined()
   })
 
+  it('suppresses a date with an impossible month even when its check digit is recomputed to match', () => {
+    // The check digit is pure digit arithmetic — it has no idea what a month
+    // is, so a corrupted YYMMDD with a matching check digit clears the
+    // checksum guard entirely. Only a calendar check catches month 13.
+    const badDob = det(LINE2.replace('7408122', '7413014'))
+    expect(checkDigit('741301')).toBe('4') // the corrupted digits' own check digit
+    const out = extractMrz([det(LINE1), badDob], '')
+    expect(out.find((c) => c.key === 'dob')).toBeUndefined()
+    expect(out.find((c) => c.key === 'last_name')).toBeDefined()
+  })
+
+  it('suppresses dl_expiry the same way, on its own check digit', () => {
+    const badExpiry = det(LINE2.replace('1204159', '3013014'))
+    expect(checkDigit('301301')).toBe('4')
+    const out = extractMrz([det(LINE1), badExpiry], '')
+    expect(out.find((c) => c.key === 'dl_expiry')).toBeUndefined()
+    expect(out.find((c) => c.key === 'dob')).toBeDefined()
+  })
+
   it('emits no box, because an MRZ line is not where the value is printed', () => {
     const out = extractMrz(MRZ_DETECTIONS, '')
     // Guards the loop below: an extractor gone silent would otherwise pass.

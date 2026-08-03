@@ -1,3 +1,4 @@
+import { isRealCalendarDate } from '@/domain/calendar'
 import { isPlausibleBox } from '../geometry'
 import { normalizeText, type Box, type Detection } from '../grounding'
 import { registerStrategy } from './index'
@@ -43,7 +44,8 @@ function toIsoDate(raw: string): string | null {
   const match = US_DATE.exec(raw)
   if (!match) return null
   const [, month, day, year] = match
-  return `${year}-${month}-${day}`
+  const iso = `${year}-${month}-${day}`
+  return isRealCalendarDate(iso) ? iso : null
 }
 
 type Tail = { readonly city: string; readonly state: string; readonly zip: string }

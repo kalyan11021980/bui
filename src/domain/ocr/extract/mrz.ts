@@ -1,4 +1,4 @@
-import { isRealCalendarDate } from '../../catalog/schemas'
+import { isRealCalendarDate } from '@/domain/calendar'
 import type { Detection } from '../grounding'
 import { registerStrategy } from './index'
 import { glyphAmbiguity, NO_EVIDENCE, type Candidate, type ExtractStrategy } from './types'

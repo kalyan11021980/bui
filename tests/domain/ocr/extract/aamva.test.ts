@@ -42,6 +42,14 @@ describe('extractAamva', () => {
     expect(read(detections, 'dob')?.raw).toBe('1982-04-17')
   })
 
+  it('rejects a calendar-invalid date, not just a badly shaped one', () => {
+    // A card has no check digit to catch a misread digit; the calendar
+    // check is the only guard this format has. Downstream schema validation
+    // would drop it too, but the extractor should not manufacture it.
+    const detections = [det('3 DOB 13/45/1982', [100, 300, 400, 330])]
+    expect(read(detections, 'dob')).toBeUndefined()
+  })
+
   it('marks a box covering the whole card as implausible', () => {
     const detections = [det('4dLIC#WDLJK00580GF', [0, 0, 1000, 1000])]
     expect(read(detections, 'dl_number')?.evidence.boxPlausible).toBe(false)
