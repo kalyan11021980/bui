@@ -1,0 +1,168 @@
+import { describe, expect, it } from 'vitest'
+import { extractAamva, splitAddressBlock } from '@/domain/ocr/extract/aamva'
+import { extractFor } from '@/domain/ocr/extract'
+import type { Detection } from '@/domain/ocr/grounding'
+
+const det = (text: string, box: [number, number, number, number]): Detection =>
+  ({ text, box })
+
+const read = (detections: Detection[], key: string) =>
+  extractAamva(detections, '').find((c) => c.key === key)
+
+describe('extractAamva', () => {
+  it('reads a licence number anchored to its field code', () => {
+    const detections = [det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])]
+    expect(read(detections, 'dl_number')?.raw).toBe('WDLJK00580GF')
+  })
+
+  it('picks the labelled occurrence when the number is printed twice', () => {
+    // Washington prints it as `4d LIC#` at the top and `5 DD` at the bottom.
+    // Value alone picks the wrong one about half the time.
+    const labelled = det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])
+    const repeat = det('5DDWDLJK00580GF', [100, 700, 400, 730])
+
+    for (const order of [[labelled, repeat], [repeat, labelled]]) {
+      const found = read(order, 'dl_number')
+      expect(found?.box).toEqual([100, 200, 400, 230])
+      expect(found?.evidence.labelAnchored).toBe(true)
+    }
+  })
+
+  it('ignores a bare repeat of the number even when it comes first', () => {
+    // The tighter box: whatever wins here, it is not because it was shortest.
+    const found = read([
+      det('WDLJK00580GF', [100, 700, 300, 730]),
+      det('4dLIC#WDLJK00580GF', [100, 200, 400, 230]),
+    ], 'dl_number')
+    expect(found?.box).toEqual([100, 200, 400, 230])
+  })
+
+  it('reads dates into ISO form', () => {
+    const detections = [det('3 DOB 04/17/1982', [100, 300, 400, 330])]
+    expect(read(detections, 'dob')?.raw).toBe('1982-04-17')
+  })
+
+  it('marks a box covering the whole card as implausible', () => {
+    const detections = [det('4dLIC#WDLJK00580GF', [0, 0, 1000, 1000])]
+    expect(read(detections, 'dl_number')?.evidence.boxPlausible).toBe(false)
+  })
+
+  it('leaves checksumValid null — a card has none to fail', () => {
+    const detections = [det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])]
+    expect(read(detections, 'dl_number')?.evidence.checksumValid).toBeNull()
+  })
+
+  it('emits nothing for a field whose anchor is absent', () => {
+    const out = extractAamva([det('SOMETHING ELSE', [0, 0, 10, 10])], '')
+    expect(out).toEqual([])
+  })
+
+  it('takes the value from the detection beside the code', () => {
+    // Oregon prints `4d NO` and the number as two detections on one row.
+    const found = read([
+      det('4dNO', [394, 257, 440, 285]),
+      det('A123456', [450, 255, 575, 303]),
+      det('12CARD', [394, 311, 509, 351]),
+    ], 'dl_number')
+    expect(found?.raw).toBe('A123456')
+    expect(found?.box).toEqual([450, 255, 575, 303])
+  })
+
+  it('takes the value from the detection under the code', () => {
+    // Massachusetts stacks `4d NUMBER` over the number.
+    const found = read([
+      det('4dNUMBER', [731, 279, 845, 312]),
+      det('S99988801', [761, 312, 958, 358]),
+      det('01/12/1959', [761, 399, 955, 455]),
+    ], 'dl_number')
+    expect(found?.raw).toBe('S99988801')
+  })
+
+  it('reads the expiry under DC’s EPX spelling', () => {
+    const found = read([
+      det('4b.EPX', [538, 220, 592, 246]),
+      det('02/21/2018', [538, 250, 655, 284]),
+    ], 'dl_expiry')
+    expect(found?.raw).toBe('2018-02-21')
+  })
+
+  it('splits the 1,2 name stack into surname then given names', () => {
+    // Virginia prints one code over two lines.
+    const detections = [
+      det('1,2 Name', [320, 312, 404, 343]),
+      det('REYES', [360, 341, 447, 379]),
+      det('RICHARD BENJAMIN', [360, 377, 570, 408]),
+    ]
+    expect(read(detections, 'last_name')?.raw).toBe('REYES')
+    expect(read(detections, 'first_name')?.raw).toBe('RICHARD BENJAMIN')
+  })
+
+  it('does not read a printed label as if it were a name', () => {
+    // `12 REST` sits under the same code family as `1,2 Name`.
+    const detections = [
+      det('12REST', [618, 452, 704, 485]),
+      det('NONE', [660, 481, 733, 520]),
+    ]
+    expect(read(detections, 'last_name')).toBeUndefined()
+    expect(read(detections, 'first_name')).toBeUndefined()
+  })
+
+  it('reads an address block anchored to code 8', () => {
+    const detections = [
+      det('8123STREETADDRESS', [339, 499, 656, 540]),
+      det('YOURCITYWA99999-0000', [353, 540, 713, 575]),
+    ]
+    expect(read(detections, 'addr_city')?.raw).toBe('YOURCITY')
+    expect(read(detections, 'addr_state')?.raw).toBe('WA')
+    expect(read(detections, 'addr_zip')?.raw).toBe('99999-0000')
+    expect(read(detections, 'addr_line1')?.raw).toBe('123STREETADDRESS')
+  })
+
+  it('falls back to the city/state/ZIP shape, and says it was not labelled', () => {
+    const detections = [
+      det('123 NORTH MAIN STREET', [401, 644, 704, 688]),
+      det('NORTHQUINCY,MA02171-1748', [425, 727, 796, 769]),
+    ]
+    const city = read(detections, 'addr_city')
+    expect(city?.raw).toBe('NORTHQUINCY')
+    expect(city?.evidence.labelAnchored).toBe(false)
+  })
+})
+
+describe('the catalog decides what a document may prove', () => {
+  const detections = [det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])]
+
+  it('keeps a licence number read off a licence', () => {
+    const keys = extractFor('drivers_license', detections, '').map((c) => c.key)
+    expect(keys).toContain('dl_number')
+  })
+
+  it('drops the same read off a state ID, which does not derive dl_number', () => {
+    expect(read(detections, 'dl_number')?.raw).toBe('WDLJK00580GF')
+    const keys = extractFor('state_id', detections, '').map((c) => c.key)
+    expect(keys).not.toContain('dl_number')
+  })
+})
+
+describe('splitAddressBlock', () => {
+  it('splits a two-line address block', () => {
+    const parts = splitAddressBlock('2600 MARTIN WAY E\nOLYMPIA, WA 98506')
+    expect(parts).toEqual({
+      line1: '2600 MARTIN WAY E', city: 'OLYMPIA', state: 'WA', zip: '98506',
+    })
+  })
+
+  it('handles a ZIP+4', () => {
+    expect(splitAddressBlock('1 A ST\nBOSTON, MA 02101-1234').zip).toBe('02101-1234')
+  })
+
+  it('splits a line the grounded output has stripped of spaces', () => {
+    expect(splitAddressBlock('123STREETADDRESS\nYOURCITYWA99999-0000')).toEqual({
+      line1: '123STREETADDRESS', city: 'YOURCITY', state: 'WA', zip: '99999-0000',
+    })
+  })
+
+  it('returns nothing usable from a malformed block', () => {
+    expect(splitAddressBlock('ANYTOWN,CAPO')).toEqual({})
+  })
+})
