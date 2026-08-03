@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { extractAamva } from '@/domain/ocr/extract/aamva'
+import { extractAamva, respaceAddresses } from '@/domain/ocr/extract/aamva'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
 import { QUIET_THRESHOLD, scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
 import type { Detection } from '@/domain/ocr/grounding'
@@ -248,8 +248,10 @@ describe('AAMVA recall against recorded specimens', () => {
 
   it('leaves a misread address disagreeing, however it is spaced', () => {
     const card = fixture('va_2023')
+    // Mirrors the real pipeline (document-service.ts): re-space, then score.
     const [line1] = withCrossPass(
-      parseCandidates(extractAamva(card.detections, card.text)), card.plainText,
+      respaceAddresses(parseCandidates(extractAamva(card.detections, card.text)), card.plainText),
+      card.plainText,
     ).filter((c) => c.key === 'addr_line1')
 
     // The zero-for-O survives re-spacing, so the passes still disagree.

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { extractAamva, respaceAddress, splitAddressBlock } from '@/domain/ocr/extract/aamva'
-import { extractFor, parseCandidates } from '@/domain/ocr/extract'
+import {
+  extractAamva, respaceAddress, respaceAddresses, splitAddressBlock,
+} from '@/domain/ocr/extract/aamva'
+import { extractFor, NO_EVIDENCE, parseCandidates } from '@/domain/ocr/extract'
 import type { Detection } from '@/domain/ocr/grounding'
 
 const det = (text: string, box: [number, number, number, number]): Detection =>
@@ -365,10 +367,20 @@ describe('respaceAddress', () => {
     expect(respaced).not.toContain('JOHN')
   })
 
+  it('never removes a space the grounded pass already had', () => {
+    // A street the grounded pass already broke into words correctly must not
+    // be re-merged because the plain pass happens to print it run together —
+    // re-spacing may only add whitespace, never take it away.
+    expect(respaceAddress('1906 LANA AVE NE', 'DL 1906LANA AVENE SALEM OR'))
+      .toBe('1906 LANA AVE NE')
+    expect(respaceAddress('123 MAIN ST', '123MAINST APT 4')).toBe('123 MAIN ST')
+  })
+
   it('leaves the value unspaced when the plain pass has nothing that lines up', () => {
     // Real case: ma_2016's plain pass drops the house number entirely, so
-    // no window of the full value's length can align without guessing.
-    const raw = '123NORTHMAINSTREETAPT.1'
+    // no window of the full value's length can align without guessing. The
+    // corpus value already carries the join-space between the two lines.
+    const raw = '123NORTHMAINSTREET APT.1'
     const unrelated = 'North Main Street, Apt. 1'
     expect(respaceAddress(raw, unrelated)).toBe(raw)
   })
@@ -378,8 +390,48 @@ describe('respaceAddress', () => {
     expect(respaceAddress(raw, 'completely unrelated text with no bearing here')).toBe(raw)
   })
 
+  it('prefers the window that reads as whole words, not just the one with fewest mismatches', () => {
+    // Two equally-exact windows exist in each text: an accidental one built
+    // from fragments of unrelated words, and the real one printed as a
+    // single word. Picking the first (earliest) or either arbitrarily can
+    // pick the fragment and garble a value that was already correct.
+    expect(respaceAddress('QUINCY', 'QUIN CY? NORTH QUINCY MA 02171')).toBe('QUINCY')
+    expect(respaceAddress('WASHINGTON', 'WASH INGTON DC DEPT WASHINGTON DC 20001'))
+      .toBe('WASHINGTON')
+  })
+
+  it('keeps the mismatch ratio at 0.3, not something looser', () => {
+    // A 10-character span with exactly 4 mismatches (40%) sits between the
+    // current 30% cutoff (rejects) and a looser 50% one (would accept and
+    // insert the space after "ABCDE") — pins the constant itself, not just
+    // its existence.
+    const raw = 'ABCDEFGHIJ'
+    const plainText = 'FILLER AXCXE XGXIJ FILLER'
+    expect(respaceAddress(raw, plainText)).toBe(raw)
+  })
+
   it('is a no-op with no plain pass, or nothing to space', () => {
     expect(respaceAddress('123STREETADDRESS', '')).toBe('123STREETADDRESS')
     expect(respaceAddress('', 'some text')).toBe('')
+  })
+})
+
+describe('respaceAddresses', () => {
+  it('re-spaces only free-text address fields, leaving state and zip alone', () => {
+    const candidates = [
+      { key: 'addr_line1', raw: '123STREETADDRESS', evidence: NO_EVIDENCE },
+      { key: 'addr_city', raw: 'YOURCITY', evidence: NO_EVIDENCE },
+      { key: 'addr_state', raw: 'WA', evidence: NO_EVIDENCE },
+      { key: 'addr_zip', raw: '99999-0000', evidence: NO_EVIDENCE },
+      { key: 'last_name', raw: 'SAMPLE', evidence: NO_EVIDENCE },
+    ]
+    const plainText = '123 Street Address\nYour City WA 99999-0000'
+    const out = respaceAddresses(candidates, plainText)
+
+    expect(out.find((c) => c.key === 'addr_line1')?.raw).toBe('123 STREET ADDRESS')
+    expect(out.find((c) => c.key === 'addr_city')?.raw).toBe('YOUR CITY')
+    expect(out.find((c) => c.key === 'addr_state')?.raw).toBe('WA')
+    expect(out.find((c) => c.key === 'addr_zip')?.raw).toBe('99999-0000')
+    expect(out.find((c) => c.key === 'last_name')?.raw).toBe('SAMPLE')
   })
 })

@@ -4,6 +4,7 @@ import '@/domain/ocr/extract/aamva'
 import '@/domain/ocr/extract/mrz'
 import '@/domain/ocr/extract/labelled'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
+import { respaceAddresses } from '@/domain/ocr/extract/aamva'
 import { QUIET_THRESHOLD, scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
 import type { DocType } from '@/domain/field-id'
 import type { Detection } from '@/domain/ocr/grounding'
@@ -58,7 +59,7 @@ const matches = (read: string, want: string): boolean => flat(read) === flat(wan
 
 function scoredFields(f: Fixture) {
   const parsed = parseCandidates(extractFor(f.docType, f.detections, f.text))
-  return withCrossPass(parsed, f.plainText)
+  return withCrossPass(respaceAddresses(parsed, f.plainText), f.plainText)
 }
 
 describe('confidence against ground truth', () => {
@@ -139,9 +140,14 @@ describe('confidence against ground truth', () => {
    * fields quiet, 19 agreed / 9 disagreed. After: 13 quiet, 24 agreed / 4
    * disagreed — every flip is a spacing artefact going away, not a misread
    * being waved through (the test above and the CA/VA glyph cases guard
-   * that). Two fields stay unspaced on purpose: the plain pass for ma_2016
-   * and dc_2018's addr_line1 does not contain the same text (a missing house
-   * number, a split across lines) close enough to align safely.
+   * that). `ma_2016`'s `addr_line1` stays unspaced on purpose: its plain
+   * pass drops the house number entirely, so no window of the full value's
+   * length lines up closely enough to trust. `dc_2018`'s `addr_line1` does
+   * re-space correctly (to "1234 COMMODORE JOSHUA BARNEY DRIVE, NE #1234")
+   * but still disagrees: its plain pass breaks the line before "#1234" with
+   * two trailing spaces and a newline, not the single space re-spacing
+   * inserts, so `isWholeWordMatch`'s exact substring search misses it —
+   * a whitespace-shape gap in cross-pass matching, not this task's to fix.
    */
   it('quiets 13 of 28 address fields across the corpus, up from 10 before re-spacing', () => {
     const ADDR = new Set(['addr_line1', 'addr_city', 'addr_state', 'addr_zip'])

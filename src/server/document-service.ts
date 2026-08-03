@@ -1,5 +1,7 @@
 // Strategies register themselves on import. Without these the pipeline has
-// nothing to dispatch to and silently reads nothing.
+// nothing to dispatch to and silently reads nothing. aamva also registers
+// via the named import below, but this line stays explicit on purpose —
+// registration must not depend on something else needing a re-space helper.
 import '@/domain/ocr/extract/aamva'
 import '@/domain/ocr/extract/labelled'
 import '@/domain/ocr/extract/mrz'
@@ -8,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { submittedRefusal } from '@/domain/application/guards'
 import { scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
 import { extractFor, parseCandidates } from '@/domain/ocr/extract'
+import { respaceAddresses } from '@/domain/ocr/extract/aamva'
 import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
 import { bandForWidth, demoteForCardExtent, type QualityBand } from '@/domain/ocr/quality'
 import { applyAction, getApplication, type Result } from './application-service'
@@ -77,10 +80,11 @@ export async function ingestDocument(
   const band = demoteForCardExtent(preflight, read.detections, imageSize.width)
   const documentId = randomUUID()
 
-  const candidates = withCrossPass(
-    parseCandidates(extractFor(input.docType, read.detections, read.text)),
-    read.plainText,
-  )
+  // Re-spaced before cross-pass is scored, so agreement is checked against
+  // the value the applicant will actually see, not the space-stripped one
+  // that always disagreed on a spacing artefact rather than a misread.
+  const parsed = parseCandidates(extractFor(input.docType, read.detections, read.text))
+  const candidates = withCrossPass(respaceAddresses(parsed, read.plainText), read.plainText)
 
   const filled: RequirementKey[] = []
   let state: ApplicationState | null = null

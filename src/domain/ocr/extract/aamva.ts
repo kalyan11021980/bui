@@ -1,4 +1,5 @@
 import { isRealCalendarDate } from '@/domain/calendar'
+import { parseReqKey } from '@/domain/requirements/key'
 import { isPlausibleBox } from '../geometry'
 import { normalizeText, type Box, type Detection } from '../grounding'
 import { registerStrategy } from './index'
@@ -79,57 +80,130 @@ export function splitAddressBlock(raw: string): {
 /** How much of the aligned window may miss before it is not a match at all. */
 const RESPACE_MISMATCH_RATIO = 0.3
 
-/**
- * Grounded output never carries a space; the plain pass does, but can misread
- * a glyph the grounded pass read correctly (or vice versa) — so its
- * characters cannot be trusted, only its word breaks. Finds the plain-pass
- * window whose letters best line up with `raw`'s own, then copies over only
- * the space positions from that window. `raw`'s characters are never
- * replaced, so a wrong glyph the grounded pass read stays wrong and visible —
- * see the safety condition in task-15-brief.md.
- */
-export function respaceAddress(raw: string, plainText: string): string {
-  const rawChars = [...raw].filter((c) => !/\s/.test(c))
-  if (rawChars.length === 0 || plainText.trim() === '') return raw
-
-  const plainChars: string[] = []
+/** A despaced run of characters, with whether a space followed each one. */
+function despace(text: string): { chars: string[]; spaceAfter: boolean[] } {
+  const chars: string[] = []
   const spaceAfter: boolean[] = []
-  for (const ch of plainText.toUpperCase()) {
+  for (const ch of text) {
     if (/\s/.test(ch)) {
       if (spaceAfter.length > 0) spaceAfter[spaceAfter.length - 1] = true
       continue
     }
-    plainChars.push(ch)
+    chars.push(ch)
     spaceAfter.push(false)
   }
+  return { chars, spaceAfter }
+}
 
+type Window = {
+  readonly start: number
+  readonly mismatches: number
+  /** True when neither edge of the window cuts into a longer printed run —
+   * a candidate that only "matches" because it starts or ends mid-word. */
+  readonly boundaryClean: boolean
+  /** How many internal breaks the plain pass prints inside this window. A
+   * value split across unrelated words scores worse here than the same
+   * value printed as the phrase it actually is. */
+  readonly fragmentation: number
+}
+
+/** Fewer mismatches wins; ties go to a whole-word window, then the least
+ * internally-split one, then the earlier one. */
+function better(a: Window, b: Window): boolean {
+  if (a.mismatches !== b.mismatches) return a.mismatches < b.mismatches
+  if (a.boundaryClean !== b.boundaryClean) return a.boundaryClean
+  if (a.fragmentation !== b.fragmentation) return a.fragmentation < b.fragmentation
+  return false
+}
+
+/**
+ * Grounded output never carries a space; the plain pass does, but can misread
+ * a glyph the grounded pass read correctly (or vice versa) — so its
+ * characters cannot be trusted, only its word breaks. Finds the plain-pass
+ * window whose letters best line up with `raw`'s own, then adds space at the
+ * positions that window has. `raw`'s own spaces (from joining a multi-line
+ * street, say) are never removed, only added to — a run the grounded pass
+ * already separated correctly must not be re-merged because the plain pass
+ * happened to print it as one word. And `raw`'s characters are never
+ * replaced, so a wrong glyph the grounded pass read stays wrong and visible —
+ * see the safety condition in task-15-brief.md.
+ */
+export function respaceAddress(raw: string, plainText: string): string {
+  const { chars: rawChars, spaceAfter: existingSpace } = despace(raw)
+  if (rawChars.length === 0 || plainText.trim() === '') return raw
+
+  const { chars: plainChars, spaceAfter } = despace(plainText.toUpperCase())
   const needle = rawChars.map((c) => c.toUpperCase())
   const span = needle.length
   if (plainChars.length < span) return raw
 
-  let bestStart = -1
-  let bestMismatches = span + 1
+  let best: Window | null = null
   for (let start = 0; start + span <= plainChars.length; start += 1) {
     let mismatches = 0
-    for (let i = 0; i < span && mismatches < bestMismatches; i += 1) {
+    let fragmentation = 0
+    for (let i = 0; i < span; i += 1) {
       if (plainChars[start + i] !== needle[i]) mismatches += 1
+      if (i < span - 1 && spaceAfter[start + i]) fragmentation += 1
     }
-    if (mismatches < bestMismatches) {
-      bestMismatches = mismatches
-      bestStart = start
-    }
+    const boundaryClean =
+      (start === 0 || spaceAfter[start - 1] === true)
+      && (start + span === plainChars.length || spaceAfter[start + span - 1] === true)
+    const candidate: Window = { start, mismatches, boundaryClean, fragmentation }
+    if (best === null || better(candidate, best)) best = candidate
   }
 
   // No plausible alignment: leave the value exactly as extracted. An ugly
   // unspaced value is safe; guessing word breaks against unrelated text is not.
-  if (bestStart === -1 || bestMismatches > Math.ceil(span * RESPACE_MISMATCH_RATIO)) return raw
+  if (best === null || best.mismatches > Math.ceil(span * RESPACE_MISMATCH_RATIO)) return raw
 
   let out = ''
   for (let i = 0; i < span; i += 1) {
     out += rawChars[i]
-    if (spaceAfter[bestStart + i] && i < span - 1) out += ' '
+    const insertSpace = existingSpace[i] === true || spaceAfter[best.start + i] === true
+    if (insertSpace && i < span - 1) out += ' '
   }
   return out
+}
+
+/**
+ * Free-text address lines and cities, the only fields grounded OCR runs
+ * together with no space at all. State and ZIP are single fixed-shape
+ * tokens — nothing to re-space, so left alone to avoid inventing a boundary
+ * inside a two-letter code.
+ *
+ * `biz_addr_*` is unreachable today — no strategy emits it yet — but is
+ * listed so it is re-spaced the day one does. When that day comes, note a
+ * short business-form value has more room to false-match inside a whole
+ * utility bill than an address does against a driver's licence, which is a
+ * small, single card.
+ */
+const RESPACE_FIELDS: ReadonlySet<string> = new Set([
+  'addr_line1', 'addr_line2', 'addr_city', 'biz_addr_line1', 'biz_addr_line2', 'biz_addr_city',
+])
+
+function fieldIdOf(key: string): string {
+  try {
+    return parseReqKey(key).fieldId
+  } catch {
+    return key
+  }
+}
+
+/**
+ * Re-spaces every address candidate's `raw` against the plain pass. Sits
+ * between `parseCandidates` and `withCrossPass` in the pipeline — cross-pass
+ * agreement is what re-spacing exists to fix, but scoring agreement is not
+ * this function's job, so it stays a value transform, not a confidence one.
+ */
+export function respaceAddresses(
+  candidates: readonly Candidate[],
+  plainText: string,
+): readonly Candidate[] {
+  return candidates.map((candidate) => (
+    RESPACE_FIELDS.has(fieldIdOf(candidate.key))
+      ? { ...candidate, raw: respaceAddress(candidate.raw, plainText) }
+      : candidate
+  ))
 }
 
 /**

@@ -365,6 +365,18 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
     }
   })
 
+  it('re-spaces the address end to end, not just in the domain function', async () => {
+    // Guards the wiring, not the algorithm: ingestDocument composes
+    // respaceAddresses with withCrossPass itself (see document-service.ts).
+    // A test that only called the domain functions directly would still pass
+    // if that composition were ever dropped from the real pipeline.
+    const app = createApplication()
+    const outcome = unwrap(await ingest(app, realImage, recorded))
+
+    expect(outcome.state.fields.addr_line1?.value).toBe('123 STREET ADDRESS')
+    expect(outcome.state.fields.addr_city?.value).toBe('YOUR CITY')
+  })
+
   it('maps the licence number onto the pixels it was printed at', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(app, realImage, recorded))
