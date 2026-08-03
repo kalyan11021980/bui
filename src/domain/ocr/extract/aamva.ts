@@ -13,6 +13,20 @@ const US_DATE = /(\d{2})[/-](\d{2})[/-](\d{4})/
 const CITY_STATE_ZIP = /^(.*?)[,.\s]*([A-Z]{2})[,.\s]*(\d{5}(?:-\d{4})?)$/
 const NAME_VALUE = /^[A-Z][A-Z' .,-]+$/
 const NUMBER_VALUE = /^[A-Z0-9][A-Z0-9-]{3,}$/
+const HOUSE_NUMBER = /^\d/
+
+/**
+ * Without this, any two letters before a ZIP become a state: `ANYTOWN 95818`
+ * splits into city `ANYTO`, state `WN`, and `addr_state` validation — two
+ * characters — accepts it.
+ */
+const US_STATES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI',
+  'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN',
+  'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH',
+  'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
+  'WV', 'WI', 'WY', 'AS', 'GU', 'MP', 'PR', 'VI',
+])
 
 /** Codes and words survive normalisation; everything else is scenery. */
 function key(text: string): string {
@@ -31,17 +45,25 @@ function toIsoDate(raw: string): string | null {
   return `${year}-${month}-${day}`
 }
 
+type Tail = { readonly city: string; readonly state: string; readonly zip: string }
+
+/** The last line of an address, or null if those two letters are not a state. */
+function cityStateZip(line: string): Tail | null {
+  const [, city, state, zip] = CITY_STATE_ZIP.exec(clean(line)) ?? []
+  if (!city || !state || !zip || !US_STATES.has(state)) return null
+  return { city, state, zip }
+}
+
 export function splitAddressBlock(raw: string): {
   line1?: string; city?: string; state?: string; zip?: string
 } {
   const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return {}
 
-  const match = CITY_STATE_ZIP.exec(clean(lines[lines.length - 1] ?? ''))
-  const [, city, state, zip] = match ?? []
-  if (!city || !state || !zip) return {}
+  const tail = cityStateZip(lines[lines.length - 1] ?? '')
+  if (!tail) return {}
 
-  return { line1: lines.slice(0, -1).join(' '), city, state, zip }
+  return { line1: lines.slice(0, -1).join(' '), ...tail }
 }
 
 /** A code followed by more digits is a longer number, not that code. */
@@ -57,9 +79,29 @@ function isLabel(text: string): boolean {
     || LABEL_WORDS.some((w) => text.startsWith(w))
 }
 
+/**
+ * Anchors a card prints flush against a letter value, with no separator left
+ * for us to see. Everything else that runs straight into a letter is a fragment
+ * of a longer word, not a code.
+ */
+const MERGES_INTO_LETTERS = new Set(['LN', 'FN'])
+const ORDINAL = /^(ST|ND|RD|TH)/
+
+/**
+ * Matching on `startsWith` alone reads a city as a licence number: drop the
+ * `4d NUMBER` label from the Massachusetts card — the same label loss this
+ * corpus already shows — and `NO` claims `NORTHQUINCY,MA02171-1748`, shipping
+ * `RTHQUINCYMA021711748` with every evidence signal green.
+ */
 function anchorAt(text: string, anchor: string): boolean {
   if (!text.startsWith(anchor)) return false
-  return !LABEL_CODES.some((c) => c.length > anchor.length && text.startsWith(c))
+  if (LABEL_CODES.some((c) => c.length > anchor.length && text.startsWith(c))) return false
+
+  const rest = text.slice(anchor.length)
+  // `1ST FLOOR` is an ordinal, not field 1.
+  if (/^\d+$/.test(anchor) && ORDINAL.test(rest)) return false
+  if (/^[A-Z#]+$/.test(anchor) && /^[A-Z]/.test(rest)) return MERGES_INTO_LETTERS.has(anchor)
+  return true
 }
 
 /** Anchoring finds the detection; the anchor text then has to come off it. */
@@ -114,12 +156,15 @@ const isBelow = (anchor: Box, box: Box): boolean =>
 /**
  * A value sits against its label. Without a bound, a lone `1` in the restriction
  * box on the Maryland card claims the BIRTH DATE label two rows down as a
- * surname. Coordinates are 0-1000, so this is 6% of the card.
+ * surname. Coordinates are 0-1000: the widest genuine gap in the corpus is 34,
+ * that Maryland miss is 118.
  */
 const MAX_GAP = 60
 
+/** Bounded on all four sides: a value is never far back up or left of its code. */
 const isAdjacent = (anchor: Box, box: Box): boolean =>
   box[0] - anchor[2] <= MAX_GAP && box[1] - anchor[3] <= MAX_GAP
+  && anchor[0] - box[0] <= MAX_GAP && anchor[1] - box[1] <= MAX_GAP
 
 /**
  * Most states print the label in its own detection and the value beside or
@@ -153,6 +198,15 @@ function isName(text: string): boolean {
 
 const hasDate = (d: Detection): boolean => US_DATE.test(normalizeText(d.text))
 
+/**
+ * AAMVA prints given names on one line: FIRST MIDDLE. We have a field for the
+ * first of them and none for the rest, so the rest is dropped rather than
+ * filed under `first_name`. Where OCR returns the line with no spaces
+ * (`RICHARDBENJAMIN`) there is nothing to split on and the whole line stands —
+ * wrong, and recorded as wrong.
+ */
+const firstGivenName = (value: string): string => value.split(/[\s,]+/)[0] ?? value
+
 function evidenceFor(box: Box, labelAnchored: boolean): Evidence {
   // No checksum on a card: `null` says the signal does not apply, not that it
   // failed.
@@ -166,6 +220,21 @@ function union(boxes: readonly Box[]): Box {
   ]
 }
 
+/**
+ * The remainder is computed on the key, which has no spaces. Recover them from
+ * the original text so `2 OREGON SAMPLE, SR` can still be split at the space.
+ */
+function inlineValue(text: string, remainder: string): string {
+  const cleaned = clean(text)
+  const skip = key(text).length - remainder.length
+  let seen = 0
+  for (let i = 0; i < cleaned.length; i += 1) {
+    if (seen === skip) return cleaned.slice(i).replace(/^[^A-Z0-9]+/, '').trim()
+    if (/[A-Z0-9#]/.test(cleaned.charAt(i))) seen += 1
+  }
+  return remainder
+}
+
 /** A number or name printed on the same detection as its code, or beside it. */
 function simpleField(
   detections: readonly Detection[],
@@ -177,7 +246,9 @@ function simpleField(
     // detection — not that the field is malformed.
     if (!accepts(hit.remainder) || hasDate(hit.detection)) return null
     const box = hit.detection.box
-    return { raw: hit.remainder, box, evidence: evidenceFor(box, true) }
+    const spaced = inlineValue(hit.detection.text, hit.remainder)
+    const raw = accepts(spaced) ? spaced : hit.remainder
+    return { raw, box, evidence: evidenceFor(box, true) }
   }
 
   const found = nearestValue(detections, hit.detection, (d) => accepts(key(d.text)))
@@ -214,7 +285,7 @@ function nameBlock(detections: readonly Detection[], hit: Hit): Candidate[] {
 
   return lines.slice(0, 2).map((line, index) => ({
     key: index === 0 ? 'last_name' : 'first_name',
-    raw: line.raw,
+    raw: index === 0 ? line.raw : firstGivenName(line.raw),
     box: line.box,
     evidence: evidenceFor(line.box, true),
   }))
@@ -241,7 +312,7 @@ function addressParts(
 }
 
 const isCityStateZip = (d: Detection): boolean =>
-  CITY_STATE_ZIP.test(clean(d.text)) && !isLabel(key(d.text))
+  cityStateZip(d.text) !== null && !isLabel(key(d.text))
 
 /** Walks down from the address code until the city/state/ZIP line turns up. */
 function anchoredAddress(
@@ -263,19 +334,46 @@ function anchoredAddress(
 }
 
 /**
- * Massachusetts, Oregon and California print the address with no code beside
- * it. `CITY, ST 99999` is distinctive enough to anchor on itself — but that is
- * a shape, not a label, so it does not claim `labelAnchored`.
+ * A street can run to more than one line, and the house number opens the first
+ * of them. Taking a single line above the city gets Massachusetts' `APT. 1` and
+ * silently drops `123 NORTH MAIN STREET` — a delivery address that is wrong
+ * while looking complete.
+ */
+function streetAbove(
+  detections: readonly Detection[],
+  tail: Detection,
+): Detection[] {
+  const lines: Detection[] = []
+  let from = tail.box
+
+  for (let i = 0; i < 3; i += 1) {
+    const above = detections
+      .filter((d) => d !== tail && !lines.includes(d))
+      .filter((d) => !isLabel(key(d.text)) && !isCityStateZip(d))
+      .filter((d) => isBelow(d.box, from) && from[1] - d.box[3] <= MAX_GAP)
+      .sort((a, b) => b.box[1] - a.box[1])[0]
+    if (!above) break
+
+    lines.unshift(above)
+    from = above.box
+    if (HOUSE_NUMBER.test(key(above.text))) return lines
+  }
+  // No house number found: keep the one line we are sure about rather than
+  // sweeping the name off the card above it.
+  return lines.slice(-1)
+}
+
+/**
+ * Massachusetts, Oregon and California lost their address code to OCR — the
+ * cards print one. `CITY, ST 99999` is distinctive enough to anchor on itself,
+ * but that is a shape, not a label, so it does not claim `labelAnchored`.
  */
 function unlabelledAddress(detections: readonly Detection[]): Candidate[] {
   for (const tail of detections.filter(isCityStateZip)) {
-    const above = detections
-      .filter((d) => d !== tail && !isLabel(key(d.text)) && !isCityStateZip(d))
-      .filter((d) => isBelow(d.box, tail.box))
-      .sort((a, b) => b.box[1] - a.box[1])[0]
-    if (!above) continue
+    const street = streetAbove(detections, tail)
+    if (street.length === 0) continue
     return addressParts(
-      [{ raw: clean(above.text), box: above.box }, { raw: clean(tail.text), box: tail.box }],
+      [...street, tail].map((d) => ({ raw: clean(d.text), box: d.box })),
       false,
     )
   }
@@ -318,14 +416,16 @@ export const extractAamva: ExtractStrategy = (detections) => {
       const found = field === 'dob' || field === 'dl_expiry'
         ? dateField(detections, hit)
         : simpleField(detections, hit, field === 'dl_number' ? isNumber : isName)
-      if (found && push({ ...found, key: field })) break
+      if (!found) continue
+
+      const raw = field === 'first_name' ? firstGivenName(found.raw) : found.raw
+      if (push({ ...found, raw, key: field })) break
     }
   }
 
   addressBlock(detections).forEach(push)
   return out
 }
-
 
 registerStrategy('drivers_license', extractAamva)
 registerStrategy('state_id', extractAamva)

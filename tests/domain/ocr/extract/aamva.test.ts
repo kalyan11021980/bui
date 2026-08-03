@@ -47,11 +47,6 @@ describe('extractAamva', () => {
     expect(read(detections, 'dl_number')?.evidence.boxPlausible).toBe(false)
   })
 
-  it('leaves checksumValid null — a card has none to fail', () => {
-    const detections = [det('4dLIC#WDLJK00580GF', [100, 200, 400, 230])]
-    expect(read(detections, 'dl_number')?.evidence.checksumValid).toBeNull()
-  })
-
   it('emits nothing for a field whose anchor is absent', () => {
     const out = extractAamva([det('SOMETHING ELSE', [0, 0, 10, 10])], '')
     expect(out).toEqual([])
@@ -94,7 +89,40 @@ describe('extractAamva', () => {
       det('RICHARD BENJAMIN', [360, 377, 570, 408]),
     ]
     expect(read(detections, 'last_name')?.raw).toBe('REYES')
-    expect(read(detections, 'first_name')?.raw).toBe('RICHARD BENJAMIN')
+    expect(read(detections, 'first_name')?.raw).toBe('RICHARD')
+  })
+
+  it('does not take a word that merely starts with a code as the value', () => {
+    // The MA card with its `4d NUMBER` label lost to OCR, which is the same
+    // label loss this corpus already shows elsewhere. `NO` must not claim
+    // NORTHQUINCY: a city in the licence-number field, every signal green.
+    const detections = [
+      det('01/12/2016', [570, 310, 724, 356]),
+      det('S99988801', [761, 312, 958, 358]),
+      det('NORTHQUINCY,MA02171-1748', [425, 727, 796, 769]),
+    ]
+    expect(read(detections, 'dl_number')).toBeUndefined()
+  })
+
+  it('does not read an ordinal in a street as a field code', () => {
+    // `1ST FLOOR` opens with a 1, which is the surname code.
+    expect(read([det('1ST FLOOR', [400, 500, 600, 530])], 'last_name')).toBeUndefined()
+    expect(read([det('12TH STREET', [400, 500, 600, 530])], 'last_name')).toBeUndefined()
+  })
+
+  it('still reads a code printed flush against its value', () => {
+    // California prints `LN SAMPLE` and OCR returns it with no space at all,
+    // so the boundary rule cannot be blanket.
+    expect(read([det('LNCARDHOLDER', [334, 369, 599, 419])], 'last_name')?.raw)
+      .toBe('CARDHOLDER')
+    expect(read([det('DL11234568', [329, 214, 560, 284])], 'dl_number')?.raw)
+      .toBe('11234568')
+  })
+
+  it('keeps only the first of the given names', () => {
+    // The card prints FIRST MIDDLE on one line; we have a field for the first.
+    expect(read([det('2 OREGON SAMPLE, SR', [400, 300, 700, 340])], 'first_name')?.raw)
+      .toBe('OREGON')
   })
 
   it('does not read a printed label as if it were a name', () => {
@@ -126,6 +154,29 @@ describe('extractAamva', () => {
     const city = read(detections, 'addr_city')
     expect(city?.raw).toBe('NORTHQUINCY')
     expect(city?.evidence.labelAnchored).toBe(false)
+  })
+
+  it('keeps the street when an apartment line sits between it and the city', () => {
+    // Taking one line above the city gives APT. 1 and posts the title
+    // documents nowhere.
+    const detections = [
+      det('CONNOR', [401, 601, 536, 644]),
+      det('123NORTHMAINSTREET', [401, 644, 704, 688]),
+      det('APT.1', [425, 690, 516, 727]),
+      det('NORTHQUINCY,MA02171-1748', [425, 727, 796, 769]),
+    ]
+    expect(read(detections, 'addr_line1')?.raw).toBe('123NORTHMAINSTREET APT.1')
+  })
+
+  it('does not take two letters of a city as the state', () => {
+    // `ANYTOWN95818` would otherwise split into ANYTO / WN / 95818, and
+    // addr_state validation is only "two characters".
+    const detections = [
+      det('2570 24TH STREET', [334, 479, 560, 519]),
+      det('ANYTOWN95818', [334, 524, 539, 559]),
+    ]
+    expect(read(detections, 'addr_state')).toBeUndefined()
+    expect(read(detections, 'addr_zip')).toBeUndefined()
   })
 })
 
@@ -164,5 +215,10 @@ describe('splitAddressBlock', () => {
 
   it('returns nothing usable from a malformed block', () => {
     expect(splitAddressBlock('ANYTOWN,CAPO')).toEqual({})
+  })
+
+  it('does not invent a state from the last two letters of the city', () => {
+    expect(splitAddressBlock('1 A ST\nANYTOWN95818')).toEqual({})
+    expect(splitAddressBlock('1 A ST\nSPRINGFIELD 62704')).toEqual({})
   })
 })

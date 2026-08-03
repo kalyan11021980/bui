@@ -52,10 +52,11 @@ function expected(card: Fixture, field: string): string | null {
   return String(value)
 }
 
-function matches(field: string, read: string, want: string): boolean {
-  if (field === 'first_name') return flat(read).startsWith(flat(want))
-  return flat(read) === flat(want)
-}
+/**
+ * Exact, once spacing and punctuation are off. A prefix rule here would pass
+ * JANET for JANE, and pass any amount of trailing over-capture.
+ */
+const matches = (read: string, want: string): boolean => flat(read) === flat(want)
 
 function readCard(card: Fixture): Map<string, string> {
   const out = parseCandidates(extractFor(card.docType, card.detections, card.text))
@@ -79,11 +80,15 @@ const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string,
   'or_2020.png': { reads: ALL, wrong: {} },
   'va_2023.png': {
     reads: ALL,
-    wrong: { addr_line1: 'OCR read JOHN TYLER HWY as J0HN, a zero for the letter' },
+    wrong: {
+      addr_line1: 'OCR read JOHN TYLER HWY as J0HN, a zero for the letter',
+      first_name: 'OCR returned RICHARD BENJAMIN with no space, so the middle name cannot be split off',
+    },
   },
   'ma_2016.png': {
     reads: ['dl_number', 'dob', 'dl_expiry', 'addr_line1', 'addr_city', 'addr_state', 'addr_zip'],
-    wrong: { addr_line1: 'no address code on the card: the fallback takes one line above CITY, ST ZIP, which is the apartment line' },
+    // OCR dropped this card's 1, 2 and 8 codes; the card does print them.
+    wrong: {},
   },
   'ca_2019.png': {
     reads: ['dl_number', 'dob', 'dl_expiry', 'last_name', 'first_name'],
@@ -92,8 +97,14 @@ const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string,
   // Pre-AAMVA, 1977: no numbered codes to anchor to at all.
   'md_1977.png': { reads: [], wrong: {} },
   'ca_id_2010.png': { reads: NO_NUMBER, wrong: {} },
-  'va_id_2023.png': { reads: NO_NUMBER, wrong: {} },
+  'va_id_2023.png': {
+    reads: NO_NUMBER,
+    wrong: { first_name: 'OCR returned JAMES ALAN with no space, so the middle name cannot be split off' },
+  },
 }
+
+/** Recall, stated as a number so a change to it has to be argued for. */
+const TOTALS = { read: 64, correct: 60, fields: 79 }
 
 describe('AAMVA recall against recorded specimens', () => {
   it('has the corpus it thinks it has', () => {
@@ -139,18 +150,40 @@ describe('AAMVA recall against recorded specimens', () => {
         const reason = lock?.wrong[field]
         // A field listed as wrong that starts matching is good news the table
         // has to be told about.
-        expect(matches(field, value, want ?? ''), `${name} ${field}=${value} want ${want}${reason ? ` (${reason})` : ''}`)
+        expect(matches(value, want ?? ''), `${name} ${field}=${value} want ${want}${reason ? ` (${reason})` : ''}`)
           .toBe(reason === undefined)
       }
     })
   }
 
-  it('puts every value it reads in a plausible box', () => {
+  it('reads 64 of 79 fields, 60 of them right', () => {
+    let read = 0
+    let correct = 0
+    let fields = 0
+
     for (const card of cards) {
-      for (const c of parseCandidates(extractFor(card.docType, card.detections, card.text))) {
-        expect(c.box, `${slug(card.image)} ${c.key}`).toBeDefined()
-        expect(c.evidence.boxPlausible, `${slug(card.image)} ${c.key}`).toBe(true)
+      fields += card.docType === 'drivers_license' ? ALL.length : NO_NUMBER.length
+      for (const [field, value] of readCard(card)) {
+        read += 1
+        if (matches(value, expected(card, field) ?? '')) correct += 1
       }
+    }
+
+    expect({ read, correct, fields }).toEqual(TOTALS)
+  })
+
+  it('puts every value it reads in a plausible box', () => {
+    const seen = cards.flatMap(
+      (card) => parseCandidates(extractFor(card.docType, card.detections, card.text)),
+    )
+    // Guards the loop: nothing to check would otherwise pass.
+    expect(seen).toHaveLength(TOTALS.read)
+    for (const c of seen) {
+      expect(c.box, c.key).toBeDefined()
+      expect(c.evidence.boxPlausible, c.key).toBe(true)
+      // A card has no checksum and we make one pass: not failed, inapplicable.
+      expect(c.evidence.checksumValid, c.key).toBeNull()
+      expect(c.evidence.crossPassAgreed, c.key).toBeNull()
     }
   })
 })
