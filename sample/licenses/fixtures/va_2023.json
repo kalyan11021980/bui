@@ -1,0 +1,310 @@
+{
+  "docType": "drivers_license",
+  "issuer": "VA",
+  "image": "sample/licenses/specimens/va_2023.png",
+  "imageSize": {
+    "width": 721,
+    "height": 473
+  },
+  "text": "<|ref|>Vintage<|/ref|><|det|>[[46, 79, 332, 223]]<|/det|>\n<|ref|>4dCustomer number<|/ref|><|det|>[[333, 230, 516, 261]]<|/det|>\n<|ref|>T16700285<|/ref|><|det|>[[360, 257, 540, 296]]<|/det|>\n<|ref|>Veteran<|/ref|><|det|>[[399, 79, 516, 125]]<|/det|>\n<|ref|>DRIVER'SLICENSE<|/ref|><|det|>[[400, 131, 780, 179]]<|/det|>\n<|ref|>VA.USA<|/ref|><|det|>[[531, 87, 664, 125]]<|/det|>\n<|ref|>1.2Name<|/ref|><|det|>[[320, 312, 404, 343]]<|/det|>\n<|ref|>REYES<|/ref|><|det|>[[360, 341, 447, 379]]<|/det|>\n<|ref|>RICHARDBENJAMIN<|/ref|><|det|>[[360, 377, 570, 408]]<|/det|>\n<|ref|>8Address<|/ref|><|det|>[[333, 442, 425, 473]]<|/det|>\n<|ref|>5235J0HNTYLERHWY<|/ref|><|det|>[[360, 471, 592, 502]]<|/det|>\n<|ref|>WILLIAMSBURG,VA23185<|/ref|><|det|>[[360, 502, 632, 533]]<|/det|>\n<|ref|>3Date ofbirth<|/ref|><|det|>[[333, 617, 455, 648]]<|/det|>\n<|ref|>9Class<|/ref|><|det|>[[551, 615, 616, 652]]<|/det|>\n<|ref|>01/05/1987<|/ref|><|det|>[[360, 644, 511, 681]]<|/det|>\n<|ref|>D,M2<|/ref|><|det|>[[562, 642, 636, 683]]<|/det|>\n<|ref|>15Sex<|/ref|><|det|>[[376, 687, 447, 720]]<|/det|>\n<|ref|>18Eyes<|/ref|><|det|>[[440, 683, 519, 722]]<|/det|>\n<|ref|>9aEnd<|/ref|><|det|>[[540, 687, 604, 720]]<|/det|>\n<|ref|>M<|/ref|><|det|>[[404, 718, 431, 750]]<|/det|>\n<|ref|>BRO<|/ref|><|det|>[[472, 714, 531, 752]]<|/det|>\n<|ref|>S<|/ref|><|det|>[[562, 716, 584, 750]]<|/det|>\n<|ref|>RR<|/ref|><|det|>[[303, 787, 327, 810]]<|/det|>\n<|ref|>16Height<|/ref|><|det|>[[364, 768, 459, 803]]<|/det|>\n<|ref|>6'-00\"<|/ref|><|det|>[[404, 797, 479, 830]]<|/det|>\n<|ref|>12Restrictions<|/ref|><|det|>[[540, 768, 663, 799]]<|/det|>\n<|ref|>NONE<|/ref|><|det|>[[562, 795, 644, 832]]<|/det|>\n<|ref|>JAN87<|/ref|><|det|>[[54, 816, 303, 884]]<|/det|>\n<|ref|>5DD71536360<|/ref|><|det|>[[89, 878, 233, 911]]<|/det|>\n<|ref|>05/06/2023<|/ref|><|det|>[[384, 872, 551, 911]]<|/det|>\n<|ref|>4a IssDUP<|/ref|><|det|>[[376, 834, 471, 873]]<|/det|>\n<|ref|>01/05/2031<|/ref|><|det|>[[562, 872, 707, 911]]<|/det|>\n<|ref|>4bExp<|/ref|><|det|>[[540, 834, 604, 873]]<|/det|>",
+  "detections": [
+    {
+      "text": "Vintage",
+      "box": [
+        46,
+        79,
+        332,
+        223
+      ]
+    },
+    {
+      "text": "4dCustomer number",
+      "box": [
+        333,
+        230,
+        516,
+        261
+      ]
+    },
+    {
+      "text": "T16700285",
+      "box": [
+        360,
+        257,
+        540,
+        296
+      ]
+    },
+    {
+      "text": "Veteran",
+      "box": [
+        399,
+        79,
+        516,
+        125
+      ]
+    },
+    {
+      "text": "DRIVER'SLICENSE",
+      "box": [
+        400,
+        131,
+        780,
+        179
+      ]
+    },
+    {
+      "text": "VA.USA",
+      "box": [
+        531,
+        87,
+        664,
+        125
+      ]
+    },
+    {
+      "text": "1.2Name",
+      "box": [
+        320,
+        312,
+        404,
+        343
+      ]
+    },
+    {
+      "text": "REYES",
+      "box": [
+        360,
+        341,
+        447,
+        379
+      ]
+    },
+    {
+      "text": "RICHARDBENJAMIN",
+      "box": [
+        360,
+        377,
+        570,
+        408
+      ]
+    },
+    {
+      "text": "8Address",
+      "box": [
+        333,
+        442,
+        425,
+        473
+      ]
+    },
+    {
+      "text": "5235J0HNTYLERHWY",
+      "box": [
+        360,
+        471,
+        592,
+        502
+      ]
+    },
+    {
+      "text": "WILLIAMSBURG,VA23185",
+      "box": [
+        360,
+        502,
+        632,
+        533
+      ]
+    },
+    {
+      "text": "3Date ofbirth",
+      "box": [
+        333,
+        617,
+        455,
+        648
+      ]
+    },
+    {
+      "text": "9Class",
+      "box": [
+        551,
+        615,
+        616,
+        652
+      ]
+    },
+    {
+      "text": "01/05/1987",
+      "box": [
+        360,
+        644,
+        511,
+        681
+      ]
+    },
+    {
+      "text": "D,M2",
+      "box": [
+        562,
+        642,
+        636,
+        683
+      ]
+    },
+    {
+      "text": "15Sex",
+      "box": [
+        376,
+        687,
+        447,
+        720
+      ]
+    },
+    {
+      "text": "18Eyes",
+      "box": [
+        440,
+        683,
+        519,
+        722
+      ]
+    },
+    {
+      "text": "9aEnd",
+      "box": [
+        540,
+        687,
+        604,
+        720
+      ]
+    },
+    {
+      "text": "M",
+      "box": [
+        404,
+        718,
+        431,
+        750
+      ]
+    },
+    {
+      "text": "BRO",
+      "box": [
+        472,
+        714,
+        531,
+        752
+      ]
+    },
+    {
+      "text": "S",
+      "box": [
+        562,
+        716,
+        584,
+        750
+      ]
+    },
+    {
+      "text": "RR",
+      "box": [
+        303,
+        787,
+        327,
+        810
+      ]
+    },
+    {
+      "text": "16Height",
+      "box": [
+        364,
+        768,
+        459,
+        803
+      ]
+    },
+    {
+      "text": "6'-00\"",
+      "box": [
+        404,
+        797,
+        479,
+        830
+      ]
+    },
+    {
+      "text": "12Restrictions",
+      "box": [
+        540,
+        768,
+        663,
+        799
+      ]
+    },
+    {
+      "text": "NONE",
+      "box": [
+        562,
+        795,
+        644,
+        832
+      ]
+    },
+    {
+      "text": "JAN87",
+      "box": [
+        54,
+        816,
+        303,
+        884
+      ]
+    },
+    {
+      "text": "5DD71536360",
+      "box": [
+        89,
+        878,
+        233,
+        911
+      ]
+    },
+    {
+      "text": "05/06/2023",
+      "box": [
+        384,
+        872,
+        551,
+        911
+      ]
+    },
+    {
+      "text": "4a IssDUP",
+      "box": [
+        376,
+        834,
+        471,
+        873
+      ]
+    },
+    {
+      "text": "01/05/2031",
+      "box": [
+        562,
+        872,
+        707,
+        911
+      ]
+    },
+    {
+      "text": "4bExp",
+      "box": [
+        540,
+        834,
+        604,
+        873
+      ]
+    }
+  ],
+  "plainText": "# Virginia  \nVeteran VA, USA  \nDRIVER'S LICENSE  \n\n4d Customer number  \nT16700285  \n\n1.2 Name  \nREYES  \nRICHARD BENJAMIN  \n\n8 Address  \n5235 JOHN TYLER HWY  \nWILLIAMSBURG, VA 23185  \n\n3 Date of birth  \n01/05/1987  \n\n15 Sex  \nM BRO  \n\n16 Height  \n6'-00\"  \n\n4a Iss DUP  \n05/06/2023  \n\n9 Class  \nD,M2  \n\n12 Restrictions  \nNONE  \n\n4b Exp  \n01/05/2031"
+}

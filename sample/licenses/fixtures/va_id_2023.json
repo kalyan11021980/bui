@@ -1,0 +1,319 @@
+{
+  "docType": "state_id",
+  "issuer": "VA",
+  "image": "sample/licenses/specimens/va_id_2023.png",
+  "imageSize": {
+    "width": 721,
+    "height": 473
+  },
+  "text": "<|ref|>Virtginia<|/ref|><|det|>[[47, 79, 339, 223]]<|/det|>\n<|ref|>IDENTIFICATION CARD<|/ref|><|det|>[[365, 142, 814, 195]]<|/det|>\n<|ref|>Veteran VA.USA<|/ref|><|det|>[[399, 79, 666, 128]]<|/det|>\n<|ref|>FEDERAL<|/ref|><|det|>[[810, 92, 906, 124]]<|/det|>\n<|ref|>LIMITS<|/ref|><|det|>[[821, 122, 899, 155]]<|/det|>\n<|ref|>APPLY<|/ref|><|det|>[[824, 153, 896, 184]]<|/det|>\n<|ref|>4dCustomer number<|/ref|><|det|>[[332, 230, 514, 261]]<|/det|>\n<|ref|>T16700487<|/ref|><|det|>[[364, 257, 536, 299]]<|/det|>\n<|ref|>ORGAN<|/ref|><|det|>[[664, 261, 714, 281]]<|/det|>\n<|ref|>DONOR<|/ref|><|det|>[[661, 279, 715, 303]]<|/det|>\n<|ref|>1.2Name<|/ref|><|det|>[[332, 315, 409, 346]]<|/det|>\n<|ref|>SARKO<|/ref|><|det|>[[360, 344, 449, 379]]<|/det|>\n<|ref|>JAMESALAN<|/ref|><|det|>[[364, 381, 504, 412]]<|/det|>\n<|ref|>8Address<|/ref|><|det|>[[344, 450, 434, 481]]<|/det|>\n<|ref|>110EASTMIDLANDTRL<|/ref|><|det|>[[364, 479, 599, 510]]<|/det|>\n<|ref|>LEXINGTON,VA24450<|/ref|><|det|>[[364, 508, 586, 539]]<|/det|>\n<|ref|>3Date ofbirth<|/ref|><|det|>[[344, 621, 464, 652]]<|/det|>\n<|ref|>03/23/1950<|/ref|><|det|>[[364, 650, 499, 681]]<|/det|>\n<|ref|>15Sex<|/ref|><|det|>[[379, 694, 440, 725]]<|/det|>\n<|ref|>18Eyes<|/ref|><|det|>[[450, 692, 516, 727]]<|/det|>\n<|ref|>M<|/ref|><|det|>[[404, 721, 434, 754]]<|/det|>\n<|ref|>BLU<|/ref|><|det|>[[464, 719, 524, 759]]<|/det|>\n<|ref|>16Height<|/ref|><|det|>[[364, 768, 464, 805]]<|/det|>\n<|ref|>12Restrictions<|/ref|><|det|>[[534, 770, 664, 801]]<|/det|>\n<|ref|>5DD71536362<|/ref|><|det|>[[94, 874, 234, 899]]<|/det|>\n<|ref|>5D-10\"<|/ref|><|det|>[[384, 790, 479, 842]]<|/det|>\n<|ref|>4aIssORI<|/ref|><|det|>[[384, 839, 464, 870]]<|/det|>\n<|ref|>05/19/2023<|/ref|><|det|>[[389, 872, 551, 903]]<|/det|>\n<|ref|>4bExp<|/ref|><|det|>[[534, 839, 604, 870]]<|/det|>\n<|ref|>03/23/2031<|/ref|><|det|>[[561, 866, 709, 905]]<|/det|>\n<|ref|>NONE<|/ref|><|det|>[[568, 799, 644, 830]]<|/det|>\n<|ref|>JAMESSAN<|/ref|><|det|>[[744, 834, 864, 910]]<|/det|>\n<|ref|>6Z0O<|/ref|><|det|>[[755, 790, 840, 850]]<|/det|>\n<|ref|>ARKS<|/ref|><|det|>[[864, 839, 904, 870]]<|/det|>",
+  "detections": [
+    {
+      "text": "Virtginia",
+      "box": [
+        47,
+        79,
+        339,
+        223
+      ]
+    },
+    {
+      "text": "IDENTIFICATION CARD",
+      "box": [
+        365,
+        142,
+        814,
+        195
+      ]
+    },
+    {
+      "text": "Veteran VA.USA",
+      "box": [
+        399,
+        79,
+        666,
+        128
+      ]
+    },
+    {
+      "text": "FEDERAL",
+      "box": [
+        810,
+        92,
+        906,
+        124
+      ]
+    },
+    {
+      "text": "LIMITS",
+      "box": [
+        821,
+        122,
+        899,
+        155
+      ]
+    },
+    {
+      "text": "APPLY",
+      "box": [
+        824,
+        153,
+        896,
+        184
+      ]
+    },
+    {
+      "text": "4dCustomer number",
+      "box": [
+        332,
+        230,
+        514,
+        261
+      ]
+    },
+    {
+      "text": "T16700487",
+      "box": [
+        364,
+        257,
+        536,
+        299
+      ]
+    },
+    {
+      "text": "ORGAN",
+      "box": [
+        664,
+        261,
+        714,
+        281
+      ]
+    },
+    {
+      "text": "DONOR",
+      "box": [
+        661,
+        279,
+        715,
+        303
+      ]
+    },
+    {
+      "text": "1.2Name",
+      "box": [
+        332,
+        315,
+        409,
+        346
+      ]
+    },
+    {
+      "text": "SARKO",
+      "box": [
+        360,
+        344,
+        449,
+        379
+      ]
+    },
+    {
+      "text": "JAMESALAN",
+      "box": [
+        364,
+        381,
+        504,
+        412
+      ]
+    },
+    {
+      "text": "8Address",
+      "box": [
+        344,
+        450,
+        434,
+        481
+      ]
+    },
+    {
+      "text": "110EASTMIDLANDTRL",
+      "box": [
+        364,
+        479,
+        599,
+        510
+      ]
+    },
+    {
+      "text": "LEXINGTON,VA24450",
+      "box": [
+        364,
+        508,
+        586,
+        539
+      ]
+    },
+    {
+      "text": "3Date ofbirth",
+      "box": [
+        344,
+        621,
+        464,
+        652
+      ]
+    },
+    {
+      "text": "03/23/1950",
+      "box": [
+        364,
+        650,
+        499,
+        681
+      ]
+    },
+    {
+      "text": "15Sex",
+      "box": [
+        379,
+        694,
+        440,
+        725
+      ]
+    },
+    {
+      "text": "18Eyes",
+      "box": [
+        450,
+        692,
+        516,
+        727
+      ]
+    },
+    {
+      "text": "M",
+      "box": [
+        404,
+        721,
+        434,
+        754
+      ]
+    },
+    {
+      "text": "BLU",
+      "box": [
+        464,
+        719,
+        524,
+        759
+      ]
+    },
+    {
+      "text": "16Height",
+      "box": [
+        364,
+        768,
+        464,
+        805
+      ]
+    },
+    {
+      "text": "12Restrictions",
+      "box": [
+        534,
+        770,
+        664,
+        801
+      ]
+    },
+    {
+      "text": "5DD71536362",
+      "box": [
+        94,
+        874,
+        234,
+        899
+      ]
+    },
+    {
+      "text": "5D-10\"",
+      "box": [
+        384,
+        790,
+        479,
+        842
+      ]
+    },
+    {
+      "text": "4aIssORI",
+      "box": [
+        384,
+        839,
+        464,
+        870
+      ]
+    },
+    {
+      "text": "05/19/2023",
+      "box": [
+        389,
+        872,
+        551,
+        903
+      ]
+    },
+    {
+      "text": "4bExp",
+      "box": [
+        534,
+        839,
+        604,
+        870
+      ]
+    },
+    {
+      "text": "03/23/2031",
+      "box": [
+        561,
+        866,
+        709,
+        905
+      ]
+    },
+    {
+      "text": "NONE",
+      "box": [
+        568,
+        799,
+        644,
+        830
+      ]
+    },
+    {
+      "text": "JAMESSAN",
+      "box": [
+        744,
+        834,
+        864,
+        910
+      ]
+    },
+    {
+      "text": "6Z0O",
+      "box": [
+        755,
+        790,
+        840,
+        850
+      ]
+    },
+    {
+      "text": "ARKS",
+      "box": [
+        864,
+        839,
+        904,
+        870
+      ]
+    }
+  ],
+  "plainText": "# Virginia  \n**Veteran VA, USA**  \n\n## Identification Card  \n\n4d Customer number  \nT16700487  \n\n1,2 Name  \nSARKO  \nJAMES ALAN  \n\n8 Address  \n110 EAST MIDLAND TRL  \nLEXINGTON, VA 24450  \n\n3 Date of birth  \n03/23/1950  \n\n15 Sex  \nM BLU  \n\n6 Height  \n5'-10\"  \n\n4a Iss ORI  \n05/19/2023  \n\n12 Restrictions  \nNONE  \n\n5 DD 71536362  \n\n6a Iss ORI  \n05/19/2023  \n\n7b Exp  \n03/23/2031"
+}

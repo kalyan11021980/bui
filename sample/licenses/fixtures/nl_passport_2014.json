@@ -1,0 +1,337 @@
+{
+  "docType": "passport",
+  "issuer": "NLD",
+  "image": "sample/licenses/specimens/nl_passport_2014.png",
+  "imageSize": {
+    "width": 1500,
+    "height": 1132
+  },
+  "text": "<|ref|>PASPOORT<|/ref|><|det|>[[24, 41, 115, 65]]<|/det|>\n<|ref|>PASSPORT<|/ref|><|det|>[[24, 66, 115, 87]]<|/det|>\n<|ref|>PASSEPORT<|/ref|><|det|>[[24, 90, 117, 111]]<|/det|>\n<|ref|>KONINKRIJK DER NEDERLANDEN<|/ref|><|det|>[[315, 36, 965, 85]]<|/det|>\n<|ref|>KINGDOM OF THE NETHERLANDS<|/ref|><|det|>[[315, 89, 551, 110]]<|/det|>\n<|ref|>ROYAUME DES PAYS-BAS<|/ref|><|det|>[[618, 89, 792, 110]]<|/det|>\n<|ref|>type<|/ref|><|det|>[[315, 115, 339, 131]]<|/det|>\n<|ref|>code<|/ref|><|det|>[[356, 114, 386, 130]]<|/det|>\n<|ref|>2 nationaliteit/nationality/nationalite<|/ref|><|det|>[[411, 111, 616, 131]]<|/det|>\n<|ref|>documentnummer/document no./no.du document<|/ref|><|det|>[[727, 111, 976, 130]]<|/det|>\n<|ref|>P<|/ref|><|det|>[[316, 136, 332, 157]]<|/det|>\n<|ref|>NLD Nederlandse<|/ref|><|det|>[[353, 133, 558, 160]]<|/det|>\n<|ref|>SPEC12014<|/ref|><|det|>[[727, 134, 849, 164]]<|/det|>\n<|ref|>3nam/surname/nom<|/ref|><|det|>[[315, 165, 434, 183]]<|/det|>\n<|ref|>De Bruijn<|/ref|><|det|>[[316, 187, 440, 216]]<|/det|>\n<|ref|>e/v Molenaar<|/ref|><|det|>[[315, 220, 464, 250]]<|/det|>\n<|ref|>4voornamen/given names/prénoms<|/ref|><|det|>[[315, 255, 502, 275]]<|/det|>\n<|ref|>Willeke Liselotte<|/ref|><|det|>[[316, 282, 505, 312]]<|/det|>\n<|ref|>5geboortedatum/date of birth/date de naissance<|/ref|><|det|>[[315, 314, 570, 333]]<|/det|>\n<|ref|>10 MAA/MAR1965<|/ref|><|det|>[[315, 336, 551, 365]]<|/det|>\n<|ref|>6geboorteplaats/place of birth/lieu de naissance<|/ref|><|det|>[[315, 371, 570, 390]]<|/det|>\n<|ref|>Specimen<|/ref|><|det|>[[316, 396, 425, 426]]<|/det|>\n<|ref|>7geslacht/sex/sexe<|/ref|><|det|>[[315, 428, 422, 447]]<|/det|>\n<|ref|>8lengte/height/taille<|/ref|><|det|>[[752, 428, 863, 447]]<|/det|>\n<|ref|>V/F<|/ref|><|det|>[[316, 450, 361, 477]]<|/det|>\n<|ref|>1,75m<|/ref|><|det|>[[752, 450, 840, 480]]<|/det|>\n<|ref|>9datum van afgifte/date of issue/ date de delivrance<|/ref|><|det|>[[315, 485, 579, 504]]<|/det|>\n<|ref|>10 geldig tot/date of expiry/ date d'expiration<|/ref|><|det|>[[752, 483, 979, 504]]<|/det|>\n<|ref|>09 MAA/MAR2014<|/ref|><|det|>[[316, 508, 531, 533]]<|/det|>\n<|ref|>65<|/ref|><|det|>[[700, 504, 731, 531]]<|/det|>\n<|ref|>09 MAA/MAR2024<|/ref|><|det|>[[755, 508, 965, 533]]<|/det|>\n<|ref|>11 handtekening/signature<|/ref|><|det|>[[315, 540, 454, 559]]<|/det|>\n<|ref|>12 instantie/authority/autorite<|/ref|><|det|>[[752, 540, 906, 559]]<|/det|>\n<|ref|>W.L.de<|/ref|><|det|>[[332, 599, 471, 644]]<|/det|>\n<|ref|>P<NLDDE<BRUIJN<<WILLEKE<LISELOTTE<<<<<<<<<|/ref|><|det|>[[41, 766, 940, 800]]<|/det|>\n<|ref|>SPEC120142NLD6503101F24030969999999990<<<84<|/ref|><|det|>[[42, 833, 941, 870]]<|/det|>",
+  "detections": [
+    {
+      "text": "PASPOORT",
+      "box": [
+        24,
+        41,
+        115,
+        65
+      ]
+    },
+    {
+      "text": "PASSPORT",
+      "box": [
+        24,
+        66,
+        115,
+        87
+      ]
+    },
+    {
+      "text": "PASSEPORT",
+      "box": [
+        24,
+        90,
+        117,
+        111
+      ]
+    },
+    {
+      "text": "KONINKRIJK DER NEDERLANDEN",
+      "box": [
+        315,
+        36,
+        965,
+        85
+      ]
+    },
+    {
+      "text": "KINGDOM OF THE NETHERLANDS",
+      "box": [
+        315,
+        89,
+        551,
+        110
+      ]
+    },
+    {
+      "text": "ROYAUME DES PAYS-BAS",
+      "box": [
+        618,
+        89,
+        792,
+        110
+      ]
+    },
+    {
+      "text": "type",
+      "box": [
+        315,
+        115,
+        339,
+        131
+      ]
+    },
+    {
+      "text": "code",
+      "box": [
+        356,
+        114,
+        386,
+        130
+      ]
+    },
+    {
+      "text": "2 nationaliteit/nationality/nationalite",
+      "box": [
+        411,
+        111,
+        616,
+        131
+      ]
+    },
+    {
+      "text": "documentnummer/document no./no.du document",
+      "box": [
+        727,
+        111,
+        976,
+        130
+      ]
+    },
+    {
+      "text": "P",
+      "box": [
+        316,
+        136,
+        332,
+        157
+      ]
+    },
+    {
+      "text": "NLD Nederlandse",
+      "box": [
+        353,
+        133,
+        558,
+        160
+      ]
+    },
+    {
+      "text": "SPEC12014",
+      "box": [
+        727,
+        134,
+        849,
+        164
+      ]
+    },
+    {
+      "text": "3nam/surname/nom",
+      "box": [
+        315,
+        165,
+        434,
+        183
+      ]
+    },
+    {
+      "text": "De Bruijn",
+      "box": [
+        316,
+        187,
+        440,
+        216
+      ]
+    },
+    {
+      "text": "e/v Molenaar",
+      "box": [
+        315,
+        220,
+        464,
+        250
+      ]
+    },
+    {
+      "text": "4voornamen/given names/prénoms",
+      "box": [
+        315,
+        255,
+        502,
+        275
+      ]
+    },
+    {
+      "text": "Willeke Liselotte",
+      "box": [
+        316,
+        282,
+        505,
+        312
+      ]
+    },
+    {
+      "text": "5geboortedatum/date of birth/date de naissance",
+      "box": [
+        315,
+        314,
+        570,
+        333
+      ]
+    },
+    {
+      "text": "10 MAA/MAR1965",
+      "box": [
+        315,
+        336,
+        551,
+        365
+      ]
+    },
+    {
+      "text": "6geboorteplaats/place of birth/lieu de naissance",
+      "box": [
+        315,
+        371,
+        570,
+        390
+      ]
+    },
+    {
+      "text": "Specimen",
+      "box": [
+        316,
+        396,
+        425,
+        426
+      ]
+    },
+    {
+      "text": "7geslacht/sex/sexe",
+      "box": [
+        315,
+        428,
+        422,
+        447
+      ]
+    },
+    {
+      "text": "8lengte/height/taille",
+      "box": [
+        752,
+        428,
+        863,
+        447
+      ]
+    },
+    {
+      "text": "V/F",
+      "box": [
+        316,
+        450,
+        361,
+        477
+      ]
+    },
+    {
+      "text": "1,75m",
+      "box": [
+        752,
+        450,
+        840,
+        480
+      ]
+    },
+    {
+      "text": "9datum van afgifte/date of issue/ date de delivrance",
+      "box": [
+        315,
+        485,
+        579,
+        504
+      ]
+    },
+    {
+      "text": "10 geldig tot/date of expiry/ date d'expiration",
+      "box": [
+        752,
+        483,
+        979,
+        504
+      ]
+    },
+    {
+      "text": "09 MAA/MAR2014",
+      "box": [
+        316,
+        508,
+        531,
+        533
+      ]
+    },
+    {
+      "text": "65",
+      "box": [
+        700,
+        504,
+        731,
+        531
+      ]
+    },
+    {
+      "text": "09 MAA/MAR2024",
+      "box": [
+        755,
+        508,
+        965,
+        533
+      ]
+    },
+    {
+      "text": "11 handtekening/signature",
+      "box": [
+        315,
+        540,
+        454,
+        559
+      ]
+    },
+    {
+      "text": "12 instantie/authority/autorite",
+      "box": [
+        752,
+        540,
+        906,
+        559
+      ]
+    },
+    {
+      "text": "W.L.de",
+      "box": [
+        332,
+        599,
+        471,
+        644
+      ]
+    },
+    {
+      "text": "P<NLDDE<BRUIJN<<WILLEKE<LISELOTTE<<<<<<<<",
+      "box": [
+        41,
+        766,
+        940,
+        800
+      ]
+    },
+    {
+      "text": "SPEC120142NLD6503101F24030969999999990<<<84",
+      "box": [
+        42,
+        833,
+        941,
+        870
+      ]
+    }
+  ],
+  "plainText": "# KONINKRIJK DER NEDERLANDEN  \nKINGDOM OF THE NETHERLANDS  \ntype code  2 nationaliteit/nationality/nationalité  \nP  NLD Nederlandse  \n3 naam/surname/nom  \n\n# SPECI2014  \n\n## De Bruijn  \ne/v Molenaar  \n4 voornamen/given names/prénoms  \n\n## Willeke Liselotte  \n5 geboortedatum/date of birth/date de naissance  \n\n## 10 MAA/MAR 1965  \n6 geboorteplaats/place of birth/lieu de naissance  \n\n## Specimen  \n7 geslacht/sex/sexe  \n\n## V/F  \n9 datum van afgifte/date of issue/date de délivrance  \n\n## 09 MAA/MAR 2014  \n11 handtekening/signature  \n\n8 lengte/height/taille  \n1,75 m  \n10 geldig tot/date of expiry/date d'expiration  \n\n## 09 MAA/MAR 2024  \n12 instantie/authority/authorite  \n\nBurg. van Stad en Dorp"
+}

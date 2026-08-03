@@ -1,0 +1,373 @@
+{
+  "docType": "drivers_license",
+  "issuer": "DC",
+  "image": "sample/licenses/specimens/dc_2018.png",
+  "imageSize": {
+    "width": 696,
+    "height": 441
+  },
+  "text": "<|ref|>WASHINGTON,DC<|/ref|><|det|>[[47, 64, 509, 118]]<|/det|>\n<|ref|>DL<|/ref|><|det|>[[746, 79, 805, 135]]<|/det|>\n<|ref|>USA<|/ref|><|det|>[[888, 55, 961, 108]]<|/det|>\n<|ref|>DRIVER LICENSE<|/ref|><|det|>[[47, 135, 287, 173]]<|/det|>\n<|ref|>4d.DLN<|/ref|><|det|>[[312, 220, 368, 246]]<|/det|>\n<|ref|>4b.EPX<|/ref|><|det|>[[538, 220, 592, 246]]<|/det|>\n<|ref|>A9999999<|/ref|><|det|>[[312, 250, 421, 284]]<|/det|>\n<|ref|>02/21/2018<|/ref|><|det|>[[538, 250, 655, 284]]<|/det|>\n<|ref|>1.FAMILYNAME<|/ref|><|det|>[[312, 293, 431, 319]]<|/det|>\n<|ref|>JONES<|/ref|><|det|>[[311, 321, 393, 361]]<|/det|>\n<|ref|>6666666/2202<|/ref|><|det|>[[41, 365, 71, 659]]<|/det|>\n<|ref|>8.ADDRESS<|/ref|><|det|>[[311, 485, 396, 515]]<|/det|>\n<|ref|>15.SEX<|/ref|><|det|>[[312, 621, 365, 647]]<|/det|>\n<|ref|>2.GIVENNAMES<|/ref|><|det|>[[312, 379, 434, 405]]<|/det|>\n<|ref|>ANGELINA<|/ref|><|det|>[[314, 409, 431, 441]]<|/det|>\n<|ref|>GABRIELA<|/ref|><|det|>[[314, 443, 434, 475]]<|/det|>\n<|ref|>1234COMMODOREJOSHUABARNEYDRIVE,NE<|/ref|><|det|>[[314, 517, 845, 549]]<|/det|>\n<|ref|>#1234<|/ref|><|det|>[[315, 547, 379, 575]]<|/det|>\n<|ref|>WASHINGTON,DC00000-0000<|/ref|><|det|>[[315, 579, 641, 611]]<|/det|>\n<|ref|>F<|/ref|><|det|>[[312, 633, 332, 667]]<|/det|>\n<|ref|>15.HGT<|/ref|><|det|>[[363, 627, 425, 653]]<|/det|>\n<|ref|>5-02<|/ref|><|det|>[[386, 651, 440, 685]]<|/det|>\n<|ref|>17.WGT<|/ref|><|det|>[[450, 627, 520, 651]]<|/det|>\n<|ref|>120<|/ref|><|det|>[[456, 649, 508, 683]]<|/det|>\n<|ref|>18.EYES<|/ref|><|det|>[[536, 623, 604, 653]]<|/det|>\n<|ref|>BRO<|/ref|><|det|>[[538, 647, 592, 681]]<|/det|>\n<|ref|>3.DOB<|/ref|><|det|>[[648, 623, 699, 649]]<|/det|>\n<|ref|>02/21/1984<|/ref|><|det|>[[648, 651, 766, 683]]<|/det|>\n<|ref|>9.CLASS<|/ref|><|det|>[[311, 691, 376, 723]]<|/det|>\n<|ref|>4a.ISS<|/ref|><|det|>[[648, 693, 699, 721]]<|/det|>\n<|ref|>A<|/ref|><|det|>[[315, 723, 332, 751]]<|/det|>\n<|ref|>02/17/2010<|/ref|><|det|>[[648, 721, 766, 753]]<|/det|>\n<|ref|>9a.ENDORSEMENTS<|/ref|><|det|>[[312, 767, 458, 793]]<|/det|>\n<|ref|>NONE<|/ref|><|det|>[[311, 795, 386, 835]]<|/det|>\n<|ref|>VODONOR<|/ref|><|det|>[[648, 797, 777, 833]]<|/det|>\n<|ref|>5.DD<|/ref|><|det|>[[44, 841, 81, 869]]<|/det|>\n<|ref|>12.RESTRICTIONS<|/ref|><|det|>[[312, 841, 443, 873]]<|/det|>\n<|ref|>VETERAN<|/ref|><|det|>[[648, 833, 759, 871]]<|/det|>\n<|ref|>12348757475974<|/ref|><|det|>[[46, 873, 222, 905]]<|/det|>\n<|ref|>3<|/ref|><|det|>[[312, 875, 330, 903]]<|/det|>",
+  "detections": [
+    {
+      "text": "WASHINGTON,DC",
+      "box": [
+        47,
+        64,
+        509,
+        118
+      ]
+    },
+    {
+      "text": "DL",
+      "box": [
+        746,
+        79,
+        805,
+        135
+      ]
+    },
+    {
+      "text": "USA",
+      "box": [
+        888,
+        55,
+        961,
+        108
+      ]
+    },
+    {
+      "text": "DRIVER LICENSE",
+      "box": [
+        47,
+        135,
+        287,
+        173
+      ]
+    },
+    {
+      "text": "4d.DLN",
+      "box": [
+        312,
+        220,
+        368,
+        246
+      ]
+    },
+    {
+      "text": "4b.EPX",
+      "box": [
+        538,
+        220,
+        592,
+        246
+      ]
+    },
+    {
+      "text": "A9999999",
+      "box": [
+        312,
+        250,
+        421,
+        284
+      ]
+    },
+    {
+      "text": "02/21/2018",
+      "box": [
+        538,
+        250,
+        655,
+        284
+      ]
+    },
+    {
+      "text": "1.FAMILYNAME",
+      "box": [
+        312,
+        293,
+        431,
+        319
+      ]
+    },
+    {
+      "text": "JONES",
+      "box": [
+        311,
+        321,
+        393,
+        361
+      ]
+    },
+    {
+      "text": "6666666/2202",
+      "box": [
+        41,
+        365,
+        71,
+        659
+      ]
+    },
+    {
+      "text": "8.ADDRESS",
+      "box": [
+        311,
+        485,
+        396,
+        515
+      ]
+    },
+    {
+      "text": "15.SEX",
+      "box": [
+        312,
+        621,
+        365,
+        647
+      ]
+    },
+    {
+      "text": "2.GIVENNAMES",
+      "box": [
+        312,
+        379,
+        434,
+        405
+      ]
+    },
+    {
+      "text": "ANGELINA",
+      "box": [
+        314,
+        409,
+        431,
+        441
+      ]
+    },
+    {
+      "text": "GABRIELA",
+      "box": [
+        314,
+        443,
+        434,
+        475
+      ]
+    },
+    {
+      "text": "1234COMMODOREJOSHUABARNEYDRIVE,NE",
+      "box": [
+        314,
+        517,
+        845,
+        549
+      ]
+    },
+    {
+      "text": "#1234",
+      "box": [
+        315,
+        547,
+        379,
+        575
+      ]
+    },
+    {
+      "text": "WASHINGTON,DC00000-0000",
+      "box": [
+        315,
+        579,
+        641,
+        611
+      ]
+    },
+    {
+      "text": "F",
+      "box": [
+        312,
+        633,
+        332,
+        667
+      ]
+    },
+    {
+      "text": "15.HGT",
+      "box": [
+        363,
+        627,
+        425,
+        653
+      ]
+    },
+    {
+      "text": "5-02",
+      "box": [
+        386,
+        651,
+        440,
+        685
+      ]
+    },
+    {
+      "text": "17.WGT",
+      "box": [
+        450,
+        627,
+        520,
+        651
+      ]
+    },
+    {
+      "text": "120",
+      "box": [
+        456,
+        649,
+        508,
+        683
+      ]
+    },
+    {
+      "text": "18.EYES",
+      "box": [
+        536,
+        623,
+        604,
+        653
+      ]
+    },
+    {
+      "text": "BRO",
+      "box": [
+        538,
+        647,
+        592,
+        681
+      ]
+    },
+    {
+      "text": "3.DOB",
+      "box": [
+        648,
+        623,
+        699,
+        649
+      ]
+    },
+    {
+      "text": "02/21/1984",
+      "box": [
+        648,
+        651,
+        766,
+        683
+      ]
+    },
+    {
+      "text": "9.CLASS",
+      "box": [
+        311,
+        691,
+        376,
+        723
+      ]
+    },
+    {
+      "text": "4a.ISS",
+      "box": [
+        648,
+        693,
+        699,
+        721
+      ]
+    },
+    {
+      "text": "A",
+      "box": [
+        315,
+        723,
+        332,
+        751
+      ]
+    },
+    {
+      "text": "02/17/2010",
+      "box": [
+        648,
+        721,
+        766,
+        753
+      ]
+    },
+    {
+      "text": "9a.ENDORSEMENTS",
+      "box": [
+        312,
+        767,
+        458,
+        793
+      ]
+    },
+    {
+      "text": "NONE",
+      "box": [
+        311,
+        795,
+        386,
+        835
+      ]
+    },
+    {
+      "text": "VODONOR",
+      "box": [
+        648,
+        797,
+        777,
+        833
+      ]
+    },
+    {
+      "text": "5.DD",
+      "box": [
+        44,
+        841,
+        81,
+        869
+      ]
+    },
+    {
+      "text": "12.RESTRICTIONS",
+      "box": [
+        312,
+        841,
+        443,
+        873
+      ]
+    },
+    {
+      "text": "VETERAN",
+      "box": [
+        648,
+        833,
+        759,
+        871
+      ]
+    },
+    {
+      "text": "12348757475974",
+      "box": [
+        46,
+        873,
+        222,
+        905
+      ]
+    },
+    {
+      "text": "3",
+      "box": [
+        312,
+        875,
+        330,
+        903
+      ]
+    }
+  ],
+  "plainText": "# WASHINGTON, DC  \n**DRIVER LICENSE**  \n\n**DL**  \nUSA  \n\n**4d.DLN**  \nA9999999  \n1. FAMILY NAME  \nJONES  \n\n2. GIVEN NAMES  \nANGELINA  \nGABRIELA  \n\n8. ADDRESS  \n1234 COMMODORE JOSHUA BARNEY DRIVE, NE  \n#1234  \n\n15. SEX  \nF  \n5-02  \n16. HGT  \n120  \n17. WGT  \n18. EYES  \nBRO  \n\n9. CLASS  \nA  \n\n**5.DD**  \n12348757475974  \n\n**12.RESTRICTIONS**  \n3  \n\n4b. EPX  \n02/21/2018  \n\n**A DONOR**  \nVETERAN"
+}

@@ -1,0 +1,185 @@
+{
+  "docType": "dealer_license",
+  "issuer": "SYNTHETIC",
+  "synthetic": true,
+  "image": "sample/licenses/synthetic/dealer_license.png",
+  "imageSize": {
+    "width": 1275,
+    "height": 990
+  },
+  "text": "<|ref|>STATE OF FRANKLIN<|/ref|><|det|>[[316, 75, 680, 111]]<|/det|>\n<|ref|>DEPARTMENTOFMOTORVEHICLES<|/ref|><|det|>[[322, 136, 676, 160]]<|/det|>\n<|ref|>MOTORVEHICLE DEALER LICENSE<|/ref|><|det|>[[268, 200, 727, 228]]<|/det|>\n<|ref|>LICENSE NUMBER<|/ref|><|det|>[[91, 320, 233, 344]]<|/det|>\n<|ref|>DLR-0000-4471<|/ref|><|det|>[[91, 351, 260, 381]]<|/det|>\n<|ref|>LICENSE TYPE<|/ref|><|det|>[[90, 392, 205, 416]]<|/det|>\n<|ref|>USED MOTOR VEHICLE DEALER<|/ref|><|det|>[[91, 425, 462, 453]]<|/det|>\n<|ref|>BUSINESS NAME<|/ref|><|det|>[[90, 465, 223, 489]]<|/det|>\n<|ref|>SPECIMEN AUTO SALES LLC<|/ref|><|det|>[[91, 494, 424, 522]]<|/det|>\n<|ref|>DOING BUSINESS AS<|/ref|><|det|>[[91, 535, 257, 559]]<|/det|>\n<|ref|>SAMPLE MOTORS<|/ref|><|det|>[[91, 562, 303, 591]]<|/det|>\n<|ref|>BUSINESS ADDRESS<|/ref|><|det|>[[91, 604, 255, 627]]<|/det|>\n<|ref|>100 SPECIMEN ROAD<|/ref|><|det|>[[91, 630, 336, 658]]<|/det|>\n<|ref|>FRANKLIN CITY, FR OOOO0<|/ref|><|det|>[[91, 673, 386, 701]]<|/det|>\n<|ref|>EFFECTIVE DATE<|/ref|><|det|>[[91, 712, 220, 735]]<|/det|>\n<|ref|>03/01/2025<|/ref|><|det|>[[90, 740, 210, 769]]<|/det|>\n<|ref|>EXPIRATION DATE<|/ref|><|det|>[[91, 780, 232, 804]]<|/det|>\n<|ref|>02/28/2027<|/ref|><|det|>[[90, 808, 210, 840]]<|/det|>\n<|ref|>SYNTHETIC SPECIMEN - NOT AN ISSUED LICENSE<|/ref|><|det|>[[287, 884, 709, 904]]<|/det|>",
+  "detections": [
+    {
+      "text": "STATE OF FRANKLIN",
+      "box": [
+        316,
+        75,
+        680,
+        111
+      ]
+    },
+    {
+      "text": "DEPARTMENTOFMOTORVEHICLES",
+      "box": [
+        322,
+        136,
+        676,
+        160
+      ]
+    },
+    {
+      "text": "MOTORVEHICLE DEALER LICENSE",
+      "box": [
+        268,
+        200,
+        727,
+        228
+      ]
+    },
+    {
+      "text": "LICENSE NUMBER",
+      "box": [
+        91,
+        320,
+        233,
+        344
+      ]
+    },
+    {
+      "text": "DLR-0000-4471",
+      "box": [
+        91,
+        351,
+        260,
+        381
+      ]
+    },
+    {
+      "text": "LICENSE TYPE",
+      "box": [
+        90,
+        392,
+        205,
+        416
+      ]
+    },
+    {
+      "text": "USED MOTOR VEHICLE DEALER",
+      "box": [
+        91,
+        425,
+        462,
+        453
+      ]
+    },
+    {
+      "text": "BUSINESS NAME",
+      "box": [
+        90,
+        465,
+        223,
+        489
+      ]
+    },
+    {
+      "text": "SPECIMEN AUTO SALES LLC",
+      "box": [
+        91,
+        494,
+        424,
+        522
+      ]
+    },
+    {
+      "text": "DOING BUSINESS AS",
+      "box": [
+        91,
+        535,
+        257,
+        559
+      ]
+    },
+    {
+      "text": "SAMPLE MOTORS",
+      "box": [
+        91,
+        562,
+        303,
+        591
+      ]
+    },
+    {
+      "text": "BUSINESS ADDRESS",
+      "box": [
+        91,
+        604,
+        255,
+        627
+      ]
+    },
+    {
+      "text": "100 SPECIMEN ROAD",
+      "box": [
+        91,
+        630,
+        336,
+        658
+      ]
+    },
+    {
+      "text": "FRANKLIN CITY, FR OOOO0",
+      "box": [
+        91,
+        673,
+        386,
+        701
+      ]
+    },
+    {
+      "text": "EFFECTIVE DATE",
+      "box": [
+        91,
+        712,
+        220,
+        735
+      ]
+    },
+    {
+      "text": "03/01/2025",
+      "box": [
+        90,
+        740,
+        210,
+        769
+      ]
+    },
+    {
+      "text": "EXPIRATION DATE",
+      "box": [
+        91,
+        780,
+        232,
+        804
+      ]
+    },
+    {
+      "text": "02/28/2027",
+      "box": [
+        90,
+        808,
+        210,
+        840
+      ]
+    },
+    {
+      "text": "SYNTHETIC SPECIMEN - NOT AN ISSUED LICENSE",
+      "box": [
+        287,
+        884,
+        709,
+        904
+      ]
+    }
+  ],
+  "plainText": "STATE OF FRANKLIN  \nDEPARTMENT OF MOTOR VEHICLES  \n\nMOTOR VEHICLE DEALER LICENSE  \n\nLICENSE NUMBER  \nDLR-0000-4471  \nLICENSE TYPE  \nUSED MOTOR VEHICLE DEALER  \nBUSINESS NAME  \nSPECIMEN AUTO SALES LLC  \nDOING BUSINESS AS  \nSAMPLE MOTORS  \nBUSINESS ADDRESS  \n100 SPECIMEN ROAD  \nFRANKLIN CITY, FR 00000  \nEFFECTIVE DATE  \n03/01/2025  \nEXPIRATION DATE  \n02/28/2027  \n\nSYNTHETIC SPECIMEN - NOT AN ISSUED LICENSE"
+}

@@ -22,6 +22,22 @@ OCR_ENDPOINT=http://<host>:<port> OCR_MODEL=<model-id> pnpm vitest run tools/ocr
 
 `score.test.ts` runs without either var, and does not touch the network.
 
+## Recording the fixture corpus
+
+`record.test.ts` reads `sample/licenses/manifest.json` and writes one
+`sample/licenses/fixtures/<slug>.json` per entry, holding the grounded read, its
+detections and the plain read. Those files are **committed**: every phase 2
+extraction test replays them, which is why none of them needs a server.
+
+```bash
+OCR_ENDPOINT=http://<host>:<port> OCR_MODEL=<model-id> pnpm vitest run record
+```
+
+Re-recording is a deliberate act. It invalidates comparison against previously
+recorded results, so do it only when the manifest changes or the model does.
+Provenance for every image is in `sample/licenses/SOURCES.md` — a new specimen
+belongs in both that file and the manifest, or it is undocumented evidence.
+
 ## Fit-model calibration
 
 `calibrate.test.ts` reads markers printed at known pixel positions on cards of
@@ -38,7 +54,8 @@ server present.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python render_cards.py
+.venv/bin/python render_cards.py            # everything
+.venv/bin/python render_cards.py dealer     # just the synthetic dealer licence
 ```
 
 Python is used for this one script and nowhere else in the repo — PIL was the

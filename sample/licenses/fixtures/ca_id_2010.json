@@ -1,0 +1,211 @@
+{
+  "docType": "state_id",
+  "issuer": "CA",
+  "image": "sample/licenses/specimens/ca_id_2010.png",
+  "imageSize": {
+    "width": 652,
+    "height": 411
+  },
+  "text": "<|ref|>CALIFORNIA<|/ref|><|det|>[[101, 46, 531, 128]]<|/det|>\n<|ref|>IDENTIFICATION<|/ref|><|det|>[[584, 48, 840, 96]]<|/det|>\n<|ref|>CARD<|/ref|><|det|>[[664, 98, 764, 140]]<|/det|>\n<|ref|>ID11234561<|/ref|><|det|>[[347, 192, 588, 255]]<|/det|>\n<|ref|>EXP08/31/2015<|/ref|><|det|>[[351, 315, 599, 370]]<|/det|>\n<|ref|>LNSAMPLE<|/ref|><|det|>[[352, 386, 531, 435]]<|/det|>\n<|ref|>FNSEIJI<|/ref|><|det|>[[351, 441, 479, 492]]<|/det|>\n<|ref|>257024THSTREET<|/ref|><|det|>[[352, 499, 575, 540]]<|/det|>\n<|ref|>L1SAMPLE<|/ref|><|det|>[[47, 526, 75, 731]]<|/det|>\n<|ref|>083177<|/ref|><|det|>[[117, 659, 303, 741]]<|/det|>\n<|ref|>SACRAMENTO.CA95818<|/ref|><|det|>[[351, 540, 647, 579]]<|/det|>\n<|ref|>DOB08/31/1977<|/ref|><|det|>[[351, 592, 599, 641]]<|/det|>\n<|ref|>DONOR<|/ref|><|det|>[[355, 721, 408, 752]]<|/det|>\n<|ref|>08311977<|/ref|><|det|>[[815, 648, 927, 688]]<|/det|>\n<|ref|>SEXM<|/ref|><|det|>[[451, 790, 547, 832]]<|/det|>\n<|ref|>HAIR BLK<|/ref|><|det|>[[611, 790, 740, 832]]<|/det|>\n<|ref|>EYESBRN<|/ref|><|det|>[[780, 790, 911, 832]]<|/det|>\n<|ref|>HGT5'-08\"<|/ref|><|det|>[[451, 834, 591, 879]]<|/det|>\n<|ref|>WGT150Ib<|/ref|><|det|>[[611, 834, 763, 879]]<|/det|>\n<|ref|>ISS<|/ref|><|det|>[[835, 850, 884, 896]]<|/det|>\n<|ref|>DD00/00/0000NNNAN/FDYY<|/ref|><|det|>[[451, 896, 771, 937]]<|/det|>\n<|ref|>09/30/2010<|/ref|><|det|>[[811, 896, 963, 937]]<|/det|>",
+  "detections": [
+    {
+      "text": "CALIFORNIA",
+      "box": [
+        101,
+        46,
+        531,
+        128
+      ]
+    },
+    {
+      "text": "IDENTIFICATION",
+      "box": [
+        584,
+        48,
+        840,
+        96
+      ]
+    },
+    {
+      "text": "CARD",
+      "box": [
+        664,
+        98,
+        764,
+        140
+      ]
+    },
+    {
+      "text": "ID11234561",
+      "box": [
+        347,
+        192,
+        588,
+        255
+      ]
+    },
+    {
+      "text": "EXP08/31/2015",
+      "box": [
+        351,
+        315,
+        599,
+        370
+      ]
+    },
+    {
+      "text": "LNSAMPLE",
+      "box": [
+        352,
+        386,
+        531,
+        435
+      ]
+    },
+    {
+      "text": "FNSEIJI",
+      "box": [
+        351,
+        441,
+        479,
+        492
+      ]
+    },
+    {
+      "text": "257024THSTREET",
+      "box": [
+        352,
+        499,
+        575,
+        540
+      ]
+    },
+    {
+      "text": "L1SAMPLE",
+      "box": [
+        47,
+        526,
+        75,
+        731
+      ]
+    },
+    {
+      "text": "083177",
+      "box": [
+        117,
+        659,
+        303,
+        741
+      ]
+    },
+    {
+      "text": "SACRAMENTO.CA95818",
+      "box": [
+        351,
+        540,
+        647,
+        579
+      ]
+    },
+    {
+      "text": "DOB08/31/1977",
+      "box": [
+        351,
+        592,
+        599,
+        641
+      ]
+    },
+    {
+      "text": "DONOR",
+      "box": [
+        355,
+        721,
+        408,
+        752
+      ]
+    },
+    {
+      "text": "08311977",
+      "box": [
+        815,
+        648,
+        927,
+        688
+      ]
+    },
+    {
+      "text": "SEXM",
+      "box": [
+        451,
+        790,
+        547,
+        832
+      ]
+    },
+    {
+      "text": "HAIR BLK",
+      "box": [
+        611,
+        790,
+        740,
+        832
+      ]
+    },
+    {
+      "text": "EYESBRN",
+      "box": [
+        780,
+        790,
+        911,
+        832
+      ]
+    },
+    {
+      "text": "HGT5'-08\"",
+      "box": [
+        451,
+        834,
+        591,
+        879
+      ]
+    },
+    {
+      "text": "WGT150Ib",
+      "box": [
+        611,
+        834,
+        763,
+        879
+      ]
+    },
+    {
+      "text": "ISS",
+      "box": [
+        835,
+        850,
+        884,
+        896
+      ]
+    },
+    {
+      "text": "DD00/00/0000NNNAN/FDYY",
+      "box": [
+        451,
+        896,
+        771,
+        937
+      ]
+    },
+    {
+      "text": "09/30/2010",
+      "box": [
+        811,
+        896,
+        963,
+        937
+      ]
+    }
+  ],
+  "plainText": "# CALIFORNIA  \n**IDENTIFICATION CARD**  \n\nID **11234561**  \n\nEXP **08/31/2015**  \nLN SAMPLE  \nFN SEIJI  \n2570 24TH STREET  \nSACRAMENTO, CA 95818  \n\nDOB **08/31/1977**  \n\nDONOR  \n\nSEX M  \nHGT 5'08\"  \nWGT 150 lb  \nDD 00/00/0000NNNANFDFYY  \n\nHAIR BLK  \nEYES BRN  \nISS  \n09/30/2010"
+}

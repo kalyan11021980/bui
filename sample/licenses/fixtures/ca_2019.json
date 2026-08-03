@@ -1,0 +1,229 @@
+{
+  "docType": "drivers_license",
+  "issuer": "CA",
+  "image": "sample/licenses/specimens/ca_2019.png",
+  "imageSize": {
+    "width": 602,
+    "height": 385
+  },
+  "text": "<|ref|>California<|/ref|><|det|>[[46, 49, 364, 149]]<|/det|>\n<|ref|>USA<|/ref|><|det|>[[365, 79, 414, 124]]<|/det|>\n<|ref|>DRIVERLICENSE<|/ref|><|det|>[[459, 54, 724, 99]]<|/det|>\n<|ref|>DL11234568<|/ref|><|det|>[[329, 214, 560, 284]]<|/det|>\n<|ref|>CLASSC<|/ref|><|det|>[[664, 209, 774, 249]]<|/det|>\n<|ref|>EXP08/31/2014<|/ref|><|det|>[[334, 299, 570, 354]]<|/det|>\n<|ref|>END NONE<|/ref|><|det|>[[664, 309, 799, 349]]<|/det|>\n<|ref|>LNCARDHOLDER<|/ref|><|det|>[[334, 369, 599, 419]]<|/det|>\n<|ref|>FNIMA<|/ref|><|det|>[[332, 424, 434, 474]]<|/det|>\n<|ref|>257024THSTREET<|/ref|><|det|>[[334, 479, 560, 519]]<|/det|>\n<|ref|>ANYTOWN,CAPO<|/ref|><|det|>[[334, 524, 539, 559]]<|/det|>\n<|ref|>DOB08/31/1977<|/ref|><|det|>[[332, 561, 575, 614]]<|/det|>\n<|ref|>RSTRNONE<|/ref|><|det|>[[334, 619, 479, 659]]<|/det|>\n<|ref|>08311977<|/ref|><|det|>[[780, 624, 930, 669]]<|/det|>\n<|ref|>DONOR<|/ref|><|det|>[[334, 694, 384, 724]]<|/det|>\n<|ref|>VETERAN<|/ref|><|det|>[[409, 699, 544, 744]]<|/det|>\n<|ref|>SEXF<|/ref|><|det|>[[429, 754, 514, 794]]<|/det|>\n<|ref|>HAIR BRN<|/ref|><|det|>[[584, 754, 724, 799]]<|/det|>\n<|ref|>EYESBRN<|/ref|><|det|>[[760, 754, 889, 799]]<|/det|>\n<|ref|>HGT5'-05\"<|/ref|><|det|>[[429, 794, 584, 839]]<|/det|>\n<|ref|>WGT125Ib<|/ref|><|det|>[[581, 794, 734, 839]]<|/det|>\n<|ref|>ISS<|/ref|><|det|>[[812, 809, 859, 854]]<|/det|>\n<|ref|>DD00/00/0000NNNAN/ANFDYY<|/ref|><|det|>[[429, 849, 744, 884]]<|/det|>\n<|ref|>08/31/2009<|/ref|><|det|>[[810, 849, 939, 884]]<|/det|>",
+  "detections": [
+    {
+      "text": "California",
+      "box": [
+        46,
+        49,
+        364,
+        149
+      ]
+    },
+    {
+      "text": "USA",
+      "box": [
+        365,
+        79,
+        414,
+        124
+      ]
+    },
+    {
+      "text": "DRIVERLICENSE",
+      "box": [
+        459,
+        54,
+        724,
+        99
+      ]
+    },
+    {
+      "text": "DL11234568",
+      "box": [
+        329,
+        214,
+        560,
+        284
+      ]
+    },
+    {
+      "text": "CLASSC",
+      "box": [
+        664,
+        209,
+        774,
+        249
+      ]
+    },
+    {
+      "text": "EXP08/31/2014",
+      "box": [
+        334,
+        299,
+        570,
+        354
+      ]
+    },
+    {
+      "text": "END NONE",
+      "box": [
+        664,
+        309,
+        799,
+        349
+      ]
+    },
+    {
+      "text": "LNCARDHOLDER",
+      "box": [
+        334,
+        369,
+        599,
+        419
+      ]
+    },
+    {
+      "text": "FNIMA",
+      "box": [
+        332,
+        424,
+        434,
+        474
+      ]
+    },
+    {
+      "text": "257024THSTREET",
+      "box": [
+        334,
+        479,
+        560,
+        519
+      ]
+    },
+    {
+      "text": "ANYTOWN,CAPO",
+      "box": [
+        334,
+        524,
+        539,
+        559
+      ]
+    },
+    {
+      "text": "DOB08/31/1977",
+      "box": [
+        332,
+        561,
+        575,
+        614
+      ]
+    },
+    {
+      "text": "RSTRNONE",
+      "box": [
+        334,
+        619,
+        479,
+        659
+      ]
+    },
+    {
+      "text": "08311977",
+      "box": [
+        780,
+        624,
+        930,
+        669
+      ]
+    },
+    {
+      "text": "DONOR",
+      "box": [
+        334,
+        694,
+        384,
+        724
+      ]
+    },
+    {
+      "text": "VETERAN",
+      "box": [
+        409,
+        699,
+        544,
+        744
+      ]
+    },
+    {
+      "text": "SEXF",
+      "box": [
+        429,
+        754,
+        514,
+        794
+      ]
+    },
+    {
+      "text": "HAIR BRN",
+      "box": [
+        584,
+        754,
+        724,
+        799
+      ]
+    },
+    {
+      "text": "EYESBRN",
+      "box": [
+        760,
+        754,
+        889,
+        799
+      ]
+    },
+    {
+      "text": "HGT5'-05\"",
+      "box": [
+        429,
+        794,
+        584,
+        839
+      ]
+    },
+    {
+      "text": "WGT125Ib",
+      "box": [
+        581,
+        794,
+        734,
+        839
+      ]
+    },
+    {
+      "text": "ISS",
+      "box": [
+        812,
+        809,
+        859,
+        854
+      ]
+    },
+    {
+      "text": "DD00/00/0000NNNAN/ANFDYY",
+      "box": [
+        429,
+        849,
+        744,
+        884
+      ]
+    },
+    {
+      "text": "08/31/2009",
+      "box": [
+        810,
+        849,
+        939,
+        884
+      ]
+    }
+  ],
+  "plainText": "# California  \n**DRIVER LICENSE**  \n\n**DL 11234568**  \n**CLASS C**  \n**EXP 08/31/2014**  \n**END NONE**  \n\n**LNCARDHOLDER**  \n**FNIMA**  \n2570 24TH STREET  \nANYTOWN, CA 95818  \n\n**DOB 08/31/1977**  \n**RSTR NONE**  \n\n**VETERAN**  \nSEX F  \nHGT 5'-05\"  \nWGT 125 lb  \n\n**DONOR**  \n08311977  \n\n**VETERAN**  \nSEX F  \nHGT 5'-05\"  \nWGT 125 lb  \n\n**DOB 08/31/1977**  \nRSTR NONE"
+}

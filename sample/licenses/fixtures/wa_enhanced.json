@@ -1,0 +1,229 @@
+{
+  "docType": "drivers_license",
+  "issuer": "WA",
+  "image": "sample/licenses/specimens/wa_enhanced.png",
+  "imageSize": {
+    "width": 1560,
+    "height": 1006
+  },
+  "text": "<|ref|>WA<|/ref|><|det|>[[60, 108, 98, 135]]<|/det|>\n<|ref|>USA<|/ref|><|det|>[[61, 139, 117, 170]]<|/det|>\n<|ref|>WASHINGTON<|/ref|><|det|>[[108, 101, 508, 164]]<|/det|>\n<|ref|>DRIVER LICENSE<|/ref|><|det|>[[601, 128, 863, 170]]<|/det|>\n<|ref|>ENHANCED<|/ref|><|det|>[[641, 87, 816, 124]]<|/det|>\n<|ref|>4dLIC#WDLJK00580GF<|/ref|><|det|>[[339, 241, 694, 290]]<|/det|>\n<|ref|>DONOR<|/ref|><|det|>[[833, 249, 920, 285]]<|/det|>\n<|ref|>1SAMPLE<|/ref|><|det|>[[339, 293, 484, 341]]<|/det|>\n<|ref|>2JANE<|/ref|><|det|>[[338, 343, 435, 386]]<|/det|>\n<|ref|>3DOB01/06/1978<|/ref|><|det|>[[338, 442, 599, 494]]<|/det|>\n<|ref|>4a1sS09/04/2018<|/ref|><|det|>[[680, 440, 936, 494]]<|/det|>\n<|ref|>8123STREETADDRESS<|/ref|><|det|>[[339, 499, 656, 540]]<|/det|>\n<|ref|>YOURCITYWA99999-0000<|/ref|><|det|>[[353, 540, 713, 575]]<|/det|>\n<|ref|>15SEXF<|/ref|><|det|>[[408, 614, 517, 645]]<|/det|>\n<|ref|>18EYESBRN<|/ref|><|det|>[[641, 612, 792, 645]]<|/det|>\n<|ref|>16HGT5'-04\"<|/ref|><|det|>[[408, 643, 585, 687]]<|/det|>\n<|ref|>17WGT120Ib<|/ref|><|det|>[[641, 645, 810, 683]]<|/det|>\n<|ref|>12RESTRICTIONS<|/ref|><|det|>[[408, 687, 630, 722]]<|/det|>\n<|ref|>9aENDNONE<|/ref|><|det|>[[641, 683, 810, 720]]<|/det|>\n<|ref|>NONE<|/ref|><|det|>[[479, 724, 563, 761]]<|/det|>\n<|ref|>4bEXP09/04/2024<|/ref|><|det|>[[641, 735, 899, 783]]<|/det|>\n<|ref|>5DDWDLJK00580GF<|/ref|><|det|>[[341, 840, 604, 876]]<|/det|>\n<|ref|>1234567XX1101<|/ref|><|det|>[[599, 840, 769, 876]]<|/det|>\n<|ref|>REV01/06/2018<|/ref|><|det|>[[799, 884, 943, 910]]<|/det|>",
+  "detections": [
+    {
+      "text": "WA",
+      "box": [
+        60,
+        108,
+        98,
+        135
+      ]
+    },
+    {
+      "text": "USA",
+      "box": [
+        61,
+        139,
+        117,
+        170
+      ]
+    },
+    {
+      "text": "WASHINGTON",
+      "box": [
+        108,
+        101,
+        508,
+        164
+      ]
+    },
+    {
+      "text": "DRIVER LICENSE",
+      "box": [
+        601,
+        128,
+        863,
+        170
+      ]
+    },
+    {
+      "text": "ENHANCED",
+      "box": [
+        641,
+        87,
+        816,
+        124
+      ]
+    },
+    {
+      "text": "4dLIC#WDLJK00580GF",
+      "box": [
+        339,
+        241,
+        694,
+        290
+      ]
+    },
+    {
+      "text": "DONOR",
+      "box": [
+        833,
+        249,
+        920,
+        285
+      ]
+    },
+    {
+      "text": "1SAMPLE",
+      "box": [
+        339,
+        293,
+        484,
+        341
+      ]
+    },
+    {
+      "text": "2JANE",
+      "box": [
+        338,
+        343,
+        435,
+        386
+      ]
+    },
+    {
+      "text": "3DOB01/06/1978",
+      "box": [
+        338,
+        442,
+        599,
+        494
+      ]
+    },
+    {
+      "text": "4a1sS09/04/2018",
+      "box": [
+        680,
+        440,
+        936,
+        494
+      ]
+    },
+    {
+      "text": "8123STREETADDRESS",
+      "box": [
+        339,
+        499,
+        656,
+        540
+      ]
+    },
+    {
+      "text": "YOURCITYWA99999-0000",
+      "box": [
+        353,
+        540,
+        713,
+        575
+      ]
+    },
+    {
+      "text": "15SEXF",
+      "box": [
+        408,
+        614,
+        517,
+        645
+      ]
+    },
+    {
+      "text": "18EYESBRN",
+      "box": [
+        641,
+        612,
+        792,
+        645
+      ]
+    },
+    {
+      "text": "16HGT5'-04\"",
+      "box": [
+        408,
+        643,
+        585,
+        687
+      ]
+    },
+    {
+      "text": "17WGT120Ib",
+      "box": [
+        641,
+        645,
+        810,
+        683
+      ]
+    },
+    {
+      "text": "12RESTRICTIONS",
+      "box": [
+        408,
+        687,
+        630,
+        722
+      ]
+    },
+    {
+      "text": "9aENDNONE",
+      "box": [
+        641,
+        683,
+        810,
+        720
+      ]
+    },
+    {
+      "text": "NONE",
+      "box": [
+        479,
+        724,
+        563,
+        761
+      ]
+    },
+    {
+      "text": "4bEXP09/04/2024",
+      "box": [
+        641,
+        735,
+        899,
+        783
+      ]
+    },
+    {
+      "text": "5DDWDLJK00580GF",
+      "box": [
+        341,
+        840,
+        604,
+        876
+      ]
+    },
+    {
+      "text": "1234567XX1101",
+      "box": [
+        599,
+        840,
+        769,
+        876
+      ]
+    },
+    {
+      "text": "REV01/06/2018",
+      "box": [
+        799,
+        884,
+        943,
+        910
+      ]
+    }
+  ],
+  "plainText": "WA  \nUSA  \n\n# WASHINGTON  \n\n**ENHANCED DRIVER LICENSE**  \n\n4d LIC# **WDLJK00580GF**  \n1 SAMPLE  \n2 JANE  \n\nDONOR ❤️  \n\n3 DOB **01/06/1978**  \n4a ISS **09/04/2018**  \n\n8-123 STREET ADDRESS  \nYOUR CITY WA **99999-0000**  \n\n15 SEX F  \n16 HGT 5'-04\"  \n12 RESTRICTIONS  \nNONE  \n\n18 EYES BRN  \n17 WGT 120 lb  \n9a END NONE  \n4b EXP **09/04/2024**  \n\n5 DD WDLJK00580GF  \n1234567XX1101"
+}

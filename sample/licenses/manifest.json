@@ -1,0 +1,94 @@
+[
+  {
+    "image": "sample/licenses/specimens/wa_enhanced.png",
+    "docType": "drivers_license",
+    "slug": "wa_enhanced",
+    "issuer": "WA",
+    "size": { "width": 1560, "height": 1006 }
+  },
+  {
+    "image": "sample/licenses/specimens/ma_2016.png",
+    "docType": "drivers_license",
+    "slug": "ma_2016",
+    "issuer": "MA",
+    "size": { "width": 795, "height": 501 }
+  },
+  {
+    "image": "sample/licenses/specimens/dc_2018.png",
+    "docType": "drivers_license",
+    "slug": "dc_2018",
+    "issuer": "DC",
+    "size": { "width": 696, "height": 441 }
+  },
+  {
+    "image": "sample/licenses/specimens/ca_2019.png",
+    "docType": "drivers_license",
+    "slug": "ca_2019",
+    "issuer": "CA",
+    "size": { "width": 602, "height": 385 }
+  },
+  {
+    "image": "sample/licenses/specimens/or_2020.png",
+    "docType": "drivers_license",
+    "slug": "or_2020",
+    "issuer": "OR",
+    "size": { "width": 700, "height": 416 }
+  },
+  {
+    "image": "sample/licenses/specimens/va_2023.png",
+    "docType": "drivers_license",
+    "slug": "va_2023",
+    "issuer": "VA",
+    "size": { "width": 721, "height": 473 }
+  },
+  {
+    "image": "sample/licenses/specimens/md_1977.png",
+    "docType": "drivers_license",
+    "slug": "md_1977",
+    "issuer": "MD",
+    "size": { "width": 658, "height": 412 }
+  },
+  {
+    "image": "sample/licenses/specimens/ca_id_2010.png",
+    "docType": "state_id",
+    "slug": "ca_id_2010",
+    "issuer": "CA",
+    "size": { "width": 652, "height": 411 }
+  },
+  {
+    "image": "sample/licenses/specimens/va_id_2023.png",
+    "docType": "state_id",
+    "slug": "va_id_2023",
+    "issuer": "VA",
+    "size": { "width": 721, "height": 473 }
+  },
+  {
+    "image": "sample/licenses/specimens/nl_passport_2014.png",
+    "docType": "passport",
+    "slug": "nl_passport_2014",
+    "issuer": "NLD",
+    "size": { "width": 1500, "height": 1132 }
+  },
+  {
+    "image": "sample/licenses/synthetic/dealer_license.png",
+    "docType": "dealer_license",
+    "slug": "dealer_license",
+    "issuer": "SYNTHETIC",
+    "synthetic": true,
+    "size": { "width": 1275, "height": 990 }
+  },
+  {
+    "image": "sample/licenses/specimens/chicago_utility_bill_2016.png",
+    "docType": "proof_of_residency",
+    "slug": "chicago_utility_bill",
+    "issuer": "City of Chicago",
+    "size": { "width": 1500, "height": 1893 }
+  },
+  {
+    "image": "sample/licenses/specimens/bank_statement_2003.png",
+    "docType": "proof_of_residency",
+    "slug": "bank_statement",
+    "issuer": "Wikipedia illustration",
+    "size": { "width": 690, "height": 533 }
+  }
+]

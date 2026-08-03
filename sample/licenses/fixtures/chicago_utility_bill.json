@@ -1,0 +1,526 @@
+{
+  "docType": "proof_of_residency",
+  "issuer": "City of Chicago",
+  "image": "sample/licenses/specimens/chicago_utility_bill_2016.png",
+  "imageSize": {
+    "width": 1500,
+    "height": 1893
+  },
+  "text": "<|ref|>City of Chicago<|/ref|><|det|>[[201, 4, 312, 20]]<|/det|>\n<|ref|>DepartmentofFinance-UtilityBilling<|/ref|><|det|>[[201, 18, 464, 33]]<|/det|>\n<|ref|>P.O.Box6330<|/ref|><|det|>[[201, 30, 312, 44]]<|/det|>\n<|ref|>Chicago,llinois60680-6330<|/ref|><|det|>[[201, 41, 411, 56]]<|/det|>\n<|ref|>CUSTOMER NAME<|/ref|><|det|>[[65, 175, 220, 189]]<|/det|>\n<|ref|>ACCOUNT NUMBER<|/ref|><|det|>[[383, 176, 540, 190]]<|/det|>\n<|ref|>BILL DATE<|/ref|><|det|>[[644, 175, 733, 189]]<|/det|>\n<|ref|>DUE DATE<|/ref|><|det|>[[821, 176, 911, 190]]<|/det|>\n<|ref|>SAM SAMPLE<|/ref|><|det|>[[65, 202, 173, 216]]<|/det|>\n<|ref|>999999-99999<|/ref|><|det|>[[404, 202, 524, 216]]<|/det|>\n<|ref|>Feb-03-2016<|/ref|><|det|>[[636, 202, 741, 216]]<|/det|>\n<|ref|>Feb-24-2016<|/ref|><|det|>[[816, 202, 920, 216]]<|/det|>\n<|ref|>Utility Service Address:456 BROADWAY AVE CHICAGO IL 60622-3208<|/ref|><|det|>[[58, 234, 583, 248]]<|/det|>\n<|ref|>Bill Summary for this Metered Account for billing period Nov-24-2015 thru Jan-27-2016<|/ref|><|det|>[[58, 271, 727, 286]]<|/det|>\n<|ref|>Previous Balance<|/ref|><|det|>[[115, 310, 247, 328]]<|/det|>\n<|ref|>$92.64<|/ref|><|det|>[[421, 311, 475, 327]]<|/det|>\n<|ref|>Adjustments<|/ref|><|det|>[[115, 330, 210, 344]]<|/det|>\n<|ref|>$0.00<|/ref|><|det|>[[432, 330, 475, 345]]<|/det|>\n<|ref|>This is a Metered Account.<|/ref|><|det|>[[590, 339, 784, 354]]<|/det|>\n<|ref|>Payments<|/ref|><|det|>[[115, 347, 198, 365]]<|/det|>\n<|ref|>$92.64<|/ref|><|det|>[[421, 348, 475, 364]]<|/det|>\n<|ref|>Current Water<|/ref|><|det|>[[115, 365, 225, 383]]<|/det|>\n<|ref|>$72.44<|/ref|><|det|>[[421, 366, 475, 382]]<|/det|>\n<|ref|>Little leaks cause big bills.<|/ref|><|det|>[[590, 365, 780, 383]]<|/det|>\n<|ref|>Current Sewer<|/ref|><|det|>[[115, 385, 225, 400]]<|/det|>\n<|ref|>$72.44<|/ref|><|det|>[[421, 385, 475, 401]]<|/det|>\n<|ref|>Check for and repair leaks.<|/ref|><|det|>[[590, 392, 786, 407]]<|/det|>\n<|ref|>Current Garbage<|/ref|><|det|>[[115, 404, 241, 421]]<|/det|>\n<|ref|>$9.50<|/ref|><|det|>[[432, 404, 475, 420]]<|/det|>\n<|ref|>Penalty<|/ref|><|det|>[[115, 423, 178, 440]]<|/det|>\n<|ref|>$1.14<|/ref|><|det|>[[432, 425, 475, 440]]<|/det|>\n<|ref|>You must pay for all metered water.<|/ref|><|det|>[[590, 420, 847, 435]]<|/det|>\n<|ref|>Total Due<|/ref|><|det|>[[115, 464, 207, 482]]<|/det|>\n<|ref|>$155.52<|/ref|><|det|>[[396, 464, 472, 482]]<|/det|>\n<|ref|>MESSAGECENTER<|/ref|><|det|>[[408, 512, 580, 528]]<|/det|>\n<|ref|>Please see important information on the back of this bill regarding your utility bill and payment options.<|/ref|><|det|>[[131, 537, 862, 556]]<|/det|>\n<|ref|>FOR BILLING QUESTIONS,PLEASE CALL312-744-4426<|/ref|><|det|>[[280, 640, 715, 655]]<|/det|>\n<|ref|>Make checks payable to City of Chicago.Be sure to include your account number on check and include bottom portion of this bill with payment.<|/ref|><|det|>[[136, 681, 860, 696]]<|/det|>\n<|ref|>City of Chicago<|/ref|><|det|>[[201, 715, 317, 730]]<|/det|>\n<|ref|>Department of Finance-Utility Billing<|/ref|><|det|>[[201, 729, 464, 747]]<|/det|>\n<|ref|>P.O.Box6330<|/ref|><|det|>[[201, 743, 312, 761]]<|/det|>\n<|ref|>Chicago,Illinois60680-6330<|/ref|><|det|>[[201, 760, 414, 775]]<|/det|>\n<|ref|>ACCOUNT NUMBER<|/ref|><|det|>[[534, 795, 694, 810]]<|/det|>\n<|ref|>DUE DATE<|/ref|><|det|>[[684, 796, 790, 811]]<|/det|>\n<|ref|>TOTAL DUE<|/ref|><|det|>[[821, 796, 920, 811]]<|/det|>\n<|ref|>999999-99999<|/ref|><|det|>[[552, 822, 671, 837]]<|/det|>\n<|ref|>Feb-24-2016<|/ref|><|det|>[[694, 822, 800, 837]]<|/det|>\n<|ref|>$155.52<|/ref|><|det|>[[835, 822, 915, 840]]<|/det|>\n<|ref|>1077 1 AV 0.388<|/ref|><|det|>[[75, 850, 191, 867]]<|/det|>\n<|ref|>1077<|/ref|><|det|>[[386, 853, 416, 865]]<|/det|>\n<|ref|>SAM SAMPLE<|/ref|><|det|>[[75, 884, 175, 899]]<|/det|>\n<|ref|>Amount Enclosed: $<|/ref|><|det|>[[618, 888, 830, 906]]<|/det|>\n<|ref|>123MAIN ST<|/ref|><|det|>[[75, 899, 170, 913]]<|/det|>\n<|ref|>CHICAGO,IL60622-3208<|/ref|><|det|>[[75, 913, 244, 928]]<|/det|>\n<|ref|>02242016<|/ref|><|det|>[[325, 953, 450, 967]]<|/det|>\n<|ref|>000999990990<|/ref|><|det|>[[442, 953, 632, 967]]<|/det|>\n<|ref|>00000155520000015552b<|/ref|><|det|>[[624, 951, 943, 969]]<|/det|>",
+  "detections": [
+    {
+      "text": "City of Chicago",
+      "box": [
+        201,
+        4,
+        312,
+        20
+      ]
+    },
+    {
+      "text": "DepartmentofFinance-UtilityBilling",
+      "box": [
+        201,
+        18,
+        464,
+        33
+      ]
+    },
+    {
+      "text": "P.O.Box6330",
+      "box": [
+        201,
+        30,
+        312,
+        44
+      ]
+    },
+    {
+      "text": "Chicago,llinois60680-6330",
+      "box": [
+        201,
+        41,
+        411,
+        56
+      ]
+    },
+    {
+      "text": "CUSTOMER NAME",
+      "box": [
+        65,
+        175,
+        220,
+        189
+      ]
+    },
+    {
+      "text": "ACCOUNT NUMBER",
+      "box": [
+        383,
+        176,
+        540,
+        190
+      ]
+    },
+    {
+      "text": "BILL DATE",
+      "box": [
+        644,
+        175,
+        733,
+        189
+      ]
+    },
+    {
+      "text": "DUE DATE",
+      "box": [
+        821,
+        176,
+        911,
+        190
+      ]
+    },
+    {
+      "text": "SAM SAMPLE",
+      "box": [
+        65,
+        202,
+        173,
+        216
+      ]
+    },
+    {
+      "text": "999999-99999",
+      "box": [
+        404,
+        202,
+        524,
+        216
+      ]
+    },
+    {
+      "text": "Feb-03-2016",
+      "box": [
+        636,
+        202,
+        741,
+        216
+      ]
+    },
+    {
+      "text": "Feb-24-2016",
+      "box": [
+        816,
+        202,
+        920,
+        216
+      ]
+    },
+    {
+      "text": "Utility Service Address:456 BROADWAY AVE CHICAGO IL 60622-3208",
+      "box": [
+        58,
+        234,
+        583,
+        248
+      ]
+    },
+    {
+      "text": "Bill Summary for this Metered Account for billing period Nov-24-2015 thru Jan-27-2016",
+      "box": [
+        58,
+        271,
+        727,
+        286
+      ]
+    },
+    {
+      "text": "Previous Balance",
+      "box": [
+        115,
+        310,
+        247,
+        328
+      ]
+    },
+    {
+      "text": "$92.64",
+      "box": [
+        421,
+        311,
+        475,
+        327
+      ]
+    },
+    {
+      "text": "Adjustments",
+      "box": [
+        115,
+        330,
+        210,
+        344
+      ]
+    },
+    {
+      "text": "$0.00",
+      "box": [
+        432,
+        330,
+        475,
+        345
+      ]
+    },
+    {
+      "text": "This is a Metered Account.",
+      "box": [
+        590,
+        339,
+        784,
+        354
+      ]
+    },
+    {
+      "text": "Payments",
+      "box": [
+        115,
+        347,
+        198,
+        365
+      ]
+    },
+    {
+      "text": "$92.64",
+      "box": [
+        421,
+        348,
+        475,
+        364
+      ]
+    },
+    {
+      "text": "Current Water",
+      "box": [
+        115,
+        365,
+        225,
+        383
+      ]
+    },
+    {
+      "text": "$72.44",
+      "box": [
+        421,
+        366,
+        475,
+        382
+      ]
+    },
+    {
+      "text": "Little leaks cause big bills.",
+      "box": [
+        590,
+        365,
+        780,
+        383
+      ]
+    },
+    {
+      "text": "Current Sewer",
+      "box": [
+        115,
+        385,
+        225,
+        400
+      ]
+    },
+    {
+      "text": "$72.44",
+      "box": [
+        421,
+        385,
+        475,
+        401
+      ]
+    },
+    {
+      "text": "Check for and repair leaks.",
+      "box": [
+        590,
+        392,
+        786,
+        407
+      ]
+    },
+    {
+      "text": "Current Garbage",
+      "box": [
+        115,
+        404,
+        241,
+        421
+      ]
+    },
+    {
+      "text": "$9.50",
+      "box": [
+        432,
+        404,
+        475,
+        420
+      ]
+    },
+    {
+      "text": "Penalty",
+      "box": [
+        115,
+        423,
+        178,
+        440
+      ]
+    },
+    {
+      "text": "$1.14",
+      "box": [
+        432,
+        425,
+        475,
+        440
+      ]
+    },
+    {
+      "text": "You must pay for all metered water.",
+      "box": [
+        590,
+        420,
+        847,
+        435
+      ]
+    },
+    {
+      "text": "Total Due",
+      "box": [
+        115,
+        464,
+        207,
+        482
+      ]
+    },
+    {
+      "text": "$155.52",
+      "box": [
+        396,
+        464,
+        472,
+        482
+      ]
+    },
+    {
+      "text": "MESSAGECENTER",
+      "box": [
+        408,
+        512,
+        580,
+        528
+      ]
+    },
+    {
+      "text": "Please see important information on the back of this bill regarding your utility bill and payment options.",
+      "box": [
+        131,
+        537,
+        862,
+        556
+      ]
+    },
+    {
+      "text": "FOR BILLING QUESTIONS,PLEASE CALL312-744-4426",
+      "box": [
+        280,
+        640,
+        715,
+        655
+      ]
+    },
+    {
+      "text": "Make checks payable to City of Chicago.Be sure to include your account number on check and include bottom portion of this bill with payment.",
+      "box": [
+        136,
+        681,
+        860,
+        696
+      ]
+    },
+    {
+      "text": "City of Chicago",
+      "box": [
+        201,
+        715,
+        317,
+        730
+      ]
+    },
+    {
+      "text": "Department of Finance-Utility Billing",
+      "box": [
+        201,
+        729,
+        464,
+        747
+      ]
+    },
+    {
+      "text": "P.O.Box6330",
+      "box": [
+        201,
+        743,
+        312,
+        761
+      ]
+    },
+    {
+      "text": "Chicago,Illinois60680-6330",
+      "box": [
+        201,
+        760,
+        414,
+        775
+      ]
+    },
+    {
+      "text": "ACCOUNT NUMBER",
+      "box": [
+        534,
+        795,
+        694,
+        810
+      ]
+    },
+    {
+      "text": "DUE DATE",
+      "box": [
+        684,
+        796,
+        790,
+        811
+      ]
+    },
+    {
+      "text": "TOTAL DUE",
+      "box": [
+        821,
+        796,
+        920,
+        811
+      ]
+    },
+    {
+      "text": "999999-99999",
+      "box": [
+        552,
+        822,
+        671,
+        837
+      ]
+    },
+    {
+      "text": "Feb-24-2016",
+      "box": [
+        694,
+        822,
+        800,
+        837
+      ]
+    },
+    {
+      "text": "$155.52",
+      "box": [
+        835,
+        822,
+        915,
+        840
+      ]
+    },
+    {
+      "text": "1077 1 AV 0.388",
+      "box": [
+        75,
+        850,
+        191,
+        867
+      ]
+    },
+    {
+      "text": "1077",
+      "box": [
+        386,
+        853,
+        416,
+        865
+      ]
+    },
+    {
+      "text": "SAM SAMPLE",
+      "box": [
+        75,
+        884,
+        175,
+        899
+      ]
+    },
+    {
+      "text": "Amount Enclosed: $",
+      "box": [
+        618,
+        888,
+        830,
+        906
+      ]
+    },
+    {
+      "text": "123MAIN ST",
+      "box": [
+        75,
+        899,
+        170,
+        913
+      ]
+    },
+    {
+      "text": "CHICAGO,IL60622-3208",
+      "box": [
+        75,
+        913,
+        244,
+        928
+      ]
+    },
+    {
+      "text": "02242016",
+      "box": [
+        325,
+        953,
+        450,
+        967
+      ]
+    },
+    {
+      "text": "000999990990",
+      "box": [
+        442,
+        953,
+        632,
+        967
+      ]
+    },
+    {
+      "text": "00000155520000015552b",
+      "box": [
+        624,
+        951,
+        943,
+        969
+      ]
+    }
+  ],
+  "plainText": "City of Chicago  \nDepartment of Finance-Utility Billing  \nP.O. Box 6330  \nChicago, Illinois 60680-6330  \n\nCUSTOMER NAME | ACCOUNT NUMBER | BILL DATE | DUE DATE  \n---|---|---|---  \nSAM SAMPLE | 999999-99999 | Feb-03-2016 | Feb-24-2016  \n\nUtility Service Address: 456 BROADWAY AVE CHICAGO IL 60622-3208  \n\n**Bill Summary for this Metered Account for billing period Nov-24-2015 thru Jan-27-2016**  \n\nPrevious Balance | $92.64  \nAdjustments | $0.00  \nPayments | $92.64  \nCurrent Water | $72.44  \nCurrent Sewer | $72.44  \nCurrent Garbage | $9.50  \nPenalty | $1.14  \n\n**Total Due** | **$155.52**  \n\nThis is a Metered Account.  \nLittle leaks cause big bills.  \nCheck for and repair leaks.  \nYou must pay for all metered water.  \n\n**MESSAGE CENTER**  \n\nPlease see important information on the back of this bill regarding your utility bill and payment options.  \n\n**FOR BILLING QUESTIONS, PLEASE CALL 312-744-4426**  \n\nMake checks payable to City of Chicago. Be sure to include your account number on check and include bottom portion of this bill with payment.  \n\nCity of Chicago  \nDepartment of Finance-Utility Billing  \nP.O. Box 6330  \nChicago, Illinois 60680-6330  \n\n| ACCOUNT NUMBER | DUE DATE | TOTAL DUE |\n|---|---|---|\n| 999999-99999   | Feb-24-2016 | **$155.52** |\n\n1077 1 AV 0.388  \nSAM SAMPLE  \n123 MAIN ST  \nCHICAGO, IL 60622-3208  \n\n1077"
+}
