@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { applyAction, createApplication } from '@/server/application-service'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
+import { QUIET_THRESHOLD } from '@/domain/ocr/confidence'
 import { ingestDocument, type IngestOutcome } from '@/server/document-service'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
 import { __resetStoreForTests } from '@/server/store'
@@ -365,16 +366,24 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
     }
   })
 
-  it('re-spaces the address end to end, not just in the domain function', async () => {
-    // Guards the wiring, not the algorithm: ingestDocument composes
-    // respaceAddresses with withCrossPass itself (see document-service.ts).
-    // A test that only called the domain functions directly would still pass
-    // if that composition were ever dropped from the real pipeline.
+  it('re-spaces the address end to end, and scores agreement on the spaced value', async () => {
+    // Guards the wiring and its order, not the algorithm. ingestDocument must
+    // compose respaceAddresses *then* withCrossPass — dropping the call
+    // entirely, or running it after cross-pass is scored, both leave the
+    // value looking right. Only the confidence tells them apart: scoring
+    // cross-pass against the still-space-stripped value caps it below
+    // QUIET_THRESHOLD even once the display value has been re-spaced, so a
+    // value-only assertion cannot see either failure — see
+    // document-service.ts.
     const app = createApplication()
     const outcome = unwrap(await ingest(app, realImage, recorded))
+    const line1 = outcome.state.fields.addr_line1
+    const city = outcome.state.fields.addr_city
 
-    expect(outcome.state.fields.addr_line1?.value).toBe('123 STREET ADDRESS')
-    expect(outcome.state.fields.addr_city?.value).toBe('YOUR CITY')
+    expect(line1?.value).toBe('123 STREET ADDRESS')
+    expect(city?.value).toBe('YOUR CITY')
+    expect(line1?.provenance?.confidence).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+    expect(city?.provenance?.confidence).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
   })
 
   it('maps the licence number onto the pixels it was printed at', async () => {

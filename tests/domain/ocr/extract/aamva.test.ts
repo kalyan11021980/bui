@@ -400,6 +400,15 @@ describe('respaceAddress', () => {
       .toBe('WASHINGTON')
   })
 
+  it('isolates boundaryClean\'s own contribution from fragmentation', () => {
+    // QUINCY/WASHINGTON above are actually decided by fragmentation alone —
+    // deleting only the boundaryClean tie-break leaves them (and the rest of
+    // the suite) green. This case ties on fragmentation (0 internal splits
+    // either way) so boundaryClean is the only thing that can prefer the
+    // real word "MAIN ST" over the fragment "MAI NST" cut from "ZMAI NST".
+    expect(respaceAddress('MAINST', 'ZMAI NST MAIN ST')).toBe('MAIN ST')
+  })
+
   it('keeps the mismatch ratio at 0.3, not something looser', () => {
     // A 10-character span with exactly 4 mismatches (40%) sits between the
     // current 30% cutoff (rejects) and a looser 50% one (would accept and
