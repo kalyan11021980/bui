@@ -234,6 +234,13 @@ Instead, confidence is derived from evidence we can observe:
 | Checksum | MRZ check digit validated. The strongest signal available and near-decisive. |
 | Cross-pass agreement | Grounded and plain passes returned the same value. |
 | Box plausibility | The box sits inside the estimated card extent and has sane proportions. |
+| Glyph ambiguity | An identifier contains mutually confusable characters — `0 O 1 I 5 S 8 B`. Subtracts only; it never earns a value credit. |
+
+The glyph signal was added after the AAMVA extractor shipped `11234568` for a card printing
+`I1234568` with every other signal green. No other signal can see that failure: the value
+is well-formed, correctly located and label-anchored, and only its shape betrays it. A
+checksum outranks it — an MRZ number proves itself arithmetically, so glyph shape stops
+mattering there.
 
 Cross-pass agreement is worth its cost. The gate found neither mode dominates: grounded
 won overall, 34/36 against 31/36, but **lost on the CA card, 7/9 against 8/9** — plain

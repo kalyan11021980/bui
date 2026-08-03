@@ -1133,6 +1133,122 @@ git commit -m "feat(ocr): read a licence card by the codes printed on it"
 
 ---
 
+### Task 6b: ID form in the profile, and a sixth evidence signal
+
+Two human rulings taken during Task 6, both cheaper now than after the scorer exists.
+
+**Why this task exists.** Task 6 found that a state ID prints a number nothing captures:
+the strategy reads it and `extractFor` drops it, because `dl_number` is `derivableFrom:
+['drivers_license']`. Simply widening that would file an ID number under a field labelled
+"Driver's license number". Adding a separate field does not work either — `dl_number` sits
+in `CORE_IDENTITY` unconditionally, the engine is a pure function of `ApplicantProfile` and
+never sees field answers, and `resyncFields` supersedes anything outside `requiredFields`.
+A merely-added field would be captured and then made invisible.
+
+So the ID form moves into the profile, where `addressDiffersFromId` already sits for
+exactly this reason: declared by the applicant, asked outright by the live registration,
+and it decides what else is owed. This also fixes a pre-existing defect — today a passport
+holder is required to supply a driver's licence number.
+
+**Files:**
+- Modify: `src/domain/requirements/rules.ts`, `engine.ts`, `version.ts`
+- Modify: `src/domain/catalog/identity.ts`
+- Modify: `src/domain/ocr/extract/types.ts`, `aamva.ts`, `synonyms.ts`
+- Modify: `src/ui/demo/ProfileControls.tsx`
+- Test: the requirements, catalog, extract and ProfileControls suites
+
+**Interfaces:**
+- Produces: `ApplicantProfile.idForm: 'drivers_license' | 'state_id' | 'passport'`;
+  catalog fields `id_number` and `passport_number`; `Evidence.glyphAmbiguous: boolean | null`;
+  `RULES_VERSION` at 3
+
+- [ ] **Step 1: Branch identity on the declared ID form**
+
+`CORE_IDENTITY` keeps everything common and loses `dl_number` and `id_form`. The engine
+then appends exactly one number field for the declared form:
+
+```ts
+const ID_NUMBER: Record<ApplicantProfile['idForm'], FieldId> = {
+  drivers_license: 'dl_number',
+  state_id: 'id_number',
+  passport: 'passport_number',
+}
+```
+
+`id_form` stops being a catalog field, since the profile now carries it — the same
+relationship `licenses` has to `license_type`. Remove it from the catalog and from
+`CORE_IDENTITY`, and check for orphaned references; Phase 1 added a coverage test that
+catches a `FieldId` no rule asks for.
+
+`id_state` is licence-and-state-ID only. A passport has no issuing state, so gate it the
+same way rather than asking a passport holder for one.
+
+Bump `RULES_VERSION` to 3. The engine's own resume logic reads it.
+
+- [ ] **Step 2: Add the two catalog fields**
+
+Mirror `dl_number`'s shape — both are `sensitive: true` with `handling` copy, since they
+are identity document numbers.
+
+```ts
+defineField({
+  id: 'id_number',
+  label: 'ID card number',
+  type: 'text',
+  section: 'identification',
+  purpose: 'Confirms the ID you uploaded belongs to you',
+  authority: 'STATE_DMV',
+  handling: 'Encrypted at rest. Never shown to other bidders.',
+  validation: z.string().min(4, 'Enter the number shown on your ID'),
+  derivableFrom: ['state_id'],
+  sensitive: true,
+}),
+```
+
+`passport_number` follows, with `authority: 'FEDERAL_KYC'`, `derivableFrom: ['passport']`,
+and a purpose naming the passport rather than a card.
+
+- [ ] **Step 3: Emit the state ID number**
+
+Add `id_number` to `AAMVA_ANCHORS` with the codes the two ID specimens actually print —
+CA shows `ID`, VA shows `4d`. Verify against the images, not the recorded text. `extractFor`'s
+`derivable()` guard then admits it for `state_id` and drops it for a licence, with no
+special-casing in the strategy.
+
+- [ ] **Step 4: Add the glyph-ambiguity signal**
+
+The acceptance gate's worst finding was the CA card's `I1234568` read as `11234568` — a
+plausible wrong value in a licence number, shipped today with every evidence signal green.
+`Evidence` gains a sixth signal so the scorer can price it:
+
+```ts
+/** Null where the field is not identifier-shaped and the confusion cannot arise. */
+readonly glyphAmbiguous: boolean | null
+```
+
+Set it on identifier-shaped fields only — `dl_number`, `id_number`, `passport_number`,
+`license_number` — true when the value contains any of the mutually confusable glyphs
+`0 O 1 I 5 S 8 B`. Leave it `null` on names, dates and addresses, where the confusion
+either cannot arise or does not change the meaning. `NO_EVIDENCE` gains it as `null`.
+
+**This must not become a filter.** An ambiguous value is still emitted; it is a value we
+are less sure of, not a malformed one. Task 9 weights it negatively.
+
+- [ ] **Step 5: Ask for the ID form in the demo controls**
+
+`ProfileControls` gains a select for `idForm`, alongside applicant type and country. Assert
+that switching it changes which number field the panel asks for.
+
+- [ ] **Step 6: Run and commit**
+
+```bash
+pnpm test && pnpm typecheck && pnpm build
+git add src/domain src/ui tests
+git commit -m "feat(identity): ask for the number the declared ID actually carries"
+```
+
+---
+
 ### Task 7: Passport MRZ extractor
 
 The only document in the set that can verify its own reading. A field whose check digit fails is not emitted at all.
@@ -1292,6 +1408,11 @@ export const extractMrz: ExtractStrategy = (_detections, text) => {
 
   const country = line1.slice(2, 5).replace(/</g, '')
   if (country) emit('id_country', country)
+
+  // The one identifier here that carries its own check digit. Task 6b added
+  // the field; without this the MRZ's strongest value goes nowhere.
+  const number = line2.slice(0, 9).replace(/</g, '')
+  if (checkDigit(line2.slice(0, 9)) === line2[9]) emit('passport_number', number)
 
   const dob = line2.slice(13, 19)
   if (checkDigit(dob) === line2[19]) emit('dob', toIsoDate(dob, 'past'))
@@ -1578,6 +1699,39 @@ describe('scoreEvidence', () => {
     expect(scoreEvidence(evidence({ schemaParsed: false, checksumValid: true }))).toBe(0)
   })
 
+  it('drops an ambiguous identifier below an unambiguous one', () => {
+    // `I1234568` read as `11234568`: label anchored, box fine, schema happy,
+    // and wrong. The glyph signal is the only thing that can see it.
+    const ambiguous = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true, glyphAmbiguous: true,
+    }))
+    const clean = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true, glyphAmbiguous: false,
+    }))
+    expect(ambiguous).toBeLessThan(clean)
+  })
+
+  it('gives an unambiguous identifier no bonus over a field that cannot be ambiguous', () => {
+    // Asymmetric by design: avoiding a failure is not an achievement.
+    const clean = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true, glyphAmbiguous: false,
+    }))
+    const notApplicable = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true, glyphAmbiguous: null,
+    }))
+    expect(clean).toBe(notApplicable)
+  })
+
+  it('keeps a checksum-validated identifier quiet despite ambiguous glyphs', () => {
+    // An MRZ number proves itself arithmetically, so glyph shape stops
+    // mattering. Losing that would make every passport noisy for no reason.
+    const score = scoreEvidence(evidence({
+      schemaParsed: true, labelAnchored: true,
+      checksumValid: true, glyphAmbiguous: true,
+    }))
+    expect(score).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
+  })
+
   it('does not punish a signal that does not apply', () => {
     const noChecksum = scoreEvidence(evidence({ schemaParsed: true, labelAnchored: true }))
     const failedChecksum = scoreEvidence(evidence({
@@ -1633,6 +1787,12 @@ const WEIGHT = {
   checksumValid: 0.45,
   crossPassAgreed: 0.25,
   boxPlausible: 0.05,
+  /**
+   * Only ever subtracts. An identifier holding 0/O, 1/I, 5/S or 8/B is the
+   * case that produced `11234568` from `I1234568` — plausible, wrong, and
+   * invisible to every other signal.
+   */
+  glyphAmbiguous: 0.2,
 } as const
 
 const BASE = 0.3
@@ -1651,6 +1811,10 @@ export function scoreEvidence(evidence: Evidence): number {
     if (value === true) score += WEIGHT[signal]
     else if (value === false) score -= WEIGHT[signal]
   }
+
+  // Asymmetric on purpose: an unambiguous identifier has earned nothing, it
+  // has merely avoided the one failure we cannot otherwise see.
+  if (evidence.glyphAmbiguous === true) score -= WEIGHT.glyphAmbiguous
 
   return Math.min(1, Math.max(0, Number(score.toFixed(3))))
 }
