@@ -38,6 +38,19 @@ describe('a whole registration, panel only', () => {
     expect(log.size()).toBeGreaterThan(0)
   })
 
+  it('empties the store when it is reset, so cases cannot leak into each other', () => {
+    // Ids are UUIDs and never collide, so a reset that did nothing would leave
+    // every test in the suite green. The store reads its map through the
+    // global on every call precisely so this cannot quietly stop working.
+    const s = createApplication('app-reset', business, OWNER)
+    putApplication(s)
+    expect(getApplication('app-reset')).toBeDefined()
+
+    __resetStoreForTests()
+
+    expect(getApplication('app-reset')).toBeUndefined()
+  })
+
   it('never writes a raw taxpayer ID into the audit log', () => {
     const log = new AuditLog(digest)
     log.append('app-1', {

@@ -28,8 +28,9 @@ import { POST as CREATE } from '@/app/api/application/route'
 import { GET } from '@/app/api/application/[id]/route'
 import { POST as ACTION } from '@/app/api/application/[id]/actions/route'
 import { POST as UPLOAD } from '@/app/api/application/[id]/documents/route'
+import { createApplication } from '@/server/application-service'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
-import { OWNER_TOKEN_HEADER } from '@/server/ownership'
+import { OWNER_TOKEN_HEADER, ownsApplication } from '@/server/ownership'
 import { __resetStoreForTests } from '@/server/store'
 import { OWNER_TOKEN_HEADER as CLIENT_HEADER } from '@/ui/client/application-api'
 import type { ApplicationState } from '@/domain/application/state'
@@ -59,8 +60,11 @@ type Created = { id: string; token: string }
 
 async function newApp(): Promise<Created> {
   const body = (await (await CREATE()).json()) as ApplicationState
-  if (body.ownerToken === null) throw new Error('creation handed out no owner token')
-  return { id: body.id, token: body.ownerToken }
+  // Asserted rather than thrown: a helper that throws pre-empts every
+  // assertion under it, and "creation hands one out" is the property.
+  expect(body.ownerToken, 'creation must hand out an owner token')
+    .toEqual(expect.any(String))
+  return { id: body.id, token: body.ownerToken ?? '' }
 }
 
 function read(id: string, token: string | null) {
@@ -106,6 +110,21 @@ describe('an application id is not enough on its own', () => {
     const { token } = await newApp()
     expect(token)
       .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  })
+
+  it('refuses a token of the wrong length rather than throwing at the caller', () => {
+    // The comparison is timing-safe, and its primitive throws when the two
+    // buffers differ in length. A junk token has to meet a refusal, not a
+    // RangeError out of the route — and a throw would pre-empt the 404 the
+    // route cases assert, so it is stated here directly.
+    const state = createApplication()
+
+    for (const junk of ['', 'x', `${state.ownerToken}x`]) {
+      expect(() => ownsApplication(state, junk), junk).not.toThrow()
+      expect(ownsApplication(state, junk), junk).toBe(false)
+    }
+    // Guards the guard: a comparison that refused everything would pass above.
+    expect(ownsApplication(state, state.ownerToken)).toBe(true)
   })
 
   it('gives every application its own token', async () => {

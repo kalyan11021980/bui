@@ -9,6 +9,7 @@ import type { ApplicationState } from '@/domain/application/state'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
+import { OWNER_TOKEN_HEADER } from '@/ui/client/application-api'
 
 /**
  * The page, against a stubbed server. Everything below the fetch boundary is
@@ -121,7 +122,7 @@ beforeEach(() => {
     const call = {
       url,
       body: init.body ? JSON.parse(String(init.body)) : undefined,
-      token: new Headers(init.headers).get('x-owner-token'),
+      token: new Headers(init.headers).get(OWNER_TOKEN_HEADER),
     }
     calls.push(call)
     if (holdActions && url.endsWith('/actions')) await holdActions

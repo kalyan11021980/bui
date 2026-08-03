@@ -26,6 +26,7 @@ import { POST as ACTION } from '@/app/api/application/[id]/actions/route'
 import { POST } from '@/app/api/application/[id]/documents/route'
 import { __resetAuditLogForTests } from '@/server/audit'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
+import { OWNER_TOKEN_HEADER } from '@/server/ownership'
 import { __resetStoreForTests } from '@/server/store'
 import type { ApplicationState } from '@/domain/application/state'
 import { pngBase64 } from '../server/image-bytes'
@@ -48,7 +49,7 @@ const tokens = new Map<string, string>()
 /** What the owner of `id` presents. Nothing, for an id nobody was given. */
 function asOwner(id: string): Record<string, string> {
   const token = tokens.get(id)
-  return token === undefined ? {} : { 'x-owner-token': token }
+  return token === undefined ? {} : { [OWNER_TOKEN_HEADER]: token }
 }
 
 async function upload(id: string, body: unknown) {

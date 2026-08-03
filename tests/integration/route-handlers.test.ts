@@ -9,6 +9,7 @@ process.env.AUDIT_DIGEST_SECRET = 'route-handler-test-secret-32-chars-min!'
 import { POST as CREATE } from '@/app/api/application/route'
 import { GET } from '@/app/api/application/[id]/route'
 import { POST } from '@/app/api/application/[id]/actions/route'
+import { OWNER_TOKEN_HEADER } from '@/server/ownership'
 import { __resetStoreForTests } from '@/server/store'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
 import type { ApplicationState } from '@/domain/application/state'
@@ -25,7 +26,7 @@ const tokens = new Map<string, string>()
 /** What the owner of `id` presents. Nothing, for an id nobody was given. */
 function asOwner(id: string): Record<string, string> {
   const token = tokens.get(id)
-  return token === undefined ? {} : { 'x-owner-token': token }
+  return token === undefined ? {} : { [OWNER_TOKEN_HEADER]: token }
 }
 
 function postBody(id: string, action: unknown): RequestInit {
