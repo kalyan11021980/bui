@@ -81,13 +81,12 @@ describe('ApplicationPanel', () => {
     let s = createApplication('app-1', profile, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
-      source: 'ocr', at: AT, box: [10, 20, 100, 60],
+      source: 'ocr', at: AT, documentId: 'doc-1', box: [10, 20, 100, 60],
     })
     render(
       <ApplicationPanel
         state={s}
-        documentUrl="blob:doc"
-        documentSize={{ width: 800, height: 500 }}
+        documents={{ 'doc-1': { url: 'blob:doc', size: { width: 800, height: 500 } } }}
       />,
     )
     expect(screen.getByRole('img')).toBeInTheDocument()

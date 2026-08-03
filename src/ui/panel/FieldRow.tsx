@@ -1,9 +1,9 @@
 import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
-import type { ImageSize } from '@/domain/ocr/geometry'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { CarryAck } from './CarryAck'
+import type { DocumentImages } from './document-images'
 import { fieldInputId } from './FieldControl'
 import { FieldInput } from './FieldInput'
 import { formatValue } from './format'
@@ -35,9 +35,8 @@ type Props = EditHandlers & {
    */
   carriedInto?: readonly RequirementKey[]
   carriedOut?: readonly RequirementKey[]
-  /** The document this row's value was read from, if the browser still holds it. */
-  documentUrl?: string
-  documentSize?: ImageSize
+  /** The documents this browser still holds, for the crop on this row. */
+  documents?: DocumentImages
 }
 
 export function FieldRow(props: Props) {
@@ -116,8 +115,7 @@ export function FieldRow(props: Props) {
       {state?.provenance && (
         <Provenance
           provenance={state.provenance}
-          {...(props.documentUrl && { imageUrl: props.documentUrl })}
-          {...(props.documentSize && { imageSize: props.documentSize })}
+          {...(props.documents && { documents: props.documents })}
         />
       )}
 

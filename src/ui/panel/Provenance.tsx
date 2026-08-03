@@ -1,8 +1,8 @@
 import type { Provenance as ProvenanceValue } from '@/domain/application/state'
 import { QUIET_THRESHOLD } from '@/domain/ocr/confidence'
-import type { ImageSize } from '@/domain/ocr/geometry'
 import { COLOR } from '@/ui/theme/tokens'
 import { DocumentCrop } from './DocumentCrop'
+import type { DocumentImages } from './document-images'
 
 /**
  * A carried value is a guess, not a fact — a dealer licence may be registered
@@ -18,12 +18,19 @@ const SOURCE_LABEL: Record<string, string> = {
 
 type Props = {
   provenance: ProvenanceValue
-  /** The uploaded document, if the browser still holds it — absent after a reload. */
-  imageUrl?: string
-  imageSize?: ImageSize
+  /** The uploaded documents, if the browser still holds them — empty after a reload. */
+  documents?: DocumentImages
 }
 
-export function Provenance({ provenance, imageUrl, imageSize }: Props) {
+export function Provenance({ provenance, documents }: Props) {
+  // The document this value was read from, and never another. A crop drawn
+  // from a later upload would show a region of a document the value did not
+  // come from, under a label saying it did. No match means no crop: the
+  // sentence and the confidence stand on their own.
+  const image = provenance.documentId
+    ? documents?.[provenance.documentId]
+    : undefined
+
   const unsure =
     provenance.source === 'ocr'
     && provenance.confidence !== undefined
@@ -35,11 +42,11 @@ export function Provenance({ provenance, imageUrl, imageSize }: Props) {
 
   return (
     <>
-      {provenance.box && (
+      {provenance.box && image && (
         <DocumentCrop
-          imageUrl={imageUrl}
+          imageUrl={image.url}
           box={provenance.box}
-          imageSize={imageSize}
+          imageSize={image.size}
           alt="The part of your document this was read from"
         />
       )}

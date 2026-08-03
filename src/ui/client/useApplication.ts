@@ -6,9 +6,9 @@ import { applicationReducer } from '@/domain/application/reducer'
 import { isComplete } from '@/domain/application/queries'
 import type { Action, ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
-import type { ImageSize } from '@/domain/ocr/geometry'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
+import type { DocumentImages } from '@/ui/panel/document-images'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
 import {
   sendAction, sendDocument, startApplication, type UploadOutcome,
@@ -36,8 +36,8 @@ const NO_START =
 
 export type UseApplication = {
   state: ApplicationState | null
-  /** The photo this browser uploaded, for the crops. Gone after a reload. */
-  document: { url: string; size: ImageSize } | null
+  /** The photos this browser uploaded, for the crops. Gone after a reload. */
+  documents: DocumentImages
   /** What to tell the applicant about their document, or about starting up. */
   notice: string | null
   /** The server is behind what is on screen, and the applicant should know. */
@@ -55,7 +55,7 @@ export type UseApplication = {
 
 export function useApplication(): UseApplication {
   const [state, setState] = useState<ApplicationState | null>(null)
-  const [docImage, setDocImage] = useState<UseApplication['document']>(null)
+  const [docImages, setDocImages] = useState<DocumentImages>({})
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
   const [carry, setCarry] = useState<CarryNotice | null>(null)
@@ -131,9 +131,6 @@ export function useApplication(): UseApplication {
 
   const readDocument = (docType: DocType, image: PreparedImage) => {
     if (!state) return
-    // Held before the call returns: the crops need it, and it never leaves
-    // this browser.
-    setDocImage({ url: image.imageUrl, size: image.imageSize })
     setNotice(READING)
 
     enqueue(async () => {
@@ -151,6 +148,13 @@ export function useApplication(): UseApplication {
         setNotice(refusal ?? NO_READER)
         return
       }
+      // Filed under the server's id, not over the last photo: a value read
+      // from an earlier document must keep showing that document, and the
+      // pixels never leave this browser either way.
+      setDocImages((held) => ({
+        ...held,
+        [result.value.documentId]: { url: image.imageUrl, size: image.imageSize },
+      }))
       setState(result.value.state)
       setCarry(null)
       setNotice(readNotice(result.value))
@@ -158,7 +162,7 @@ export function useApplication(): UseApplication {
   }
 
   return {
-    state, document: docImage, notice, outOfStep, carry,
+    state, documents: docImages, notice, outOfStep, carry,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
   }

@@ -88,9 +88,7 @@ export default function Page() {
           onClear: app.clear,
         })}
         {...(app.carry && !closed && { carry: app.carry })}
-        {...(app.document && {
-          documentUrl: app.document.url, documentSize: app.document.size,
-        })}
+        documents={app.documents}
       />
 
       {/* The attempt is always allowed; the answer is what is outstanding, or

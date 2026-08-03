@@ -35,6 +35,9 @@ export type IngestInput = {
 
 export type IngestOutcome = {
   readonly band: QualityBand
+  /** What this upload was filed as. The browser draws crops from the photo
+   * that carries this id, and from no other. */
+  readonly documentId: string
   readonly filled: readonly RequirementKey[]
   readonly state: ApplicationState
 }
@@ -118,7 +121,7 @@ export async function ingestDocument(
     state = current.value
   }
 
-  return { ok: true, value: { band, filled, state } }
+  return { ok: true, value: { band, documentId, filled, state } }
 }
 
 /**

@@ -26,6 +26,13 @@ const PREPARED: PreparedImage = {
   imageSize: { width: 1560, height: 1006 },
 }
 
+/** A second, differently-sized document — a passport after a licence. */
+const SECOND: PreparedImage = {
+  imageBase64: 'b3RoZXI=',
+  imageUrl: 'data:image/jpeg;base64,b3RoZXI=',
+  imageSize: { width: 3024, height: 4032 },
+}
+
 /** Below the read floor: refused in the browser, never sent. */
 const TOO_SMALL: PreparedImage = {
   imageBase64: 'dGlueQ==',
@@ -60,6 +67,23 @@ function withDlNumber(state: ApplicationState, placed = true): ApplicationState 
         provenance: {
           source: 'ocr', documentId: 'doc-1', confidence: 0.9,
           ...(placed && { box: BOX }),
+        },
+      },
+    },
+  }
+}
+
+/** A field read off a second document, with a box of its own. */
+function withDob(state: ApplicationState): ApplicationState {
+  return {
+    ...state,
+    fields: {
+      ...state.fields,
+      dob: {
+        value: '1978-01-06',
+        status: 'derived',
+        provenance: {
+          source: 'ocr', documentId: 'doc-2', confidence: 0.9, box: BOX,
         },
       },
     },
@@ -204,7 +228,10 @@ describe('the page', () => {
       call.url.endsWith('/documents')
         ? {
             status: 200,
-            body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: withDlNumber(created()),
+            },
           }
         : asServer(call)
 
@@ -229,7 +256,10 @@ describe('the page', () => {
       call.url.endsWith('/documents')
         ? {
             status: 200,
-            body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: withDlNumber(created()),
+            },
           }
         : asServer(call)
 
@@ -244,6 +274,56 @@ describe('the page', () => {
     expect(image).toHaveAttribute('src', PREPARED.imageUrl)
     expect(image?.style.width).toBe(`${1560 * (260 / 300)}px`)
     expect(image?.style.left).toBe(`${-100 * (260 / 300)}px`)
+  })
+
+  it('never repaints an earlier crop with a second document’s pixels', async () => {
+    // Two successful uploads of different photos. Server state is cumulative,
+    // so the first document's field keeps its box — and would happily have it
+    // clipped out of the second photo, under a label saying it was read there.
+    let seen = 0
+    respond = (call) => {
+      if (!call.url.endsWith('/documents')) return asServer(call)
+      seen += 1
+      return seen === 1
+        ? {
+            status: 200,
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: withDlNumber(created()),
+            },
+          }
+        : {
+            status: 200,
+            body: {
+              band: 'full', documentId: 'doc-2', filled: ['dob'],
+              state: withDob(withDlNumber(created())),
+            },
+          }
+    }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+    await screen.findByRole('img', { name: /part of your document/i })
+
+    decoder.next = SECOND
+    await uploadPhoto()
+
+    const dob = await screen.findByRole('group', { name: /date of birth/i })
+    await waitFor(() =>
+      expect(within(dob).getByRole('img', { name: /part of your document/i }))
+        .toBeInTheDocument())
+
+    // The licence number was read off the first photo and must still be shown
+    // against it — never against the passport uploaded after it.
+    const licence = screen.getByRole('group', { name: /driver's license number/i })
+    const carried = within(licence).queryByRole('img', { name: /part of your document/i })
+    expect(carried?.querySelector('img')).toHaveAttribute('src', PREPARED.imageUrl)
+    expect(within(dob).getByRole('img', { name: /part of your document/i })
+      .querySelector('img')).toHaveAttribute('src', SECOND.imageUrl)
+    // Whatever else changed, the second photo is nowhere near the first row.
+    expect(carried?.querySelector('img')).not.toHaveAttribute('src', SECOND.imageUrl)
   })
 
   it('says something true and calm when the reader is unreachable, and asks nothing again', async () => {
@@ -325,7 +405,7 @@ describe('the page', () => {
   it('says plainly when the document gave up nothing, without calling it a failure', async () => {
     respond = (call) =>
       call.url.endsWith('/documents')
-        ? { status: 200, body: { band: 'full', filled: [], state: created() } }
+        ? { status: 200, body: { band: 'full', documentId: 'doc-1', filled: [], state: created() } }
         : asServer(call)
 
     render(<Page />)
@@ -346,7 +426,7 @@ describe('the page', () => {
         ? {
             status: 200,
             body: {
-              band: 'text-only', filled: ['dl_number'],
+              band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
               state: withDlNumber(created(), false),
             },
           }
@@ -434,7 +514,10 @@ describe('the page', () => {
       call.url.endsWith('/documents')
         ? {
             status: 200,
-            body: { band: 'full', filled: ['dl_number'], state: withDlNumber(created()) },
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: withDlNumber(created()),
+            },
           }
         : asServer(call)
 

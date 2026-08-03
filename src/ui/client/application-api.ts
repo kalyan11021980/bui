@@ -22,6 +22,8 @@ export type ApiResult<T> =
 
 export type UploadOutcome = {
   readonly band: QualityBand
+  /** What the server filed this upload as — the key the photo is held under. */
+  readonly documentId: string
   readonly filled: readonly RequirementKey[]
   readonly state: ApplicationState
 }
