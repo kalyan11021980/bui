@@ -1,6 +1,7 @@
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { CarryNotice } from '@/domain/application/carry'
+import type { ImageSize } from '@/domain/ocr/geometry'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { requiredFields } from '@/domain/requirements/engine'
 import { groupIntoSections } from '@/domain/requirements/sections'
@@ -23,6 +24,9 @@ type Props = EditHandlers & {
   onSubmit?: () => void
   /** Absent when the last edit changed nothing elsewhere. */
   carry?: CarryNotice
+  /** The uploaded document, if the browser still holds it — absent after a reload. */
+  documentUrl?: string
+  documentSize?: ImageSize
 }
 
 /**
@@ -31,7 +35,9 @@ type Props = EditHandlers & {
  * catalog's own `section`, in the order the requirements engine emits them.
  */
 export function ApplicationPanel(props: Props) {
-  const { state, onConfirm, onEdit, onSubmit, carry } = props
+  const {
+    state, onConfirm, onEdit, onSubmit, carry, documentUrl, documentSize,
+  } = props
   const required = requiredFields(state.profile)
   const outstanding = new Set(outstandingFields(state))
   const done = required.length - outstanding.size
@@ -101,6 +107,8 @@ export function ApplicationPanel(props: Props) {
                   {...(carry?.from === id && {
                     carriedInto: carry.filled, carriedOut: carry.cleared,
                   })}
+                  {...(documentUrl && { documentUrl })}
+                  {...(documentSize && { documentSize })}
                 />
               ))}
             </section>

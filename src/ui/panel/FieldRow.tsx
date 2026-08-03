@@ -1,5 +1,6 @@
 import type { FieldState } from '@/domain/application/state'
 import { fieldDef } from '@/domain/catalog'
+import type { ImageSize } from '@/domain/ocr/geometry'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
 import { COLOR, STATUS_COLOR } from '@/ui/theme/tokens'
 import { CarryAck } from './CarryAck'
@@ -34,6 +35,9 @@ type Props = EditHandlers & {
    */
   carriedInto?: readonly RequirementKey[]
   carriedOut?: readonly RequirementKey[]
+  /** The document this row's value was read from, if the browser still holds it. */
+  documentUrl?: string
+  documentSize?: ImageSize
 }
 
 export function FieldRow(props: Props) {
@@ -109,7 +113,13 @@ export function FieldRow(props: Props) {
 
       <Rationale field={def} id={rationaleId} />
 
-      {state?.provenance && <Provenance provenance={state.provenance} />}
+      {state?.provenance && (
+        <Provenance
+          provenance={state.provenance}
+          {...(props.documentUrl && { imageUrl: props.documentUrl })}
+          {...(props.documentSize && { imageSize: props.documentSize })}
+        />
+      )}
 
       {state?.rejection && <RejectionBanner reason={state.rejection.reason} />}
 

@@ -40,6 +40,32 @@ describe('FieldRow', () => {
     expect(screen.getByText(/from your document/i)).toBeInTheDocument()
   })
 
+  it('passes the document image down to the crop when both are given', () => {
+    render(
+      <FieldRow
+        fieldId="dob"
+        state={{ ...derived, provenance: { ...derived.provenance!, box: [10, 20, 100, 60] } }}
+        documentUrl="blob:doc"
+        documentSize={{ width: 800, height: 500 }}
+      />,
+    )
+    expect(screen.getByRole('img')).toBeInTheDocument()
+  })
+
+  it('shows no crop when a box exists but the row was never given a document', () => {
+    // documentUrl/documentSize are threaded from ApplicationPanel and can be
+    // absent (pre-upload, or after a reload); the row must degrade cleanly
+    // rather than assume they are always there.
+    render(
+      <FieldRow
+        fieldId="dob"
+        state={{ ...derived, provenance: { ...derived.provenance!, box: [10, 20, 100, 60] } }}
+      />,
+    )
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.getByText(/from your document/i)).toBeInTheDocument()
+  })
+
   it('asks the user to check a carried value rather than stating it as fact', () => {
     render(
       <FieldRow
