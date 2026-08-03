@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { extractFor, parseCandidates, registerStrategy } from '@/domain/ocr/extract'
-import { glyphAmbiguity, NO_EVIDENCE } from '@/domain/ocr/extract/types'
-import type { Candidate, Evidence } from '@/domain/ocr/extract/types'
+import {
+  extractFor, glyphAmbiguity, NO_EVIDENCE, parseCandidates, registerStrategy,
+} from '@/domain/ocr/extract'
+import type { Candidate, Evidence } from '@/domain/ocr/extract'
 
 const noEvidence: Evidence = {
   schemaParsed: false, labelAnchored: false,

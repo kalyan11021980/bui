@@ -83,14 +83,6 @@ describe('requiredFields', () => {
     expect(k).not.toContain('biz_addr_line2')
   })
 
-  it('returns no duplicates', () => {
-    const k = requiredFields({
-      ...base, applicantType: 'business', wantsGsa: true,
-      licenses: ['dealer', 'salvage'], state: 'OH',
-    })
-    expect(new Set(k).size).toBe(k.length)
-  })
-
   it('returns the exact expected set for an individual in Georgia', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
@@ -121,6 +113,7 @@ describe('requiredFields', () => {
 
 describe('the declared ID form decides which number is owed', () => {
   const NUMBERS = ['dl_number', 'id_number', 'passport_number'] as const
+  const ID_FORMS = ['drivers_license', 'state_id', 'passport'] as const
 
   /** Exactly one, never two, never none — asserted as a set, not a contains. */
   const numbersAsked = (profile: ApplicantProfile) =>
@@ -153,6 +146,15 @@ describe('the declared ID form decides which number is owed', () => {
     expect(keys).toContain('id_images')
   })
 
+  it('returns the exact expected set for a state ID holder', () => {
+    expect([...requiredFields({ ...base, idForm: 'state_id' })].sort()).toEqual([
+      'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'dl_expiry', 'dob', 'first_name',
+      'id_country', 'id_images', 'id_number', 'id_state',
+      'last_name', 'phone_mobile', 'preferred_language', 'primary_activity',
+    ])
+  })
+
   it('returns the exact expected set for a passport holder', () => {
     expect([...requiredFields({ ...base, idForm: 'passport' })].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
@@ -162,11 +164,43 @@ describe('the declared ID form decides which number is owed', () => {
     ])
   })
 
+  it('returns no duplicates, whichever document is declared', () => {
+    for (const idForm of ID_FORMS) {
+      const k = requiredFields({
+        ...base, idForm, applicantType: 'business', wantsGsa: true,
+        licenses: ['dealer', 'salvage'], state: 'OH',
+      })
+      expect(new Set(k).size, idForm).toBe(k.length)
+    }
+  })
+
+  it('asks for identity in one order, whichever document is declared', () => {
+    // The number belongs beside the other document fields. Appended after
+    // id_images instead, the panel asks for photographs of the ID before the
+    // number printed on it, and section order is not enough to catch that.
+    const identity = (idForm: ApplicantProfile['idForm']) =>
+      requiredFields({ ...base, idForm })
+        .filter((k) => CATALOG.get(parseReqKey(k).fieldId)?.section === 'identification')
+
+    expect(identity('drivers_license')).toEqual([
+      'first_name', 'last_name', 'dl_number', 'dl_expiry',
+      'id_country', 'id_state', 'dob', 'id_images',
+    ])
+    expect(identity('state_id')).toEqual([
+      'first_name', 'last_name', 'id_number', 'dl_expiry',
+      'id_country', 'id_state', 'dob', 'id_images',
+    ])
+    expect(identity('passport')).toEqual([
+      'first_name', 'last_name', 'passport_number', 'dl_expiry',
+      'id_country', 'dob', 'id_images',
+    ])
+  })
+
   it('keeps each section contiguous, so the panel groups it as one block', () => {
-    // The number and issuing state are appended by the engine rather than by
-    // CORE_IDENTITY; appending them after contact would split identification
-    // in two and the panel would show a different order from the engine's.
-    for (const idForm of ['drivers_license', 'state_id', 'passport'] as const) {
+    // Identity is composed in one place; emitting the document-dependent part
+    // after contact would split identification in two, and the panel would
+    // show a different order from the one the engine validates.
+    for (const idForm of ID_FORMS) {
       const sections = requiredFields({ ...base, idForm })
         .map((k) => CATALOG.get(parseReqKey(k).fieldId)?.section)
       const runs = sections.filter((s, i) => s !== sections[i - 1])

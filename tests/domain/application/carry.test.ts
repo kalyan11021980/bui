@@ -96,7 +96,7 @@ describe('applyCarry', () => {
   it('never carries into a field this applicant is not asked for', () => {
     // An individual is never asked for a business address. Carrying into one
     // anyway puts fields in the record that the panel cannot show and the
-    // route's §8.2 check would refuse.
+    // route's requirements check would refuse.
     const individual: ApplicantProfile = { ...business, applicantType: 'individual' }
     let s = createApplication('app-1', individual)
     s = applicationReducer(s, {
@@ -129,16 +129,23 @@ function everyEmittableKey(): Set<string> {
   const licenceSets: readonly (readonly LicenseType[])[] = [
     [], ['dealer'], ['dealer', 'salvage'], ['dismantler', 'exporter', 'salvage'],
   ]
+  const idForms = ['drivers_license', 'state_id', 'passport'] as const
   const keys = new Set<string>()
   for (const applicantType of ['individual', 'business'] as const) {
     for (const wantsGsa of [false, true]) {
       for (const state of [null, 'GA', 'OH', 'ZZ']) {
         for (const licenses of licenceSets) {
-          const profile: ApplicantProfile = {
-            applicantType, country: 'US', state, wantsGsa, licenses, addressDiffersFromId: false,
-            idForm: 'drivers_license',
+          // Both declarations are swept too: pinning either would report a
+          // rule naming id_number or proof_of_residency as dead.
+          for (const idForm of idForms) {
+            for (const addressDiffersFromId of [false, true]) {
+              const profile: ApplicantProfile = {
+                applicantType, country: 'US', state, wantsGsa, licenses,
+                addressDiffersFromId, idForm,
+              }
+              for (const key of requiredFields(profile)) keys.add(key)
+            }
           }
-          for (const key of requiredFields(profile)) keys.add(key)
         }
       }
     }
@@ -212,7 +219,7 @@ describe('a carried value tracks its source until the applicant owns it', () => 
   it('leaves a stale carried value nowhere for a correction to hide', () => {
     // The quieter version of the same bug over the API: correcting a home
     // address left the old one mirrored into the business address, and a
-    // plausible stale value is exactly what gets rubber-stamped (§10.4).
+    // plausible stale value is exactly what gets rubber-stamped.
     let s = setAddress(createApplication('app-1', business), '2345 Anywhere St')
     s = applyCarry(s, AT).state
     s = setAddress(s, '99 Other Rd')
@@ -295,7 +302,7 @@ describe('carry and a cleared source', () => {
   it('clears an unconfirmed mirror when its source goes away', () => {
     // Otherwise correcting a home address by clearing it leaves a plausible
     // business address behind with nothing backing it — a stale carried value
-    // is exactly what gets rubber-stamped (§10.4).
+    // is exactly what gets rubber-stamped.
     let s = applyCarry(withAddress(), AT).state
     expect(s.fields.biz_addr_line1?.value).toBe('2345 Anywhere St')
 
@@ -339,5 +346,19 @@ describe('carry and a cleared source', () => {
     const second = applyCarry(s, AT)
     expect(second.applied).toEqual([])
     expect(second.state).toBe(s)
+  })
+})
+
+describe('everyEmittableKey sweeps the whole profile', () => {
+  it('reaches the keys only a non-default declaration produces', () => {
+    // Guards the guard. Pinning idForm or addressDiffersFromId narrows the
+    // set silently, and the two tests above then report a live carry rule as
+    // dead — a finding that reads like drift and is not.
+    const emittable = everyEmittableKey()
+    for (const key of [
+      'dl_number', 'id_number', 'passport_number', 'proof_of_residency',
+    ]) {
+      expect(emittable.has(key), `no profile in the sweep asks for ${key}`).toBe(true)
+    }
   })
 })

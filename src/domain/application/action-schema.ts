@@ -70,8 +70,13 @@ const licenseType = z.enum(['dealer', 'dismantler', 'exporter', 'salvage'])
  * Strict because the profile is the only input to the requirements engine: an
  * unrecognised key changes nothing today and changes an applicant's legal
  * obligations the day a rule reads it.
+ *
+ * Exported so a test can check it against ALL_PROFILE_KEYS. `Partial<
+ * ApplicantProfile>` on the action does not force an entry here, so a key
+ * added to the profile and forgotten here parses green and is refused at
+ * runtime — which is how proof of residency stayed unreachable for a task.
  */
-const profilePatch = z
+export const profilePatch = z
   .object({
     applicantType: z.enum(['business', 'individual']).optional(),
     country: z.string().min(1).optional(),

@@ -17,7 +17,7 @@ const control = (label: RegExp) => screen.getByLabelText(label, CONTROL)
 const queryControl = (label: RegExp) => screen.queryByLabelText(label, CONTROL)
 
 /**
- * Phase 1's exit criterion (§15) is that a user can complete a registration
+ * Phase 1's exit criterion is that a user can complete a registration
  * through the panel. Before this wave `grep -rnE "<input|<select"` over src/
  * returned nothing at all: the panel could display an application and never
  * accept one.

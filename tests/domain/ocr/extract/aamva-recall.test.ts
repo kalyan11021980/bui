@@ -108,8 +108,41 @@ const EXPECTED: Record<string, { reads: readonly string[]; wrong: Record<string,
   },
 }
 
-/** Recall, stated as a number so a change to it has to be argued for. */
-const TOTALS = { read: 66, correct: 61, fields: 81 }
+/** What each document type owes, so a card is graded against its own fields. */
+const GRADED: Record<Fixture['docType'], readonly string[]> = {
+  drivers_license: ALL,
+  state_id: ID_ALL,
+}
+
+/**
+ * Recall, stated as a number so a change to it has to be argued for, and split
+ * by document type so a change is attributable. One lumped total hid which
+ * half moved — and the two field lists are the same length, so a ternary over
+ * them could not tell its own branches apart.
+ */
+const TOTALS: Record<Fixture['docType'], { read: number; correct: number; fields: number }> = {
+  drivers_license: { read: 48, correct: 45, fields: 63 },
+  state_id: { read: 18, correct: 16, fields: 18 },
+}
+
+const summed = (of: 'read' | 'correct' | 'fields'): number =>
+  TOTALS.drivers_license[of] + TOTALS.state_id[of]
+
+/** Counts one document type, or the whole corpus when given none. */
+function tally(docType?: Fixture['docType']) {
+  let read = 0
+  let correct = 0
+  let fields = 0
+
+  for (const card of cards.filter((c) => docType === undefined || c.docType === docType)) {
+    fields += GRADED[card.docType].length
+    for (const [field, value] of readCard(card)) {
+      read += 1
+      if (matches(value, expected(card, field) ?? '')) correct += 1
+    }
+  }
+  return { read, correct, fields }
+}
 
 describe('AAMVA recall against recorded specimens', () => {
   it('has the corpus it thinks it has', () => {
@@ -161,20 +194,32 @@ describe('AAMVA recall against recorded specimens', () => {
     })
   }
 
-  it('reads 66 of 81 fields, 61 of them right', () => {
-    let read = 0
-    let correct = 0
-    let fields = 0
+  it('grades each document type against its own field list', () => {
+    // The two lists are the same length, so a swap would not move any total.
+    // What separates them is which number field they name.
+    expect(GRADED.drivers_license).toContain('dl_number')
+    expect(GRADED.drivers_license).not.toContain('id_number')
+    expect(GRADED.state_id).toContain('id_number')
+    expect(GRADED.state_id).not.toContain('dl_number')
+  })
 
-    for (const card of cards) {
-      fields += card.docType === 'drivers_license' ? ALL.length : ID_ALL.length
-      for (const [field, value] of readCard(card)) {
-        read += 1
-        if (matches(value, expected(card, field) ?? '')) correct += 1
-      }
-    }
+  it('reads 48 of 63 fields off the licences, 45 of them right', () => {
+    expect(tally('drivers_license')).toEqual(TOTALS.drivers_license)
+  })
 
-    expect({ read, correct, fields }).toEqual(TOTALS)
+  it('reads every one of the 18 fields off the ID cards, 16 of them right', () => {
+    // Split out so a change is attributable: one lumped number could move
+    // because ID cards regressed and licences improved by the same amount.
+    expect(tally('state_id')).toEqual(TOTALS.state_id)
+  })
+
+  it('reads 66 of 81 fields across the corpus, 61 of them right', () => {
+    const all = cards.map((c) => c.docType)
+    // Guards the two above: a docType present in neither tally is ungraded.
+    expect(new Set(all)).toEqual(new Set(Object.keys(TOTALS)))
+    expect(tally()).toEqual({
+      read: summed('read'), correct: summed('correct'), fields: summed('fields'),
+    })
   })
 
   it('puts every value it reads in a plausible box', () => {
@@ -182,7 +227,7 @@ describe('AAMVA recall against recorded specimens', () => {
       (card) => parseCandidates(extractFor(card.docType, card.detections, card.text)),
     )
     // Guards the loop: nothing to check would otherwise pass.
-    expect(seen).toHaveLength(TOTALS.read)
+    expect(seen).toHaveLength(summed('read'))
     for (const c of seen) {
       expect(c.box, c.key).toBeDefined()
       expect(c.evidence.boxPlausible, c.key).toBe(true)

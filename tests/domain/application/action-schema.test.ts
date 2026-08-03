@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  actionSchema, describeZodError, requestBodySchema, toAction,
+  actionSchema, describeZodError, profilePatch, requestBodySchema, toAction,
 } from '@/domain/application/action-schema'
+import { ALL_PROFILE_KEYS } from '@/domain/requirements/rules'
+import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const AT = '2026-08-01T12:00:00.000Z'
 
@@ -127,5 +129,57 @@ describe('describeZodError', () => {
     expect(r.success).toBe(false)
     if (r.success) throw new Error('unreachable')
     expect(describeZodError(r.error)).toMatch(/reason/)
+  })
+})
+
+/**
+ * `Action.patch` is `Partial<ApplicantProfile>`, so adding a key to the profile
+ * does not make tsc demand one in `profilePatch`. It parses green and `.strict()`
+ * refuses the key at runtime — which is how `addressDiffersFromId` sat
+ * unreachable over the wire for a whole task, taking the proof-of-residency
+ * rule with it. A type cannot be enumerated at runtime; ALL_PROFILE_KEYS can.
+ */
+describe('every profile key is reachable over the wire', () => {
+  /** One valid value per key, so each can be sent on its own and read back. */
+  const SAMPLE: { [K in keyof ApplicantProfile]: ApplicantProfile[K] } = {
+    applicantType: 'business',
+    country: 'US',
+    state: 'OH',
+    wantsGsa: true,
+    licenses: ['dealer'],
+    addressDiffersFromId: true,
+    idForm: 'passport',
+  }
+
+  it('declares exactly the keys the wire schema accepts', () => {
+    expect(Object.keys(profilePatch.shape).sort())
+      .toEqual([...ALL_PROFILE_KEYS].sort())
+  })
+
+  it('has a sample value for every declared key, so the sweep below is real', () => {
+    // Guards the loop: a SAMPLE that had drifted would silently test less.
+    expect(Object.keys(SAMPLE).sort()).toEqual([...ALL_PROFILE_KEYS].sort())
+  })
+
+  it('parses and carries through each key sent on its own', () => {
+    // Three places to forget, not two: the schema, and `toAction`'s
+    // key-by-key rebuild, which would drop a key the schema accepted.
+    for (const key of ALL_PROFILE_KEYS) {
+      const patch = { [key]: SAMPLE[key] }
+      const parsed = actionSchema.safeParse({ type: 'UPDATE_PROFILE', patch, at: AT })
+      expect(parsed.success, `${key} is not accepted by profilePatch`).toBe(true)
+      if (!parsed.success) continue
+
+      const action = toAction(parsed.data)
+      if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
+      expect(action.patch, `${key} is dropped by toAction`).toEqual(patch)
+    }
+  })
+
+  it('still refuses a key the profile does not declare', () => {
+    // The sweep above must not have been bought by loosening `.strict()`.
+    expect(actionSchema.safeParse({
+      type: 'UPDATE_PROFILE', patch: { favouriteColour: 'blue' }, at: AT,
+    }).success).toBe(false)
   })
 })

@@ -263,7 +263,7 @@ describe('AuditLog — the sensitive-value boundary fails CLOSED', () => {
   })
 })
 
-describe('AuditLog — per-application trails (spec §10.1)', () => {
+describe('AuditLog — per-application trails', () => {
   it('stamps every event with the application it belongs to', () => {
     const log = new AuditLog(digester)
     const e = log.append('app-7', {

@@ -7,7 +7,7 @@ describe('catalog index', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('requires purpose and authority on every field — the §9 guarantee', () => {
+  it('requires purpose and authority on every field — the spec guarantee', () => {
     for (const f of ALL_FIELDS) {
       expect(f.purpose.trim(), f.id).not.toBe('')
       expect(f.authority, f.id).toBeTruthy()

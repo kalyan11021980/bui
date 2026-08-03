@@ -182,7 +182,7 @@ describe('SUBMIT', () => {
   })
 
   it('refuses to submit while requirements remain, and names them', () => {
-    // Spec §8.2: reject any completion attempt while requirements remain.
+    // Reject any completion attempt while requirements remain.
     // Refusing is not the same as disabling the button — the attempt is
     // always allowed, and the answer says what is missing.
     const s = createApplication('app-1', profile)
@@ -296,7 +296,7 @@ describe('a submitted application is closed to further change', () => {
   })
 })
 
-describe('UPDATE_PROFILE resyncs fields the profile no longer requires (§8.5)', () => {
+describe('UPDATE_PROFILE resyncs fields the profile no longer requires', () => {
   const twoLicences: ApplicantProfile = {
     applicantType: 'business', country: 'US', state: 'GA',
     wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,

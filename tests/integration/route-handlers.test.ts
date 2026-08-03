@@ -164,7 +164,7 @@ describe('POST /api/application/[id]/actions', () => {
 describe('POST /api/application/[id]/actions — carried provenance', () => {
   it('carries a personal address into the business address on the write path', async () => {
     // applyCarry had no caller outside tests: the route applied the reducer
-    // and persisted, so §9's headline case was unsolved in the running app.
+    // and persisted, so the headline case was unsolved in the running app.
     const id = await newBusiness()
     const res = await post(id, {
       type: 'SET_VALUE', fieldId: 'addr_line1', value: '2345 Anywhere St',
@@ -217,7 +217,7 @@ describe('POST /api/application/[id]/actions — carried provenance', () => {
 })
 
 /**
- * Spec §8.2 names this handler as the enforcement point. Every case below
+ * The spec names this handler as the enforcement point. Every case below
  * returned 200 and was stored before this wave. Phase 3 puts an LLM on this
  * exact surface, so each of these is a tool call a misbehaving model can make.
  */

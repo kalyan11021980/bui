@@ -26,6 +26,25 @@ export type ApplicantProfile = {
   idForm: IdForm
 }
 
+/**
+ * Every key of ApplicantProfile, as a runtime array — a type cannot be
+ * enumerated at runtime, and the wire schema that has to accept all of them is
+ * typed `Partial<ApplicantProfile>`, which does not force a matching entry.
+ * `addressDiffersFromId` spent a whole task unreachable over the wire that way.
+ */
+export const ALL_PROFILE_KEYS = [
+  'applicantType', 'country', 'state', 'wantsGsa', 'licenses',
+  'addressDiffersFromId', 'idForm',
+] as const satisfies readonly (keyof ApplicantProfile)[]
+
+/** A profile key missing from the array above is a compile error, not a gap. */
+type UnlistedProfileKey = Exclude<
+  keyof ApplicantProfile, (typeof ALL_PROFILE_KEYS)[number]
+>
+const _everyProfileKeyIsListed: UnlistedProfileKey extends never
+  ? true : UnlistedProfileKey = true
+void _everyProfileKeyIsListed
+
 /** Each document carries its own number, under its own name. */
 export const ID_NUMBER: Readonly<Record<IdForm, FieldId>> = {
   drivers_license: 'dl_number',
@@ -38,10 +57,22 @@ export const CORE_PROFILE: readonly FieldId[] = [
   'primary_activity', 'preferred_language',
 ]
 
-/** Common to every document. The number and issuing state depend on `idForm`. */
-export const CORE_IDENTITY: readonly FieldId[] = [
-  'first_name', 'last_name', 'dl_expiry', 'id_country', 'dob', 'id_images',
-]
+/**
+ * Identity, in the order the panel asks it. A function rather than a list
+ * because the declared document decides two of the entries — and their place
+ * in the order matters: the number printed on the ID belongs beside the other
+ * document fields, not after the request for photographs of it.
+ */
+export function identityFields(profile: ApplicantProfile): readonly FieldId[] {
+  return [
+    'first_name', 'last_name',
+    ID_NUMBER[profile.idForm],
+    'dl_expiry', 'id_country',
+    // A passport has no issuing state, so asking for one has no answer.
+    ...(profile.idForm === 'passport' ? [] : ['id_state' as const]),
+    'dob', 'id_images',
+  ]
+}
 
 export const CORE_ADDRESS: readonly FieldId[] = [
   'addr_line1', 'addr_city', 'addr_state', 'addr_zip',

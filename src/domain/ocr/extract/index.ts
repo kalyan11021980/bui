@@ -5,7 +5,7 @@ import type { Detection } from '../grounding'
 import type { Candidate, ExtractStrategy } from './types'
 
 export type { Candidate, Evidence, ExtractStrategy } from './types'
-export { NO_EVIDENCE } from './types'
+export { glyphAmbiguity, NO_EVIDENCE } from './types'
 
 const strategies = new Map<DocType, ExtractStrategy>()
 

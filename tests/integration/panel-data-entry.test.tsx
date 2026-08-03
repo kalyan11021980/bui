@@ -78,7 +78,7 @@ describe('completing an application through the panel', () => {
     await userEvent.type(control(/first name/i), 'Ada')
 
     expect(latest?.fields.first_name?.value).toBe('Ada')
-    // A value the user typed is confirmed by the act of typing it (§9.1),
+    // A value the user typed is confirmed by the act of typing it,
     // which is what makes the field stop being outstanding.
     expect(latest?.fields.first_name?.status).toBe('confirmed')
     expect(outstandingFields(latest!)).not.toContain('first_name')
@@ -210,7 +210,7 @@ describe('completing an application through the panel', () => {
 
   it('clears the business address it carried when the source is cleared', async () => {
     // A plausible carried value with nothing behind it is exactly what gets
-    // rubber-stamped (§10.4), and it is a value the applicant deleted.
+    // rubber-stamped, and it is a value the applicant deleted.
     let latest: ApplicationState | undefined
     render(<Harness profile={business} onState={(s) => { latest = s }} />)
 

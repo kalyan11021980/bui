@@ -6,7 +6,7 @@ import { CATALOG } from '@/domain/catalog'
 /**
  * `signedOff` is read by nothing at runtime, so an un-reviewed encoding of a
  * state's licensing law is indistinguishable from a reviewed one. The
- * sign-off itself is a compliance owner's job (§10.3) and stays parked; what
+ * sign-off itself is a compliance owner's job and stays parked; what
  * belongs in code is a list that cannot quietly change.
  *
  * If you are here because this test failed, you have either added a state
@@ -32,7 +32,7 @@ describe('what an applicant owes, by document', () => {
   })
 })
 
-describe('STATE_RULES sign-off (spec §10.3)', () => {
+describe('STATE_RULES sign-off', () => {
   it('has exactly these rules still awaiting a compliance sign-off', () => {
     const unsigned = Object.entries(STATE_RULES)
       .filter(([, rule]) => !rule.signedOff)
