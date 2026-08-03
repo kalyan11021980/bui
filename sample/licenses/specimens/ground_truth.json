@@ -1,5 +1,6 @@
 {
   "_note": "Hand-transcribed from the specimen images. Field keys are our own catalog FieldIds (src/domain/field-id.ts), so a score here reads directly as 'could OCR fill this required field'. `dl_number_box` is an EYEBALLED region on a 0-1000 scale, adequate for asking 'did the box land on the right field rather than a neighbour', NOT for tight IoU claims.",
+  "_provenance": "Every value here was read off the specimen image by eye. None of it was copied from a recorded OCR `text` or `detections`, because grading an extractor against OCR output measures parsing, not reading, and would score a misread card as a success. `first_name` is the first given name as printed; a card that prints middle names on the same line is noted.",
   "_multiline": "A value is a LIST when the card prints it across two lines. Those come back as separate detections, so a concatenated string would score a correct read as a miss.",
   "specimens": [
     {
@@ -74,6 +75,93 @@
         "addr_zip": "95818"
       },
       "dl_number_box": [362, 213, 507, 260]
+    },
+    {
+      "image": "or_2020.png",
+      "state": "OR",
+      "px": [700, 416],
+      "notes": "Name is one `1,2` stack: CARD on the first line, OREGON SAMPLE, SR on the second. The address code 8 sits beside the street line.",
+      "labels": { "dl_number": "4d NO" },
+      "fields": {
+        "dl_number": "A123456",
+        "last_name": "CARD",
+        "first_name": "OREGON",
+        "dob": "12/12/1979",
+        "dl_expiry": "12/12/2026",
+        "addr_line1": "1906 LANA AVE NE",
+        "addr_city": "SALEM",
+        "addr_state": "OR",
+        "addr_zip": "97314"
+      }
+    },
+    {
+      "image": "va_2023.png",
+      "state": "VA",
+      "px": [721, 473],
+      "notes": "Licence number is labelled `4d Customer number`, spelled out. Name is a `1,2 Name` stack.",
+      "labels": { "dl_number": "4d Customer number" },
+      "fields": {
+        "dl_number": "T16700285",
+        "last_name": "REYES",
+        "first_name": "RICHARD",
+        "dob": "01/05/1987",
+        "dl_expiry": "01/05/2031",
+        "addr_line1": "5235 JOHN TYLER HWY",
+        "addr_city": "WILLIAMSBURG",
+        "addr_state": "VA",
+        "addr_zip": "23185"
+      }
+    },
+    {
+      "image": "md_1977.png",
+      "state": "MD",
+      "px": [658, 412],
+      "notes": "Pre-AAMVA, 1977. No numbered field codes anywhere: labels are words (IDENTIFICATION NO., BIRTH DATE, EXPIRES). Dates are two-digit years. The address spells the state out in full and gives no two-letter code.",
+      "fields": {
+        "dl_number": "D-222-333-444-555",
+        "last_name": "DOE",
+        "first_name": "JANE",
+        "dob": "05-03-47",
+        "dl_expiry": "05-03-77",
+        "addr_line1": "1000 ANYWHERE STREET",
+        "addr_city": "BALTIMORE",
+        "addr_state": "MARYLAND",
+        "addr_zip": "22262"
+      }
+    },
+    {
+      "image": "ca_id_2010.png",
+      "state": "CA",
+      "px": [652, 411],
+      "notes": "Identification card, not a licence. The number is labelled `ID` and is an ID number, not a dl_number — the catalog does not derive dl_number from a state ID, so nothing in our schema holds it.",
+      "fields": {
+        "id_number": "I1234561",
+        "last_name": "SAMPLE",
+        "first_name": "SEIJI",
+        "dob": "08/31/1977",
+        "dl_expiry": "08/31/2015",
+        "addr_line1": "2570 24TH STREET",
+        "addr_city": "SACRAMENTO",
+        "addr_state": "CA",
+        "addr_zip": "95818"
+      }
+    },
+    {
+      "image": "va_id_2023.png",
+      "state": "VA",
+      "px": [721, 473],
+      "notes": "Identification card sharing the VA licence layout. `4d Customer number` holds an ID number, same caveat as ca_id_2010.",
+      "fields": {
+        "id_number": "T16700487",
+        "last_name": "SARKO",
+        "first_name": "JAMES",
+        "dob": "03/23/1950",
+        "dl_expiry": "03/23/2031",
+        "addr_line1": "110 EAST MIDLAND TRL",
+        "addr_city": "LEXINGTON",
+        "addr_state": "VA",
+        "addr_zip": "24450"
+      }
     }
   ]
 }
