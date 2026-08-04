@@ -16,6 +16,14 @@ describe('actionSchema', () => {
       { type: 'REJECT', fieldId: 'id_images', at: AT, reason: 'too dark' },
       { type: 'SUPERSEDE', fieldId: 'license_number#1', at: AT },
       { type: 'UPDATE_PROFILE', patch: { applicantType: 'business' }, at: AT },
+      {
+        type: 'APPEND_TURN', at: AT,
+        turn: {
+          seq: 1, at: AT, role: 'agent', voice: 'Right — a couple more.',
+          blocks: [{ kind: 'field_ask', fieldId: 'first_name' }],
+        },
+      },
+      { type: 'RECORD_REJECTION', at: AT },
     ]
     for (const c of cases) {
       expect(actionSchema.safeParse(c).success, JSON.stringify(c)).toBe(true)
@@ -61,6 +69,51 @@ describe('actionSchema', () => {
   })
 })
 
+describe('APPEND_TURN turn schema', () => {
+  const baseTurn = { seq: 1, at: AT, role: 'agent', voice: 'hi', blocks: [] }
+
+  it('accepts one of every block kind', () => {
+    const blocks = [
+      { kind: 'field_ask', fieldId: 'first_name' },
+      { kind: 'rationale', fieldId: 'first_name' },
+      { kind: 'document_request', docType: 'drivers_license' },
+      { kind: 'orientation', done: 2, total: 5 },
+      { kind: 'notice', copyId: 'guard_fallback' },
+    ]
+    for (const block of blocks) {
+      const turn = { ...baseTurn, blocks: [block] }
+      const result = actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT })
+      expect(result.success, JSON.stringify(block)).toBe(true)
+    }
+  })
+
+  it('rejects a block kind it has never heard of', () => {
+    const turn = { ...baseTurn, blocks: [{ kind: 'aside', fieldId: 'first_name' }] }
+    expect(actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT }).success).toBe(false)
+  })
+
+  it('rejects a doc type outside the catalog on a document_request block', () => {
+    const block = { kind: 'document_request', docType: 'birth_certificate' }
+    const turn = { ...baseTurn, blocks: [block] }
+    expect(actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT }).success).toBe(false)
+  })
+
+  it('rejects a copy id outside the vetted registry on a notice block', () => {
+    const turn = { ...baseTurn, blocks: [{ kind: 'notice', copyId: 'made_up_copy' }] }
+    expect(actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT }).success).toBe(false)
+  })
+
+  it('rejects a stray property on the turn, like every other variant', () => {
+    const turn = { ...baseTurn, sneaky: true }
+    expect(actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT }).success).toBe(false)
+  })
+
+  it('rejects a seq that is not a positive integer', () => {
+    const turn = { ...baseTurn, seq: 0 }
+    expect(actionSchema.safeParse({ type: 'APPEND_TURN', turn, at: AT }).success).toBe(false)
+  })
+})
+
 describe('toAction', () => {
   it('omits absent optionals entirely rather than setting them undefined', () => {
     // exactOptionalPropertyTypes draws a line between "absent" and "present
@@ -80,6 +133,32 @@ describe('toAction', () => {
     })
     const action = toAction(parsed)
     expect(action).toMatchObject({ documentId: 'doc-1', confidence: 0.96, box: [1, 2, 3, 4] })
+  })
+
+  it('omits an APPEND_TURN turn\'s absent optionals rather than setting them undefined', () => {
+    const parsed = actionSchema.parse({
+      type: 'APPEND_TURN', at: AT,
+      turn: {
+        seq: 1, at: AT, role: 'agent', voice: 'hi',
+        blocks: [{ kind: 'field_ask', fieldId: 'first_name' }],
+      },
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'APPEND_TURN') throw new Error('unreachable')
+    expect(Object.keys(action.turn).sort()).toEqual(['at', 'blocks', 'role', 'seq', 'voice'])
+  })
+
+  it('keeps an APPEND_TURN turn\'s optionals that were actually supplied', () => {
+    const parsed = actionSchema.parse({
+      type: 'APPEND_TURN', at: AT,
+      turn: {
+        seq: 1, at: AT, role: 'applicant', voice: null, voiceDropped: 'lint',
+        blocks: [], text: 'wants to skip GSA',
+      },
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'APPEND_TURN') throw new Error('unreachable')
+    expect(action.turn).toMatchObject({ voiceDropped: 'lint', text: 'wants to skip GSA' })
   })
 
   it('carries a profile patch through with only the keys that were sent', () => {

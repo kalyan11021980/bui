@@ -15,6 +15,9 @@ const KIND: Record<Action['type'], AuditKind> = {
   SUPERSEDE: 'superseded',
   UPDATE_PROFILE: 'profile_updated',
   SUBMIT: 'submitted',
+  // Content beyond `kind` is Task 6's concern (auditing turns).
+  APPEND_TURN: 'turn_appended',
+  RECORD_REJECTION: 'rejection_recorded',
 }
 
 /**

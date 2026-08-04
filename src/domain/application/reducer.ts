@@ -19,6 +19,8 @@ export function createApplication(
     profile,
     fields: {},
     submittedAt: null,
+    transcript: [],
+    orchestratorRejections: 0,
   }
 }
 
@@ -107,6 +109,19 @@ export function applicationReducer(
       }
       return { ...state, submittedAt: action.at }
     }
+
+    case 'APPEND_TURN': {
+      const expected = state.transcript.length + 1
+      if (action.turn.seq !== expected) {
+        throw new Error(
+          `Turn seq ${action.turn.seq} is not the next one (expected ${expected})`,
+        )
+      }
+      return { ...state, transcript: [...state.transcript, action.turn] }
+    }
+
+    case 'RECORD_REJECTION':
+      return { ...state, orchestratorRejections: state.orchestratorRejections + 1 }
   }
 }
 

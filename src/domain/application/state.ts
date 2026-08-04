@@ -1,5 +1,6 @@
 import type { RequirementKey } from '../requirements/key'
 import type { ApplicantProfile } from '../requirements/rules'
+import type { Turn } from '../orchestrator/transcript'
 
 export type FieldStatus =
   | 'empty' | 'derived' | 'confirmed' | 'verified' | 'rejected' | 'superseded'
@@ -38,6 +39,10 @@ export type ApplicationState = {
   /** Keyed by RequirementKey — plain FieldId, or `id#n` for licences. */
   fields: Partial<Record<RequirementKey, FieldState>>
   submittedAt: string | null
+  /** Agent and applicant turns, in order. Empty until phase 3 writes one. */
+  transcript: readonly Turn[]
+  /** Guard rejections on this application. Three drops it to panel-only. */
+  orchestratorRejections: number
 }
 
 export type Action =
@@ -65,3 +70,5 @@ export type Action =
   | { type: 'UPDATE_PROFILE'; patch: Partial<ApplicantProfile>; at: string }
   /** Refused while anything is outstanding. */
   | { type: 'SUBMIT'; at: string }
+  | { type: 'APPEND_TURN'; turn: Turn; at: string }
+  | { type: 'RECORD_REJECTION'; at: string }

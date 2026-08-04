@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { Action } from './state'
+import { ALL_COPY_IDS } from '../orchestrator/copy'
+import { ALL_DOC_TYPES } from '../field-id'
 
 /**
  * The wire shape of an Action, and the only sanctioned way to turn untrusted
@@ -100,9 +102,39 @@ const submit = z
   .object({ type: z.literal('SUBMIT'), at: timestamp })
   .strict()
 
+const block = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('field_ask'), fieldId: requirementKey }).strict(),
+  z.object({ kind: z.literal('rationale'), fieldId: requirementKey }).strict(),
+  z.object({
+    kind: z.literal('document_request'), docType: z.enum(ALL_DOC_TYPES),
+  }).strict(),
+  z.object({
+    kind: z.literal('orientation'), done: z.number().int(), total: z.number().int(),
+  }).strict(),
+  z.object({ kind: z.literal('notice'), copyId: z.enum(ALL_COPY_IDS) }).strict(),
+])
+
+const turnSchema = z.object({
+  seq: z.number().int().positive(),
+  at: timestamp,
+  role: z.enum(['agent', 'applicant']),
+  voice: z.string().nullable(),
+  voiceDropped: z.enum(['lint', 'sensitive']).optional(),
+  blocks: z.array(block),
+  text: z.string().optional(),
+}).strict()
+
+const appendTurn = z.object({
+  type: z.literal('APPEND_TURN'), turn: turnSchema, at: timestamp,
+}).strict()
+
+const recordRejection = z.object({
+  type: z.literal('RECORD_REJECTION'), at: timestamp,
+}).strict()
+
 export const actionSchema = z.discriminatedUnion('type', [
   setValue, clearValue, confirm, verify, reject, supersede, updateProfile,
-  submit,
+  submit, appendTurn, recordRejection,
 ])
 
 /** The body of `POST /api/application/[id]/actions`. The id comes from the path. */
@@ -154,6 +186,24 @@ export function toAction(parsed: ParsedAction): Action {
       return { type: 'SUPERSEDE', fieldId: parsed.fieldId, at: parsed.at }
     case 'SUBMIT':
       return { type: 'SUBMIT', at: parsed.at }
+    case 'APPEND_TURN': {
+      const t = parsed.turn
+      return {
+        type: 'APPEND_TURN',
+        at: parsed.at,
+        turn: {
+          seq: t.seq,
+          at: t.at,
+          role: t.role,
+          voice: t.voice,
+          blocks: t.blocks,
+          ...(t.voiceDropped !== undefined && { voiceDropped: t.voiceDropped }),
+          ...(t.text !== undefined && { text: t.text }),
+        },
+      }
+    }
+    case 'RECORD_REJECTION':
+      return { type: 'RECORD_REJECTION', at: parsed.at }
     case 'UPDATE_PROFILE': {
       const p = parsed.patch
       return {
