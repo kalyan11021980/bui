@@ -79,7 +79,9 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     purpose: 'Sets which checks your ID has to pass',
     authority: 'FEDERAL_KYC',
     validation: z.string().min(2, 'Select the issuing country'),
-    derivableFrom: ['drivers_license', 'state_id', 'passport'],
+    // Only the MRZ carries a country code; a licence and a state ID print
+    // nothing a strategy reads it from.
+    derivableFrom: ['passport'],
     orchestratorVisible: true,
   }),
   defineField({
@@ -90,7 +92,8 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     purpose: 'We check your ID against that state’s records',
     authority: 'STATE_DMV',
     validation: z.string().length(2, 'Select the issuing state'),
-    derivableFrom: ['drivers_license', 'state_id'],
+    // No derivableFrom: no strategy emits an issuing state, so claiming one
+    // would promise a read that never happens.
     orchestratorVisible: true,
   }),
   defineField({

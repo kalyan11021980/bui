@@ -9,7 +9,12 @@ import type { Box, Detection } from '../grounding'
 export type Evidence = {
   readonly schemaParsed: boolean
   readonly labelAnchored: boolean
-  readonly checksumValid: boolean | null
+  /**
+   * `true` or "does not apply", never `false`: a failed check digit
+   * suppresses the field at the point it is read, so a value that reaches
+   * scoring has never failed one.
+   */
+  readonly checksumValid: true | null
   readonly crossPassAgreed: boolean | null
   readonly boxPlausible: boolean | null
   /** Null where the field is not identifier-shaped and the confusion cannot arise. */

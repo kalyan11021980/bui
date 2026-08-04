@@ -12,12 +12,12 @@ export const ALL_FIELD_IDS = [
   'first_name', 'last_name', 'dl_number', 'id_number', 'passport_number',
   'dl_expiry', 'id_country', 'id_state', 'dob', 'id_images', 'proof_of_residency',
   // personal address
-  'addr_line1', 'addr_line2', 'addr_city', 'addr_state', 'addr_zip',
+  'addr_line1', 'addr_city', 'addr_state', 'addr_zip',
   // contact
-  'phone_mobile', 'phone_primary',
+  'phone_mobile',
   // business
   'biz_name', 'biz_legal_name',
-  'biz_addr_line1', 'biz_addr_line2', 'biz_addr_city',
+  'biz_addr_line1', 'biz_addr_city',
   'biz_addr_state', 'biz_addr_zip', 'biz_phone',
   // license
   'license_type', 'license_number', 'license_effective',

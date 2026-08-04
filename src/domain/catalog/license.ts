@@ -51,7 +51,7 @@ export const LICENSE_FIELDS: readonly FieldDef[] = [
     purpose: 'Which country’s board issued it, so we verify against the right one',
     authority: 'STATE_DEALER_BOARD',
     validation: z.string().min(2, 'Select the issuing country'),
-    derivableFrom: ['dealer_license'],
+    // No derivableFrom: the labelled anchor table holds no country label.
     orchestratorVisible: true,
   }),
   defineField({

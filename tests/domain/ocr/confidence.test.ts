@@ -5,10 +5,13 @@ import type { Candidate, Evidence } from '@/domain/ocr/extract/types'
 
 const evidence = (patch: Partial<Evidence>): Evidence => ({ ...NO_EVIDENCE, ...patch })
 
+/** Every state a checksum can reach: a failed one never gets this far. */
+const CHECKSUMS = [true, null] as const
+
 describe('scoreEvidence', () => {
   it('stays within bounds for every combination', () => {
     const flags = [true, false, null] as const
-    for (const checksumValid of flags) {
+    for (const checksumValid of CHECKSUMS) {
       for (const crossPassAgreed of flags) {
         for (const boxPlausible of flags) {
           for (const labelAnchored of [true, false]) {
@@ -110,28 +113,18 @@ describe('scoreEvidence', () => {
     expect(score).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
   })
 
-  it('does not punish a signal that does not apply', () => {
-    const noChecksum = scoreEvidence(evidence({ schemaParsed: true, labelAnchored: true }))
-    const failedChecksum = scoreEvidence(evidence({
-      schemaParsed: true, labelAnchored: true, checksumValid: false,
-    }))
-    expect(noChecksum).toBeGreaterThan(failedChecksum)
-  })
-
-  it('does not score a null signal as failure, for each linearly-weighted signal', () => {
-    // checksumValid and boxPlausible are still plain add/subtract, so a
-    // single loop covers both: null must land exactly on the untouched base,
-    // strictly above an explicit false. (crossPassAgreed is not linear any
-    // more — it is a veto, covered on its own below, because "null" and
-    // "false" only diverge for it once the pre-veto score would have
-    // cleared the cap.)
+  it('does not score a null signal as failure', () => {
+    // null must land exactly on the untouched base, strictly above an
+    // explicit false. boxPlausible is the only linearly-weighted signal that
+    // has a false: a failed checksum never reaches scoring, and
+    // crossPassAgreed is a veto rather than a weight — covered on its own
+    // below, because "null" and "false" only diverge for it once the
+    // pre-veto score would have cleared the cap.
     const base = scoreEvidence(evidence({ schemaParsed: true }))
-    for (const signal of ['checksumValid', 'boxPlausible'] as const) {
-      const withNull = scoreEvidence(evidence({ schemaParsed: true, [signal]: null }))
-      const withFalse = scoreEvidence(evidence({ schemaParsed: true, [signal]: false }))
-      expect(withNull, signal).toBe(base)
-      expect(withNull, signal).toBeGreaterThan(withFalse)
-    }
+    expect(scoreEvidence(evidence({ schemaParsed: true, checksumValid: null }))).toBe(base)
+    expect(scoreEvidence(evidence({ schemaParsed: true, boxPlausible: null }))).toBe(base)
+    expect(scoreEvidence(evidence({ schemaParsed: true, boxPlausible: false })))
+      .toBeLessThan(base)
   })
 
   it('gates on an explicit cross-pass disagreement but not on a null one', () => {
@@ -141,7 +134,7 @@ describe('scoreEvidence', () => {
     // threshold, where the veto actually has something to veto.
     const strong = {
       schemaParsed: true, labelAnchored: true, checksumValid: true, boxPlausible: true,
-    }
+    } as const
     const withNull = scoreEvidence(evidence({ ...strong, crossPassAgreed: null }))
     const withFalse = scoreEvidence(evidence({ ...strong, crossPassAgreed: false }))
     expect(withNull).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
@@ -165,7 +158,7 @@ describe('scoreEvidence', () => {
     // tuning — this is what would catch the veto being removed or weakened
     // back into a subtraction.
     const flags = [true, false, null] as const
-    for (const checksumValid of flags) {
+    for (const checksumValid of CHECKSUMS) {
       for (const boxPlausible of flags) {
         for (const glyphAmbiguous of flags) {
           for (const labelAnchored of [true, false]) {
@@ -198,7 +191,7 @@ describe('scoreEvidence', () => {
     // case.
     const flags = [true, false, null] as const
     for (const labelAnchored of [true, false]) {
-      for (const checksumValid of flags) {
+      for (const checksumValid of CHECKSUMS) {
         for (const crossPassAgreed of flags) {
           for (const boxPlausible of flags) {
             for (const glyphAmbiguous of flags) {

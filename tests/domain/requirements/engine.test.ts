@@ -77,12 +77,6 @@ describe('requiredFields', () => {
       .toContain('oh_foreign_buyer_form')
   })
 
-  it('omits optional fields — line 2 is never required', () => {
-    const k = requiredFields({ ...base, applicantType: 'business' })
-    expect(k).not.toContain('addr_line2')
-    expect(k).not.toContain('biz_addr_line2')
-  })
-
   it('returns the exact expected set for an individual in Georgia', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',

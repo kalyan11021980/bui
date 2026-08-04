@@ -162,4 +162,3 @@ export const extractLabelled: ExtractStrategy = (detections) => {
 }
 
 registerStrategy('dealer_license', extractLabelled)
-registerStrategy('proof_of_residency', extractLabelled)

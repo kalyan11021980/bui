@@ -36,15 +36,6 @@ export const BUSINESS_FIELDS: readonly FieldDef[] = [
     derivableFrom: ['dealer_license'],
   }),
   defineField({
-    id: 'biz_addr_line2',
-    label: 'Business address line 2',
-    type: 'text',
-    section: 'business',
-    purpose: 'Suite or unit, if you have one',
-    authority: 'IAA_POLICY',
-    validation: z.string().optional(),
-  }),
-  defineField({
     id: 'biz_addr_city',
     label: 'Business city',
     type: 'text',

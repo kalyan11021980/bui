@@ -14,13 +14,4 @@ export const CONTACT_FIELDS: readonly FieldDef[] = [
     authority: 'IAA_POLICY',
     validation: phoneSchema,
   }),
-  defineField({
-    id: 'phone_primary',
-    label: 'Daytime phone',
-    type: 'phone',
-    section: 'contact',
-    purpose: 'How Buyer Services reaches you if a document needs fixing',
-    authority: 'IAA_POLICY',
-    validation: phoneSchema.optional(),
-  }),
 ]

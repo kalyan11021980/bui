@@ -159,9 +159,8 @@ function everyEmittableKey(): Set<string> {
 describe('CARRY_RULES agree with the requirements engine', () => {
   it('names only sources the engine can actually emit for some profile', () => {
     // This is the test that would have caught the drift. Two of six rules
-    // pointed at keys no profile ever produces: `addr_line2` (optional, so
-    // never required) and `phone_primary` (CORE_CONTACT is phone_mobile
-    // only). Neither could ever fire.
+    // pointed at keys no profile ever produces — both fields have since been
+    // dropped from the catalog entirely. Neither rule could ever fire.
     const emittable = everyEmittableKey()
     for (const rule of CARRY_RULES) {
       expect(emittable.has(rule.from), `no profile ever asks for ${rule.from}`).toBe(true)
@@ -186,7 +185,7 @@ describe('CARRY_RULES agree with the requirements engine', () => {
 
   it('carries the mobile phone into the business phone — the redundancy the spec names', () => {
     // biz_phone is required of every business and had no working carry: the
-    // rule pointed at phone_primary, which is never collected.
+    // rule pointed at a daytime-phone field nothing ever collected.
     let s = createApplication('app-1', business, OWNER)
     s = applicationReducer(s, {
       type: 'SET_VALUE', fieldId: 'phone_mobile', value: '4045551234',

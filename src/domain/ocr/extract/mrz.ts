@@ -64,7 +64,7 @@ export const extractMrz: ExtractStrategy = (detections) => {
 
   const out: Candidate[] = []
   const emit = (
-    key: string, raw: string | null, checksumValid: boolean | null, asRead?: string,
+    key: string, raw: string | null, checksumValid: true | null, asRead?: string,
   ) => {
     if (!raw) return
     out.push({

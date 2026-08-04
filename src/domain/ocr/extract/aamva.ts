@@ -178,7 +178,7 @@ export function respaceAddress(raw: string, plainText: string): string {
  * small, single card.
  */
 const RESPACE_FIELDS: ReadonlySet<string> = new Set([
-  'addr_line1', 'addr_line2', 'addr_city', 'biz_addr_line1', 'biz_addr_line2', 'biz_addr_city',
+  'addr_line1', 'addr_city', 'biz_addr_line1', 'biz_addr_city',
 ])
 
 function fieldIdOf(key: string): string {

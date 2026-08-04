@@ -19,15 +19,6 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     derivableFrom: ['drivers_license', 'state_id'],
   }),
   defineField({
-    id: 'addr_line2',
-    label: 'Address line 2',
-    type: 'text',
-    section: 'address',
-    purpose: 'Apartment or suite, if you have one',
-    authority: 'IAA_POLICY',
-    validation: z.string().optional(),
-  }),
-  defineField({
     id: 'addr_city',
     label: 'City',
     type: 'text',

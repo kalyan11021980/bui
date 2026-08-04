@@ -39,7 +39,7 @@ export const AAMVA_ANCHORS: Readonly<Record<string, readonly string[]>> = {
  * it is not a value for the field beside it.
  */
 export const LABEL_CODES: readonly string[] = [
-  '1', '2', '3', '4A', '4B', '4D', '5', '6', '8', '9', '9A',
+  '1', '2', '3', '4A', '4B', '4D', '5', '6', '8', '9',
   '10', '11', '12', '15', '16', '17', '18',
 ]
 

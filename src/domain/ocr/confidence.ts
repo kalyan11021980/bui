@@ -38,12 +38,13 @@ export function scoreEvidence(evidence: Evidence): number {
   let score = BASE
   if (evidence.labelAnchored) score += WEIGHT.labelAnchored
 
-  for (const signal of ['checksumValid', 'boxPlausible'] as const) {
-    const value = evidence[signal]
-    // null is "does not apply", which must not read as failure.
-    if (value === true) score += WEIGHT[signal]
-    else if (value === false) score -= WEIGHT[signal]
-  }
+  // No failing branch: a check digit that does not verify suppresses the
+  // field where it is read, so nothing scored here has ever failed one.
+  if (evidence.checksumValid === true) score += WEIGHT.checksumValid
+
+  // null is "does not apply", which must not read as failure.
+  if (evidence.boxPlausible === true) score += WEIGHT.boxPlausible
+  else if (evidence.boxPlausible === false) score -= WEIGHT.boxPlausible
 
   if (evidence.crossPassAgreed === true) score += WEIGHT.crossPassAgreed
 
