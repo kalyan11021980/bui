@@ -62,7 +62,9 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
     actions.push(...outcome.actions)
   }
 
-  if (blocks.length === 0 && actions.length === 0) {
+  // Gated on blocks alone: an accepted setProfile renders nothing, so a
+  // turn with only actions is still an empty screen without this fallback.
+  if (blocks.length === 0) {
     blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
     const [next] = outstandingFields(request.state)
     if (next) blocks.push({ kind: 'field_ask', fieldId: next })
@@ -70,9 +72,11 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
 
   const voice = decideVoice(result.text, blocks)
 
+  const seq = request.transcript.reduce((max, t) => Math.max(max, t.seq), 0) + 1
+
   return {
     turn: {
-      seq: request.transcript.length + 1,
+      seq,
       at: request.at,
       role: 'agent',
       voice: voice.text,
@@ -88,10 +92,12 @@ function decideVoice(
   text: string,
   blocks: readonly Block[],
 ): { text: string | null; dropped?: 'lint' | 'sensitive' } {
-  const asksSensitive = blocks.some(
-    (b) => b.kind === 'field_ask' && fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true,
+  // A rationale is as much "about a sensitive field" as an ask for it.
+  const touchesSensitive = blocks.some(
+    (b) => (b.kind === 'field_ask' || b.kind === 'rationale')
+      && fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true,
   )
-  if (asksSensitive) return { text: null, dropped: 'sensitive' }
+  if (touchesSensitive) return { text: null, dropped: 'sensitive' }
 
   const trimmed = text.trim()
   if (trimmed === '') return { text: null }

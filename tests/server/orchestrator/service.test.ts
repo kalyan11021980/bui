@@ -59,6 +59,24 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBe('sensitive')
   })
 
+  it('suppresses voice when an accepted rationale touches a sensitive field', async () => {
+    const { turn } = await run('Here is why we ask.', [
+      { toolName: 'explain', input: { fieldId: 'tax_id' } },
+    ], freshBusiness())
+    expect(turn.blocks).toContainEqual({ kind: 'rationale', fieldId: 'tax_id' })
+    expect(turn.voice).toBeNull()
+    expect(turn.voiceDropped).toBe('sensitive')
+  })
+
+  it('still falls back when only an action survives, so the screen is never empty', async () => {
+    const { turn, actions } = await run('Got it, one sec.', [
+      { toolName: 'setProfile', input: { patch: { wantsGsa: true } } },
+    ])
+    expect(actions).toHaveLength(1)
+    expect(turn.blocks).toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
+    expect(turn.blocks.some((b) => b.kind === 'field_ask')).toBe(true)
+  })
+
   it('drops a rejected tool call and records its code', async () => {
     let state = fresh()
     state = applicationReducer(state, {
@@ -89,12 +107,14 @@ describe('runTurn', () => {
     expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
   })
 
-  it('numbers the turn as the next in the transcript', async () => {
+  it('numbers the turn from the highest existing seq, not the transcript length', async () => {
+    // Seqs start above the array length — a windowed transcript (fewer
+    // entries than the record) must not renumber onto a seq that already exists.
     const prior: Turn[] = [
-      { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] },
-      { seq: 2, at: AT, role: 'applicant', voice: null, blocks: [], text: 'hi' },
+      { seq: 5, at: AT, role: 'agent', voice: null, blocks: [] },
+      { seq: 6, at: AT, role: 'applicant', voice: null, blocks: [], text: 'hi' },
     ]
     const { turn } = await run('Sure.', ASK_NAME, fresh(), prior)
-    expect(turn.seq).toBe(3)
+    expect(turn.seq).toBe(7)
   })
 })
