@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ALL_FIELDS } from '@/domain/catalog'
-import { toOrchestratorView } from '@/domain/orchestrator/view'
+import { toOrchestratorView, type FieldView } from '@/domain/orchestrator/view'
 import { runTurn } from '@/server/orchestrator/service'
 import { createApplication } from '@/domain/application/reducer'
 import { requiredFields } from '@/domain/requirements/engine'
-import { reqKey } from '@/domain/requirements/key'
+import { reqKey, parseReqKey } from '@/domain/requirements/key'
 import type { ApplicationState } from '@/domain/application/state'
 import { stubModel } from '../server/orchestrator/stub-model'
 
@@ -36,7 +36,7 @@ function everythingFilled(): ApplicationState {
       ...state,
       fields: {
         ...state.fields,
-        [key]: { value: valueFor(def.id), status: 'derived' as const },
+        [key]: { value: valueFor(def.id), status: 'derived' },
       },
     }
   }
@@ -44,8 +44,7 @@ function everythingFilled(): ApplicationState {
 }
 
 /** Everything the SDK would send: system prompt, messages, tool schemas. */
-async function capturedPayload(): Promise<string> {
-  const state = everythingFilled()
+async function capturedPayload(state: ApplicationState): Promise<string> {
   const model = stubModel('Right.', [])
   await runTurn({
     model,
@@ -59,11 +58,37 @@ async function capturedPayload(): Promise<string> {
 
 describe('no field value reaches the model', () => {
   let payload: string
-  beforeEach(async () => { payload = await capturedPayload() })
+  let outstanding: readonly FieldView[]
+  let fields: ApplicationState['fields']
+
+  beforeEach(async () => {
+    const state = everythingFilled()
+    outstanding = toOrchestratorView(state, []).outstanding
+    fields = state.fields
+    payload = await capturedPayload(state)
+  })
 
   it('transmits no value of any field lacking orchestratorVisible', () => {
     const hidden = ALL_FIELDS.filter((d) => d.orchestratorVisible !== true)
     expect(hidden.length).toBeGreaterThan(20)
+
+    // Pins the fixture, not just the catalog filter above: these hidden,
+    // sensitive fields must actually be outstanding (present in the redacted
+    // view) and carry a real value in state (something for the gate to
+    // redact), or the absence check below inspects nothing and passes for
+    // free. id_number, passport_number and oh_foreign_buyer_form are
+    // excluded by this profile's idForm/state, not by the redaction gate —
+    // they are not asserted here.
+    const outstandingIds = new Set(outstanding.map((f) => f.id))
+    for (const id of ['tax_id', 'dob', 'dl_number', 'proof_of_residency']) {
+      expect(outstandingIds.has(id), `${id} missing from outstanding`).toBe(true)
+      expect(fields[id]?.value, `fixture never set a value for ${id}`).toBe(valueFor(id))
+    }
+
+    const hiddenIds = new Set(hidden.map((d) => d.id))
+    const hiddenOutstanding = outstanding.filter((f) => hiddenIds.has(parseReqKey(f.id).fieldId))
+    expect(hiddenOutstanding.length).toBeGreaterThan(20)
+
     for (const def of hidden) {
       expect(payload, `leaked ${def.id}`).not.toContain(valueFor(def.id))
     }
