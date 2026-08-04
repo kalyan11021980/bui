@@ -864,16 +864,31 @@ git commit -m "feat(orchestrator): put the transcript on the application record"
 ### Task 6: Auditing turns
 
 **Files:**
-- Modify: `src/domain/audit/event.ts`, `src/domain/audit/log.ts`
-- Test: extend `tests/domain/audit/log.test.ts`
+- Modify: `src/domain/audit/event.ts`, `src/domain/audit/log.ts`, `src/domain/orchestrator/transcript.ts`, `src/domain/application/action-schema.ts`
+- Test: extend `tests/domain/audit/log.test.ts`, `tests/domain/orchestrator/transcript.test.ts`
 
 **Interfaces:**
-- Consumes: `Turn` from `@/domain/orchestrator/transcript`; `Digester`.
-- Produces: `AuditKind` gains `'agent_turn' | 'applicant_message'`; `AuditLog.appendTurn(applicationId: string, turn: Turn, shownCopyHash: string, rejections?: readonly string[]): AuditEvent`.
+- Consumes: `Turn`, `Block` from `@/domain/orchestrator/transcript`; `COPY_VERSION`, `vettedCopy` from `@/domain/orchestrator/copy`; the existing `Digester`.
+- Produces: `AuditKind` gains `'agent_turn' | 'applicant_message'`; `Turn` gains `rejections?: readonly string[]`; `shownCopyMaterial(blocks, labelOf)` exported from `transcript.ts`; `AuditEvent` gains `turnSeq?`, `shownCopyHash?` (already present), `voiceDropped?`, `rejections?`.
 
-- [ ] **Step 1: Write the failing test**
+**Design correction, read this first.** An earlier draft of this plan gave `AuditLog` a
+separate `appendTurn(...)` method, reasoning that a turn is not a field mutation. Task 5
+dissolved that reasoning: appending a turn **is** an `Action` (`APPEND_TURN`), and it
+commits through `applyAction` → `commit()` → `log.append` like every other action. A second
+append call alongside that path would write two audit events for one turn.
 
-Append to `tests/domain/audit/log.test.ts`:
+So turn content goes **inside `AuditLog.append`'s existing per-kind branches**, beside
+`valuePart`, `confirmPart`, `rejectPart` and `profilePart`. Do not add a second method and
+do not add a second call site. `commit()` stays the only write path.
+
+Task 5 left placeholder kinds `turn_appended` and `rejection_recorded` in the `KIND` map to
+keep it exhaustive. `rejection_recorded` stays. `turn_appended` is replaced: an
+`APPEND_TURN` event's kind depends on `turn.role`, which a static map cannot express, so
+`append` selects it explicitly.
+
+- [ ] **Step 1: Write the failing tests**
+
+Extend `tests/domain/audit/log.test.ts`:
 
 ```ts
 describe('agent turns', () => {
@@ -882,39 +897,58 @@ describe('agent turns', () => {
     voice: 'Right, a couple more.',
     blocks: [{ kind: 'field_ask' as const, fieldId: 'first_name' }],
   }
+  const appendTurnAction = (t: typeof turn) =>
+    ({ type: 'APPEND_TURN' as const, turn: t, at: t.at })
 
   it('records an agent turn under its own kind', () => {
     const log = new AuditLog(() => 'digest')
-    const event = log.appendTurn('app-1', turn, 'hash-abc')
+    const event = log.append('app-1', appendTurnAction(turn))
     expect(event.kind).toBe('agent_turn')
     expect(event.turnSeq).toBe(1)
-    expect(event.shownCopyHash).toBe('hash-abc')
+    expect(event.shownCopyHash).toBe('digest')
   })
 
   it('records an applicant message under a different kind', () => {
     const log = new AuditLog(() => 'digest')
-    const event = log.appendTurn('app-1', {
+    const event = log.append('app-1', appendTurnAction({
       ...turn, role: 'applicant', voice: null, blocks: [], text: 'I am a dealer',
-    }, 'hash-abc')
+    }))
     expect(event.kind).toBe('applicant_message')
   })
 
   it('never writes the model voice text into the log', () => {
     const log = new AuditLog(() => 'digest')
-    log.appendTurn('app-1', turn, 'hash-abc')
+    log.append('app-1', appendTurnAction(turn))
     expect(JSON.stringify(log.entriesFor('app-1'))).not.toContain('a couple more')
+  })
+
+  it('never writes what the applicant typed into the log', () => {
+    const log = new AuditLog(() => 'digest')
+    log.append('app-1', appendTurnAction({
+      ...turn, role: 'applicant', voice: null, blocks: [], text: 'my ssn is 123456789',
+    }))
+    expect(JSON.stringify(log.entriesFor('app-1'))).not.toContain('123456789')
   })
 
   it('records why a voice was dropped', () => {
     const log = new AuditLog(() => 'digest')
-    const event = log.appendTurn('app-1', { ...turn, voice: null, voiceDropped: 'lint' }, 'h')
+    const event = log.append('app-1',
+      appendTurnAction({ ...turn, voice: null, voiceDropped: 'lint' }))
     expect(event.voiceDropped).toBe('lint')
   })
 
-  it('records guard rejection codes', () => {
+  it('records guard rejection codes carried on the turn', () => {
     const log = new AuditLog(() => 'digest')
-    const event = log.appendTurn('app-1', turn, 'h', ['field_not_outstanding'])
+    const event = log.append('app-1',
+      appendTurnAction({ ...turn, rejections: ['field_not_outstanding'] }))
     expect(event.rejections).toEqual(['field_not_outstanding'])
+  })
+
+  it('hashes what was shown through the injected digester', () => {
+    const seen: string[] = []
+    const log = new AuditLog((input) => { seen.push(input); return 'digest' })
+    log.append('app-1', appendTurnAction(turn))
+    expect(seen[0]).toContain('first_name')
   })
 
   it('shares one seq counter with field events', () => {
@@ -923,70 +957,62 @@ describe('agent turns', () => {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'K',
       source: 'user', at: turn.at,
     })
-    expect(log.appendTurn('app-1', turn, 'h').seq).toBe(2)
+    expect(log.append('app-1', appendTurnAction(turn)).seq).toBe(2)
   })
 })
 ```
 
-- [ ] **Step 2: Run and confirm it fails for the right reason**
-
-Run: `npx vitest run tests/domain/audit/log.test.ts` → FAIL, `appendTurn` is not a function.
-
-- [ ] **Step 3: Implement**
-
-In `src/domain/audit/event.ts`, extend `AuditKind` with `'agent_turn' | 'applicant_message'` and add optional fields:
+And in `tests/domain/orchestrator/transcript.test.ts`, pin the copy-hash relationship the
+design requires — this closes a gap Task 3's review flagged and deferred here:
 
 ```ts
-  /** The Turn.seq this event records. */
-  turnSeq?: number
-  /** Set when the voice slot was suppressed or linted away. */
-  voiceDropped?: 'lint' | 'sensitive'
-  /** Guard reason codes for tool calls refused this turn. */
+describe('shownCopyMaterial', () => {
+  const labelOf = (id: string) => `Label for ${id}`
+  const blocks = [{ kind: 'notice' as const, copyId: 'guard_fallback' as const }]
+
+  it('is stable for the same blocks', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toBe(shownCopyMaterial(blocks, labelOf))
+  })
+
+  it('carries the copy version, so a version bump changes the material', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toContain(COPY_VERSION)
+  })
+
+  it('carries the resolved text, so editing a vetted string changes the material', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toContain(vettedCopy('guard_fallback'))
+  })
+
+  it('distinguishes blocks that differ only by field id', () => {
+    const a = [{ kind: 'field_ask' as const, fieldId: 'first_name' }]
+    const b = [{ kind: 'field_ask' as const, fieldId: 'last_name' }]
+    expect(shownCopyMaterial(a, labelOf)).not.toBe(shownCopyMaterial(b, labelOf))
+  })
+})
+```
+
+- [ ] **Step 2: Run and confirm they fail for the right reason**
+
+Run: `npx vitest run tests/domain/audit/log.test.ts tests/domain/orchestrator/transcript.test.ts`
+Expected: FAIL — `shownCopyMaterial` is not exported, and `event.kind` is `turn_appended` rather than `agent_turn`. Read the messages and confirm those are the failures, not a missing import.
+
+- [ ] **Step 3: Add `rejections` to the Turn type and its schema**
+
+In `src/domain/orchestrator/transcript.ts` add to `Turn`:
+
+```ts
+  /** Guard reason codes for tool calls refused on this turn. */
   rejections?: readonly string[]
 ```
 
-In `src/domain/audit/log.ts`, add:
+and in `action-schema.ts` add `rejections: z.array(z.string().min(1)).optional()` to
+`turnSchema`, re-attaching it in `toAction` with the same one-at-a-time pattern the other
+optionals use.
 
-```ts
-  /**
-   * A turn is not a field mutation, so it does not go through `append`, whose
-   * contract is Action and whose body is built around fieldId and value.
-   *
-   * The voice text is deliberately absent. It is not legally operative by
-   * construction, and writing model prose into a compliance artefact invites
-   * it being read as though it were.
-   */
-  appendTurn(
-    applicationId: string,
-    turn: Turn,
-    shownCopyHash: string,
-    rejections?: readonly string[],
-  ): AuditEvent {
-    if (applicationId === '') {
-      throw new Error('Audit events must name the application they belong to')
-    }
-    const trail = this.#byApplication.get(applicationId) ?? []
-    const event: AuditEvent = Object.freeze({
-      applicationId,
-      seq: trail.length + 1,
-      at: turn.at,
-      kind: turn.role === 'agent' ? 'agent_turn' : 'applicant_message',
-      turnSeq: turn.seq,
-      shownCopyHash,
-      ...(turn.voiceDropped !== undefined && { voiceDropped: turn.voiceDropped }),
-      ...(rejections !== undefined && rejections.length > 0
-        && { rejections: Object.freeze([...rejections]) }),
-    })
-    trail.push(event)
-    this.#byApplication.set(applicationId, trail)
-    this.#all.push(event)
-    return event
-  }
-```
+- [ ] **Step 4: Add `shownCopyMaterial` to `transcript.ts`**
 
-- [ ] **Step 4: Add the copy-hash helper**
-
-It goes in `src/domain/orchestrator/transcript.ts`, **not** `copy.ts`: it needs both `Block` and `vettedCopy`, and `transcript.ts` already imports from `copy.ts`. Putting it the other way round would make the two files import each other.
+It goes here rather than in `copy.ts` because it needs both `Block` and `vettedCopy`, and
+`transcript.ts` already imports from `copy.ts`. The reverse would make the two files import
+each other.
 
 ```ts
 import { COPY_VERSION, vettedCopy } from './copy'
@@ -1013,24 +1039,74 @@ export function shownCopyMaterial(
 }
 ```
 
-Add a test asserting the material changes when `COPY_VERSION` changes and when a notice's text changes, and is stable otherwise.
+- [ ] **Step 5: Extend `AuditEvent` and `AuditLog.append`**
 
-- [ ] **Step 5: Run and confirm pass**
+In `src/domain/audit/event.ts` add `'agent_turn' | 'applicant_message'` to `AuditKind`,
+remove `'turn_appended'`, and add the optional fields:
+
+```ts
+  /** The Turn.seq this event records. */
+  turnSeq?: number
+  /** Set when the voice slot was suppressed or linted away. */
+  voiceDropped?: 'lint' | 'sensitive'
+  /** Guard reason codes for tool calls refused this turn. */
+  rejections?: readonly string[]
+```
+
+In `src/domain/audit/log.ts`, drop `APPEND_TURN` from the static `KIND` map (its kind is
+role-dependent) and add a `turnPart` beside the existing `xPart` constants:
+
+```ts
+    let turnPart: Partial<AuditEvent> = {}
+    if (action.type === 'APPEND_TURN') {
+      const turn = action.turn
+      turnPart = {
+        turnSeq: turn.seq,
+        shownCopyHash: this.#digest(
+          shownCopyMaterial(turn.blocks, (id) => fieldDef(parseReqKey(id).fieldId).label),
+        ),
+        ...(turn.voiceDropped !== undefined && { voiceDropped: turn.voiceDropped }),
+        ...(turn.rejections !== undefined && turn.rejections.length > 0
+          && { rejections: Object.freeze([...turn.rejections]) }),
+      }
+    }
+```
+
+and select the kind:
+
+```ts
+    const kind: AuditKind = action.type === 'APPEND_TURN'
+      ? (action.turn.role === 'agent' ? 'agent_turn' : 'applicant_message')
+      : KIND[action.type]
+```
+
+**Neither `turn.voice` nor `turn.text` is written.** The voice is not legally operative by
+construction — that is the whole point of the copy tiers — and writing model prose into a
+compliance artefact invites it being read as though it were. The applicant's typed text is
+free-form input that may contain anything they chose to type, including a value; the log is
+not where that belongs.
+
+- [ ] **Step 6: Run and confirm pass**
 
 Run: `npx vitest run tests/domain/audit tests/domain/orchestrator` → PASS
 
-- [ ] **Step 6: Sabotage check**
+- [ ] **Step 7: Sabotage checks**
 
-Add `voice: turn.voice` to the event object in `appendTurn`. Confirm **"never writes the model voice text into the log"** goes red naming the phrase. Revert.
+1. Add `voice: action.turn.voice` to `turnPart`. Confirm **"never writes the model voice text into the log"** goes red naming the phrase. Revert.
+2. Add `text: action.turn.text` to `turnPart`. Confirm **"never writes what the applicant typed into the log"** goes red naming the digits. Revert.
+3. Make the kind selection always return `'agent_turn'`. Confirm **"records an applicant message under a different kind"** goes red. Revert.
 
-- [ ] **Step 7: Commit**
+Quote the actual assertion message for each.
+
+- [ ] **Step 8: Verify, then commit**
+
+Run `npm run typecheck` (zero errors) and `npm test` (green), quoting both.
 
 ```bash
-git add src/domain/audit src/domain/orchestrator/copy.ts tests/domain
+git add src/domain/audit src/domain/orchestrator src/domain/application/action-schema.ts tests/domain
 git commit -m "feat(audit): record agent turns with a hash of what was shown"
 ```
 
----
 
 ### Task 7: Tool schemas
 

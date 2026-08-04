@@ -346,17 +346,20 @@ action.
 ### 8.3 Audit
 
 `AuditKind` gains **two** kinds, `'agent_turn'` and `'applicant_message'`, because a turn
-has a `role` and one event kind covering both would misname half of them. A turn is not a
-state mutation of a field, so neither goes through `AuditLog.append(applicationId, action)`
-— that function's contract is `Action`, and widening it would put a non-field event down a
-path built around `fieldId` and `value`. Instead:
+has a `role` and one event kind covering both would misname half of them.
 
-```ts
-appendTurn(applicationId: string, turn: Turn): AuditEvent
-```
+**Revised during implementation.** This section originally specified a separate
+`appendTurn(applicationId, turn)` method, on the reasoning that `AuditLog.append`'s
+contract is `Action` and a turn is not a field mutation. That reasoning did not survive
+Task 5: appending a turn *is* an `Action` (`APPEND_TURN`), and it commits through
+`applyAction` → `commit()` → `log.append` like every other one. A second append call
+alongside that path would write two events for one turn.
 
-which selects the kind from `turn.role`, and adds these optional fields to `AuditEvent`
-(all absent on an `applicant_message` except `turnSeq`):
+So turn content is added inside `AuditLog.append`'s existing per-kind branches, beside
+`valuePart`, `confirmPart`, `rejectPart` and `profilePart` — the same shape those already
+use. `commit()` remains the only write path, which is the invariant that matters more than
+the method boundary did. The kind is selected from `turn.role`, and these optional fields
+are added to `AuditEvent` (all absent on an `applicant_message` except `turnSeq`):
 
 | Field | Meaning |
 |---|---|
