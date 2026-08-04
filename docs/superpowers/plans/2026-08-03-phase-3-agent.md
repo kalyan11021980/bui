@@ -2070,7 +2070,11 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
     actions.push(...outcome.actions)
   }
 
-  if (blocks.length === 0 && actions.length === 0) {
+  // Gated on blocks alone, deliberately: actions are invisible. An accepted
+  // setProfile mutates the profile and renders nothing, so `actions.length`
+  // in this condition would let a turn end with an empty screen — no ask, and
+  // no second model call to recover.
+  if (blocks.length === 0) {
     blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
     const [next] = outstandingFields(request.state)
     if (next) blocks.push({ kind: 'field_ask', fieldId: next })
@@ -2080,7 +2084,11 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
 
   return {
     turn: {
-      seq: request.transcript.length + 1,
+      // Off the highest seq, not the array length: the two agree only while
+      // the caller passes the whole transcript, and the moment one is
+      // windowed for prompt size, length-derived numbering silently reuses
+      // seqs that already exist on the record.
+      seq: request.transcript.reduce((max, t) => Math.max(max, t.seq), 0) + 1,
       at: request.at,
       role: 'agent',
       voice: voice.text,
@@ -2096,8 +2104,11 @@ function decideVoice(
   text: string,
   blocks: readonly Block[],
 ): { text: string | null; dropped?: 'lint' | 'sensitive' } {
+  // Covers `rationale` as well as `field_ask`: a turn explaining the taxpayer
+  // ID is as much "about a sensitive field" as one asking for it.
   const asksSensitive = blocks.some(
-    (b) => b.kind === 'field_ask' && fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true,
+    (b) => (b.kind === 'field_ask' || b.kind === 'rationale')
+      && fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true,
   )
   if (asksSensitive) return { text: null, dropped: 'sensitive' }
 
