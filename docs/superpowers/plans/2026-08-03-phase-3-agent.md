@@ -1476,10 +1476,13 @@ export function guardToolCall(
       if (!parsed.success) return reject('malformed_patch')
       const { patch } = parsed.data as { patch: Record<string, unknown> }
       if (Object.keys(patch).length === 0) return reject('empty_patch')
+      // Built directly rather than through `toAction`: profilePatch has
+      // already validated the shape, and routing a typed value back through
+      // the wire parser would need a cast to satisfy it.
       return {
         ok: true,
         blocks: [],
-        actions: [toAction({ type: 'UPDATE_PROFILE', patch, at } as never)],
+        actions: [{ type: 'UPDATE_PROFILE', patch, at }],
       }
     }
 
