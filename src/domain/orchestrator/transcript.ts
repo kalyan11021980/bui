@@ -1,6 +1,7 @@
 import type { VettedCopyId } from './copy'
 import type { DocType } from '../field-id'
 import type { RequirementKey } from '../requirements/key'
+import { COPY_VERSION, vettedCopy } from './copy'
 
 /**
  * Blocks carry identifiers, not copy. The string is resolved from the catalog
@@ -25,4 +26,27 @@ export type Turn = {
   blocks: readonly Block[]
   /** Applicant turns only. Intent, never data. */
   text?: string
+  /** Guard reason codes for tool calls refused on this turn. */
+  rejections?: readonly string[]
+}
+
+/**
+ * What the applicant was shown, as a stable string: the version, then each
+ * block's identity and its resolved text. Hashed by the caller, which owns the
+ * Digester — the domain stays free of the secret.
+ */
+export function shownCopyMaterial(
+  blocks: readonly Block[],
+  labelOf: (fieldId: RequirementKey) => string,
+): string {
+  const parts = blocks.map((b) => {
+    switch (b.kind) {
+      case 'field_ask': return `ask:${b.fieldId}:${labelOf(b.fieldId)}`
+      case 'rationale': return `why:${b.fieldId}:${labelOf(b.fieldId)}`
+      case 'document_request': return `doc:${b.docType}`
+      case 'orientation': return `orient:${b.done}/${b.total}`
+      case 'notice': return `notice:${b.copyId}:${vettedCopy(b.copyId)}`
+    }
+  })
+  return `v${COPY_VERSION}|${parts.join('|')}`
 }

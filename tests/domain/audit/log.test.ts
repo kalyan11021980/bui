@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { AuditLog } from '@/domain/audit/log'
 import { createDigester } from '@/domain/audit/digest'
+import type { Turn } from '@/domain/orchestrator/transcript'
 
 const AT = '2026-08-01T12:00:00.000Z'
 const TEST_SECRET = 'test-secret-at-least-32-characters-long'
@@ -331,5 +332,75 @@ describe('AuditLog — per-application trails', () => {
         source: 'user', at: AT,
       }),
     ).toThrow(/name the application/i)
+  })
+})
+
+describe('agent turns', () => {
+  const turn = {
+    seq: 1, at: '2026-08-03T00:00:00.000Z', role: 'agent' as const,
+    voice: 'Right, a couple more.',
+    blocks: [{ kind: 'field_ask' as const, fieldId: 'first_name' }],
+  }
+  const appendTurnAction = (t: Turn) =>
+    ({ type: 'APPEND_TURN' as const, turn: t, at: t.at })
+
+  it('records an agent turn under its own kind', () => {
+    const log = new AuditLog(() => 'digest')
+    const event = log.append('app-1', appendTurnAction(turn))
+    expect(event.kind).toBe('agent_turn')
+    expect(event.turnSeq).toBe(1)
+    expect(event.shownCopyHash).toBe('digest')
+  })
+
+  it('records an applicant message under a different kind', () => {
+    const log = new AuditLog(() => 'digest')
+    const event = log.append('app-1', appendTurnAction({
+      ...turn, role: 'applicant', voice: null, blocks: [], text: 'I am a dealer',
+    }))
+    expect(event.kind).toBe('applicant_message')
+  })
+
+  it('never writes the model voice text into the log', () => {
+    const log = new AuditLog(() => 'digest')
+    log.append('app-1', appendTurnAction(turn))
+    expect(JSON.stringify(log.entriesFor('app-1'))).not.toContain('a couple more')
+  })
+
+  it('never writes what the applicant typed into the log', () => {
+    const log = new AuditLog(() => 'digest')
+    log.append('app-1', appendTurnAction({
+      ...turn, role: 'applicant', voice: null, blocks: [], text: 'my ssn is 123456789',
+    }))
+    expect(JSON.stringify(log.entriesFor('app-1'))).not.toContain('123456789')
+  })
+
+  it('records why a voice was dropped', () => {
+    const log = new AuditLog(() => 'digest')
+    const event = log.append('app-1',
+      appendTurnAction({ ...turn, voice: null, voiceDropped: 'lint' }))
+    expect(event.voiceDropped).toBe('lint')
+  })
+
+  it('records guard rejection codes carried on the turn', () => {
+    const log = new AuditLog(() => 'digest')
+    const event = log.append('app-1',
+      appendTurnAction({ ...turn, rejections: ['field_not_outstanding'] }))
+    expect(event.rejections).toEqual(['field_not_outstanding'])
+  })
+
+  it('hashes what was shown through the injected digester', () => {
+    const seen: string[] = []
+    const log = new AuditLog((input) => { seen.push(input); return 'digest' })
+    log.append('app-1', appendTurnAction(turn))
+    expect(seen[0]).toContain('first_name')
+  })
+
+  it('shares one seq counter with field events', () => {
+    const log = new AuditLog(() => 'digest')
+    log.append('app-1', {
+      type: 'SET_VALUE', fieldId: 'first_name', value: 'K',
+      source: 'user', at: turn.at,
+    })
+    expect(log.append('app-1', appendTurnAction(turn)).seq).toBe(2)
   })
 })

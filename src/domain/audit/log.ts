@@ -1,10 +1,11 @@
 import type { Action, ProvenanceSource } from '../application/state'
 import { fieldDef } from '../catalog'
 import { parseReqKey } from '../requirements/key'
+import { shownCopyMaterial } from '../orchestrator/transcript'
 import type { AuditEvent, AuditKind } from './event'
 import type { Digester } from './digest'
 
-const KIND: Record<Action['type'], AuditKind> = {
+const KIND: Record<Exclude<Action['type'], 'APPEND_TURN'>, AuditKind> = {
   SET_VALUE: 'value_set',
   // Carries no `value`: the old one is already in the SET_VALUE that put it
   // there, digested if sensitive. Repeating it opens a second plaintext path.
@@ -15,10 +16,6 @@ const KIND: Record<Action['type'], AuditKind> = {
   SUPERSEDE: 'superseded',
   UPDATE_PROFILE: 'profile_updated',
   SUBMIT: 'submitted',
-  // Turn content belongs inside this method's per-kind branches, not a second
-  // append call: commit() is the only write path, and a second one would log
-  // the same turn twice.
-  APPEND_TURN: 'turn_appended',
   RECORD_REJECTION: 'rejection_recorded',
 }
 
@@ -64,17 +61,38 @@ export class AuditLog {
       ? { patch: Object.freeze({ ...action.patch }) }
       : {}
 
+    let turnPart: Partial<AuditEvent> = {}
+    if (action.type === 'APPEND_TURN') {
+      const turn = action.turn
+      turnPart = {
+        turnSeq: turn.seq,
+        shownCopyHash: this.#digest(
+          shownCopyMaterial(turn.blocks, (id) => fieldDef(parseReqKey(id).fieldId).label),
+        ),
+        ...(turn.voiceDropped !== undefined && { voiceDropped: turn.voiceDropped }),
+        ...(turn.rejections !== undefined && turn.rejections.length > 0
+          && { rejections: Object.freeze([...turn.rejections]) }),
+      }
+    }
+
+    // APPEND_TURN's kind depends on turn.role, which the static KIND map
+    // above cannot express.
+    const kind: AuditKind = action.type === 'APPEND_TURN'
+      ? (action.turn.role === 'agent' ? 'agent_turn' : 'applicant_message')
+      : KIND[action.type]
+
     const trail = this.#byApplication.get(applicationId) ?? []
     const event: AuditEvent = Object.freeze({
       applicationId,
       seq: trail.length + 1,
       at: action.at,
-      kind: KIND[action.type],
+      kind,
       ...fieldIdPart,
       ...valuePart,
       ...confirmPart,
       ...rejectPart,
       ...profilePart,
+      ...turnPart,
     })
 
     trail.push(event)

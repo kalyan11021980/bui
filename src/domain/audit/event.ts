@@ -5,7 +5,7 @@ import type { ApplicantProfile } from '../requirements/rules'
 export type AuditKind =
   | 'value_set' | 'value_cleared' | 'confirmed' | 'verified'
   | 'rejected' | 'superseded' | 'profile_updated' | 'submitted'
-  | 'turn_appended' | 'rejection_recorded'
+  | 'agent_turn' | 'applicant_message' | 'rejection_recorded'
 
 export type AuditEvent = {
   applicationId: string
@@ -28,4 +28,10 @@ export type AuditEvent = {
    * a profile is sensitive.
    */
   patch?: Partial<ApplicantProfile>
+  /** The Turn.seq this event records. */
+  turnSeq?: number
+  /** Set when the voice slot was suppressed or linted away. */
+  voiceDropped?: 'lint' | 'sensitive'
+  /** Guard reason codes for tool calls refused this turn. */
+  rejections?: readonly string[]
 }

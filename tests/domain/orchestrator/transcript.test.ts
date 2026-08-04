@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import type { ApplicationState } from '@/domain/application/state'
 import type { Turn } from '@/domain/orchestrator/transcript'
+import { shownCopyMaterial } from '@/domain/orchestrator/transcript'
+import { COPY_VERSION, vettedCopy } from '@/domain/orchestrator/copy'
 
 const PROFILE = {
   applicantType: 'individual' as const, country: 'US', state: 'GA',
@@ -56,5 +58,28 @@ describe('transcript on the application record', () => {
     expect(() => applicationReducer(submitted, {
       type: 'APPEND_TURN', turn: turn(1), at: turn(1).at,
     })).toThrow()
+  })
+})
+
+describe('shownCopyMaterial', () => {
+  const labelOf = (id: string) => `Label for ${id}`
+  const blocks = [{ kind: 'notice' as const, copyId: 'guard_fallback' as const }]
+
+  it('is stable for the same blocks', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toBe(shownCopyMaterial(blocks, labelOf))
+  })
+
+  it('carries the copy version, so a version bump changes the material', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toContain(COPY_VERSION)
+  })
+
+  it('carries the resolved text, so editing a vetted string changes the material', () => {
+    expect(shownCopyMaterial(blocks, labelOf)).toContain(vettedCopy('guard_fallback'))
+  })
+
+  it('distinguishes blocks that differ only by field id', () => {
+    const a = [{ kind: 'field_ask' as const, fieldId: 'first_name' }]
+    const b = [{ kind: 'field_ask' as const, fieldId: 'last_name' }]
+    expect(shownCopyMaterial(a, labelOf)).not.toBe(shownCopyMaterial(b, labelOf))
   })
 })

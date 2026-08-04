@@ -122,6 +122,7 @@ const turnSchema = z.object({
   voiceDropped: z.enum(['lint', 'sensitive']).optional(),
   blocks: z.array(block),
   text: z.string().optional(),
+  rejections: z.array(z.string().min(1)).optional(),
 }).strict()
 
 const appendTurn = z.object({
@@ -199,6 +200,7 @@ export function toAction(parsed: ParsedAction): Action {
           blocks: t.blocks,
           ...(t.voiceDropped !== undefined && { voiceDropped: t.voiceDropped }),
           ...(t.text !== undefined && { text: t.text }),
+          ...(t.rejections !== undefined && { rejections: t.rejections }),
         },
       }
     }
