@@ -2,18 +2,23 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 
-export type OrchestratorConfig = {
-  provider: 'local' | 'anthropic'
-  modelId: string
-  endpoint?: string
-  /** Ignored by the local provider: an OpenAI-compatible endpoint has no equivalent. */
-  effort: string
-  apiKey?: string
-}
+export type OrchestratorConfig =
+  | {
+      provider: 'local'
+      modelId: string
+      endpoint: string
+      effort: string
+    }
+  | {
+      provider: 'anthropic'
+      modelId: string
+      effort: string
+      apiKey: string
+    }
 
 const PROVIDERS = new Set(['local', 'anthropic'])
 
-export function readConfig(env: NodeJS.ProcessEnv): OrchestratorConfig {
+export function readConfig(env: Record<string, string | undefined>): OrchestratorConfig {
   const provider = env.ORCHESTRATOR_PROVIDER ?? 'local'
   if (!PROVIDERS.has(provider)) {
     throw new Error(
@@ -29,15 +34,15 @@ export function readConfig(env: NodeJS.ProcessEnv): OrchestratorConfig {
   if (provider === 'anthropic') {
     const apiKey = env.ANTHROPIC_API_KEY
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY must be set when ORCHESTRATOR_PROVIDER=anthropic')
-    return { provider, modelId, effort, apiKey }
+    return { provider: 'anthropic', modelId, effort, apiKey }
   }
 
   const endpoint = env.ORCHESTRATOR_ENDPOINT
   if (!endpoint) throw new Error('ORCHESTRATOR_ENDPOINT must be set when ORCHESTRATOR_PROVIDER=local')
-  return { provider, modelId, effort, endpoint }
+  return { provider: 'local', modelId, effort, endpoint }
 }
 
-export function resolveModel(env: NodeJS.ProcessEnv): LanguageModel {
+export function resolveModel(env: Record<string, string | undefined>): LanguageModel {
   const config = readConfig(env)
   if (config.provider === 'anthropic') {
     return createAnthropic({ apiKey: config.apiKey })(config.modelId)
