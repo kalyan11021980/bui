@@ -15,6 +15,13 @@ describe('tool schemas', () => {
     }
   })
 
+  it('tells the model when to call each tool, not just what it does', () => {
+    // The descriptions are the only tool-selection signal the model gets.
+    for (const name of ALL_TOOL_NAMES) {
+      expect(TOOL_DESCRIPTIONS[name], name).toMatch(/\bCall this\b/)
+    }
+  })
+
   it('caps askFor at four fields and requires at least one', () => {
     expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: [] }).success).toBe(false)
     expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: ['a', 'b', 'c', 'd', 'e'] }).success).toBe(false)
