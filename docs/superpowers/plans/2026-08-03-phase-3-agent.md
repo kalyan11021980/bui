@@ -1142,6 +1142,13 @@ describe('tool schemas', () => {
     }
   })
 
+  it('tells the model when to call each tool, not just what it does', () => {
+    // The descriptions are the only tool-selection signal the model gets.
+    for (const name of ALL_TOOL_NAMES) {
+      expect(TOOL_DESCRIPTIONS[name], name).toMatch(/\bCall this\b/)
+    }
+  })
+
   it('caps askFor at four fields and requires at least one', () => {
     expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: [] }).success).toBe(false)
     expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: ['a', 'b', 'c', 'd', 'e'] }).success).toBe(false)
@@ -1198,17 +1205,22 @@ export const TOOL_SCHEMAS = Object.freeze({
   orient: z.object({}).strict(),
 })
 
+/**
+ * Every description states WHEN to call, not just what the tool does. These
+ * strings are the model's only signal for tool selection, so one that names
+ * the action and stops is a tool the model will reach for at the wrong moment.
+ */
 export const TOOL_DESCRIPTIONS: Readonly<Record<ToolName, string>> = Object.freeze({
   askFor:
-    'Ask the applicant for up to four outstanding fields. Each renders with its own vetted explanation. Only field ids listed as outstanding are accepted.',
+    'Ask the applicant for up to four outstanding fields. Call this whenever you are ready to collect answers and the applicant is not asking you a question. Prefer grouping fields that belong together — the parts of an address, a name and a date of birth — over asking one at a time. Each renders with its own vetted explanation. Only field ids listed as outstanding are accepted.',
   explain:
-    'Show the vetted explanation for one field — what it is for and who requires it. Use when the applicant asks why something is needed.',
+    'Show the vetted explanation for one field — what it is for and who requires it. Call this when the applicant asks why something is needed, hesitates over a field, or says they would rather not answer.',
   setProfile:
-    'Record what the applicant told you about who they are: individual or business, their state, which licences they hold, whether they want GSA access, which form of ID they carry.',
+    'Record what the applicant told you about who they are: individual or business, their state, which licences they hold, whether they want GSA access, which form of ID they carry. Call this as soon as they mention any of it, including in passing. The requirements engine cannot tell what to ask for until the profile is set, and a fact left unrecorded is one you will ask for twice.',
   requestDocument:
-    'Ask the applicant to photograph one document. Only documents this applicant actually owes are accepted.',
+    'Ask the applicant to photograph one document. Call this before asking for fields that document can fill in — one licence photo answers around eight questions, so requesting it first saves the applicant typing. Only documents this applicant actually owes are accepted.',
   orient:
-    'Show a returning applicant how far through they are. Use only on the first turn of a resumed application.',
+    'Show a returning applicant how far through they are. Call this only on the first turn of a resumed application, before anything else.',
 })
 ```
 
