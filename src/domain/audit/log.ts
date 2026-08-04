@@ -17,6 +17,7 @@ const KIND: Record<Exclude<Action['type'], 'APPEND_TURN'>, AuditKind> = {
   UPDATE_PROFILE: 'profile_updated',
   SUBMIT: 'submitted',
   RECORD_REJECTION: 'rejection_recorded',
+  RECORD_DOCUMENT: 'document_recorded',
 }
 
 /**
@@ -61,6 +62,12 @@ export class AuditLog {
       ? { patch: Object.freeze({ ...action.patch }) }
       : {}
 
+    // Neither is sensitive: a reviewer needs to know which document was
+    // accepted, and when, without opening the field-level trail.
+    const documentPart = action.type === 'RECORD_DOCUMENT'
+      ? { documentId: action.documentId, docType: action.docType }
+      : {}
+
     let turnPart: Partial<AuditEvent> = {}
     if (action.type === 'APPEND_TURN') {
       const turn = action.turn
@@ -92,6 +99,7 @@ export class AuditLog {
       ...confirmPart,
       ...rejectPart,
       ...profilePart,
+      ...documentPart,
       ...turnPart,
     })
 

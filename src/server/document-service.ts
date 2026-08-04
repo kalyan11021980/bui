@@ -83,6 +83,17 @@ export async function ingestDocument(
   const band = demoteForCardExtent(preflight, read.detections, imageSize.width)
   const documentId = randomUUID()
 
+  // Recorded through the same commit path as the derived fields below, so it
+  // is audited alongside them and on the record even when nothing in the
+  // photo was legible to extract.
+  const recorded = applyAction(input.applicationId, input.ownerToken, {
+    type: 'RECORD_DOCUMENT',
+    documentId,
+    docType: input.docType,
+    at: input.at,
+  })
+  if (!recorded.ok) return recorded
+
   // Re-spaced before cross-pass is scored, so agreement is checked against
   // the value the applicant will actually see, not the space-stripped one
   // that always disagreed on a spacing artefact rather than a misread.
@@ -90,7 +101,7 @@ export async function ingestDocument(
   const candidates = withCrossPass(respaceAddresses(parsed, read.plainText), read.plainText)
 
   const filled: RequirementKey[] = []
-  let state: ApplicationState | null = null
+  let state: ApplicationState = recorded.value
 
   for (const candidate of candidates) {
     const box = provenanceBox(band, candidate.box, imageSize)
@@ -113,14 +124,8 @@ export async function ingestDocument(
   }
 
   // Reading nothing is a normal outcome, not a failure — the fields get asked
-  // for as they are today. Fetch rather than mutate: a no-op action would put
-  // an event in the audit log saying something happened.
-  if (state === null) {
-    const current = getApplication(input.applicationId, input.ownerToken)
-    if (!current.ok) return current
-    state = current.value
-  }
-
+  // for as they are today. The document itself is still on the record, via
+  // the RECORD_DOCUMENT committed above.
   return { ok: true, value: { band, documentId, filled, state } }
 }
 

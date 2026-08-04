@@ -1,3 +1,4 @@
+import type { DocType } from '../field-id'
 import type { RequirementKey } from '../requirements/key'
 import type { ProvenanceSource } from '../application/state'
 import type { ApplicantProfile } from '../requirements/rules'
@@ -5,7 +6,7 @@ import type { ApplicantProfile } from '../requirements/rules'
 export type AuditKind =
   | 'value_set' | 'value_cleared' | 'confirmed' | 'verified'
   | 'rejected' | 'superseded' | 'profile_updated' | 'submitted'
-  | 'agent_turn' | 'applicant_message' | 'rejection_recorded'
+  | 'agent_turn' | 'applicant_message' | 'rejection_recorded' | 'document_recorded'
 
 export type AuditEvent = {
   applicationId: string
@@ -34,4 +35,7 @@ export type AuditEvent = {
   voiceDropped?: 'lint' | 'sensitive'
   /** Guard reason codes for tool calls refused this turn. */
   rejections?: readonly string[]
+  /** What a RECORD_DOCUMENT event filed the upload under, and as what kind. */
+  documentId?: string
+  docType?: DocType
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { uploadedDocTypes } from '@/domain/application/documents'
 import { modelForTurn } from '@/server/orchestrator/model-for-turn'
-import { applyTurn } from '@/server/application-service'
+import { applyTurn, getApplication } from '@/server/application-service'
 import { failure, jsonError } from '@/server/http'
 import { ownerTokenOf } from '@/server/ownership'
 
@@ -24,11 +25,20 @@ export async function POST(request: Request, context: Context) {
     return jsonError(failure('malformed', 'Malformed turn request'))
   }
 
-  const result = await applyTurn(id, ownerTokenOf(request), {
+  const ownerToken = ownerTokenOf(request)
+  // A snapshot ahead of the model call, same as every other TurnInput field —
+  // applyTurn already re-reads the record after the await for what it
+  // commits, so a document landing mid-call is picked up on the next turn.
+  // A failed load answers no documents held; applyTurn repeats the same
+  // lookup and returns the real 404/403.
+  const loaded = getApplication(id, ownerToken)
+  const uploadedDocs = loaded.ok ? uploadedDocTypes(loaded.value) : []
+
+  const result = await applyTurn(id, ownerToken, {
     text: parsed.data.text,
     modelForTurn,
     isResume: false,
-    uploadedDocs: [],
+    uploadedDocs,
     at: new Date().toISOString(),
   })
 

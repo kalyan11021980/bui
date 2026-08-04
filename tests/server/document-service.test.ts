@@ -292,7 +292,7 @@ describe('ingestDocument', () => {
     expect(score(agreed)).toBeGreaterThan(score(silent))
   })
 
-  it('fills nothing and fails nothing when the read yields no fields', async () => {
+  it('fills nothing and fails nothing when the read yields no fields, but still records the upload', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(
       app, FULL,
@@ -301,9 +301,15 @@ describe('ingestDocument', () => {
 
     expect(outcome.filled).toEqual([])
     expect(outcome.state.id).toBe(app.id)
-    // Nothing happened, so nothing is claimed to have happened. A no-op
-    // action here would put an event in an append-only compliance record.
-    expect(getAuditLog().sizeFor(app.id)).toBe(0)
+    // No SET_VALUE fired — nothing was legible — but the document itself was
+    // still handed over and accepted, so it must count as held: an applicant
+    // who photographed an unreadable licence must not be asked to
+    // photograph it again forever.
+    expect(getAuditLog().sizeFor(app.id)).toBe(1)
+    expect(getAuditLog().entriesFor(app.id)[0]?.kind).toBe('document_recorded')
+    expect(outcome.state.documents).toEqual([
+      { documentId: outcome.documentId, docType: 'drivers_license', at: AT },
+    ])
   })
 
   it('404s an application that does not exist, even when it read nothing', async () => {

@@ -3,11 +3,13 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { POST as turn } from '@/app/api/application/[id]/turn/route'
 import { __setModelForTurnTests } from '@/server/orchestrator/model-for-turn'
 import { applyAction } from '@/server/application-service'
+import { ingestDocument } from '@/server/document-service'
 import { __resetStoreForTests, getApplication, putApplication } from '@/server/store'
 import { __resetAuditLogForTests, getAuditLog } from '@/server/audit'
 import { createApplication } from '@/domain/application/reducer'
 import { OWNER_TOKEN_HEADER } from '@/server/ownership'
 import { stubModel } from '../server/orchestrator/stub-model'
+import { pngBase64 } from '../server/image-bytes'
 
 const AT = '2026-08-03T00:00:00.000Z'
 const PROFILE = {
@@ -194,6 +196,32 @@ describe('POST /turn', () => {
     }))
     await post('app-1', {})
     expect(getApplication('app-1')?.fields.first_name?.value).toBe('Concurrent')
+  })
+
+  it('rejects a request for a document already uploaded, once genuinely ingested', async () => {
+    // Uploads through the real service — the same commit path an applicant's
+    // photo takes — rather than pre-filling `documents` on the state by
+    // hand. Only the former proves ingestDocument -> reducer -> uploadedDocTypes
+    // -> route -> guard is actually wired end to end.
+    seed()
+    const ingested = await ingestDocument({
+      applicationId: 'app-1',
+      ownerToken: 'tok',
+      docType: 'drivers_license',
+      imageBase64: pngBase64(1600, 1000),
+      at: AT,
+      provider: async () => ({ text: '', detections: [] }),
+    })
+    expect(ingested.ok).toBe(true)
+
+    useModel(stubModel('One moment.', [
+      { toolName: 'requestDocument', input: { docType: 'drivers_license' } },
+    ]))
+    await post('app-1', {})
+
+    expect(getApplication('app-1')?.orchestratorRejections).toBe(1)
+    const event = getAuditLog().entriesFor('app-1').find((e) => e.kind === 'agent_turn')
+    expect(event?.rejections).toEqual(['document_already_held'])
   })
 
   it('answers 409 if the application is submitted while the model call is in flight', async () => {

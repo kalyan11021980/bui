@@ -21,6 +21,7 @@ export function createApplication(
     submittedAt: null,
     transcript: [],
     orchestratorRejections: 0,
+    documents: [],
   }
 }
 
@@ -122,6 +123,20 @@ export function applicationReducer(
 
     case 'RECORD_REJECTION':
       return { ...state, orchestratorRejections: state.orchestratorRejections + 1 }
+
+    case 'RECORD_DOCUMENT': {
+      if (state.documents.some((d) => d.documentId === action.documentId)) {
+        throw new Error(`Document ${action.documentId} is already recorded`)
+      }
+      return {
+        ...state,
+        documents: [...state.documents, {
+          documentId: action.documentId,
+          docType: action.docType,
+          at: action.at,
+        }],
+      }
+    }
   }
 }
 

@@ -133,9 +133,18 @@ const recordRejection = z.object({
   type: z.literal('RECORD_REJECTION'), at: timestamp,
 }).strict()
 
+const recordDocument = z
+  .object({
+    type: z.literal('RECORD_DOCUMENT'),
+    documentId: z.string().min(1),
+    docType: z.enum(ALL_DOC_TYPES),
+    at: timestamp,
+  })
+  .strict()
+
 export const actionSchema = z.discriminatedUnion('type', [
   setValue, clearValue, confirm, verify, reject, supersede, updateProfile,
-  submit, appendTurn, recordRejection,
+  submit, appendTurn, recordRejection, recordDocument,
 ])
 
 /** The body of `POST /api/application/[id]/actions`. The id comes from the path. */
@@ -206,6 +215,11 @@ export function toAction(parsed: ParsedAction): Action {
     }
     case 'RECORD_REJECTION':
       return { type: 'RECORD_REJECTION', at: parsed.at }
+    case 'RECORD_DOCUMENT':
+      return {
+        type: 'RECORD_DOCUMENT', documentId: parsed.documentId,
+        docType: parsed.docType, at: parsed.at,
+      }
     case 'UPDATE_PROFILE': {
       const p = parsed.patch
       return {

@@ -1,3 +1,4 @@
+import type { DocType } from '../field-id'
 import type { RequirementKey } from '../requirements/key'
 import type { ApplicantProfile } from '../requirements/rules'
 import type { Turn } from '../orchestrator/transcript'
@@ -24,6 +25,9 @@ export type FieldState<T = unknown> = {
   rejection?: { reason: string; at: string }
 }
 
+/** One accepted upload: what it was filed as, and what kind of document it is. */
+export type DocumentRecord = { documentId: string; docType: DocType; at: string }
+
 export type ApplicationState = {
   id: string
   /**
@@ -43,6 +47,8 @@ export type ApplicationState = {
   transcript: readonly Turn[]
   /** Guard rejections on this application. Three drops it to panel-only. */
   orchestratorRejections: number
+  /** Documents the applicant has actually uploaded, in order. */
+  documents: readonly DocumentRecord[]
 }
 
 export type Action =
@@ -72,3 +78,4 @@ export type Action =
   | { type: 'SUBMIT'; at: string }
   | { type: 'APPEND_TURN'; turn: Turn; at: string }
   | { type: 'RECORD_REJECTION'; at: string }
+  | { type: 'RECORD_DOCUMENT'; documentId: string; docType: DocType; at: string }

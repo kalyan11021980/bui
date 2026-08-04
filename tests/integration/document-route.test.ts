@@ -24,7 +24,7 @@ vi.mock('@/server/ocr/client', async (importOriginal) => {
 import { POST as CREATE } from '@/app/api/application/route'
 import { POST as ACTION } from '@/app/api/application/[id]/actions/route'
 import { POST } from '@/app/api/application/[id]/documents/route'
-import { __resetAuditLogForTests } from '@/server/audit'
+import { __resetAuditLogForTests, getAuditLog } from '@/server/audit'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
 import { OWNER_TOKEN_HEADER } from '@/server/ownership'
 import { __resetStoreForTests } from '@/server/store'
@@ -134,6 +134,20 @@ describe('POST /api/application/[id]/documents — a successful upload', () => {
     expect(body.state.fields.dl_number?.provenance?.source).toBe('ocr')
     expect(body.state.fields.dl_number?.provenance?.box).toHaveLength(4)
     expect(body.state.fields.dl_number?.provenance?.confidence).toBeGreaterThan(0)
+  })
+
+  it('records the upload itself, not just the fields it filled', async () => {
+    const id = await newApp()
+    const res = await upload(id, { docType: 'drivers_license', imageBase64: WA_PNG })
+    const body = (await res.json()) as { documentId: string; state: ApplicationState }
+
+    expect(body.state.documents).toEqual([
+      { documentId: body.documentId, docType: 'drivers_license', at: expect.any(String) },
+    ])
+    const events = getAuditLog().entriesFor(id).filter((e) => e.kind === 'document_recorded')
+    expect(events).toHaveLength(1)
+    expect(events[0]?.documentId).toBe(body.documentId)
+    expect(events[0]?.docType).toBe('drivers_license')
   })
 
   it('persists what it read, rather than only returning it', async () => {
