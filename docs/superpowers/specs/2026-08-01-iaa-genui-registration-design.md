@@ -63,7 +63,7 @@ Two further defects:
 | Constraint | Decision |
 |---|---|
 | Runtime | Next.js (full-stack, route handlers) |
-| Model access | **AI SDK v5 only.** No vendor SDKs. Any model swappable underneath. |
+| Model access | **AI SDK 7 only.** No vendor SDKs. Any model swappable underneath. |
 | OCR | DeepSeek-OCR (MLX) via LM Studio for development; production target decided at §13.1 gate |
 | Services | Small modular services with real interfaces, not fakes |
 | Visual | Must follow existing IAA colors and guidelines |
@@ -171,7 +171,7 @@ mark an application complete, or author compliance copy.
        │ metadata only (§8.1)             │
 ┌──────▼───────────────┐        ┌─────────▼────────────┐
 │  ORCHESTRATOR        │        │  SERVICES            │
-│  AI SDK v5 · tools   │◄──────►│  Ocr · Address       │
+│  AI SDK 7 · tools    │◄──────►│  Ocr · Address       │
 │  picks the next ask  │        │  LicenseVerify       │
 │  frames it (voice)   │        │  Review · Signing    │
 └──────┬───────────────┘        │  Notification        │
@@ -495,7 +495,7 @@ depends on it.
 
 ## 15. Implementation phases
 
-This design is too large for one implementation plan. It decomposes into five phases, each
+This design is too large for one implementation plan. It decomposes into six phases, each
 independently valuable and separately planned.
 
 **Phase 1 — Deterministic core.** Field catalog with mandatory rationale, requirements
@@ -515,6 +515,13 @@ notifications.
 
 **Phase 5 — Signing.** DocuSign envelope prefill from collected data, embedded ceremony,
 separate attestation step per §10.2.
+
+**Phase 6 — Voice interaction.** Spoken input and output, deferred from Phase 3. The turn
+structure already keeps vetted copy as discrete blocks (§9), so speaking them aloud is a
+rendering choice, not a restructuring. The §8.1 PII boundary must be redesigned before
+microphone input is accepted: that boundary keys off field values never reaching the
+orchestrator's text context, but a spoken taxpayer ID leaves the network as audio on its way
+to transcription, ahead of and outside that boundary entirely.
 
 **On the ordering.** The agent is phase 3 rather than phase 1 because it orchestrates the
 requirements engine and consumes OCR output — it needs both to exist before it has anything
