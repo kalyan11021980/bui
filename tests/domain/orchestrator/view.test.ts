@@ -35,13 +35,20 @@ describe('toOrchestratorView', () => {
 
   it('carries the value only for an orchestratorVisible field', () => {
     // first_name is the allowlisted display value; see the catalog.
-    const state = applicationReducer(seeded(), {
+    let state = applicationReducer(seeded(), {
       type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
+      source: 'user', at: '2026-08-03T00:00:00.000Z',
+    })
+    // last_name is non-sensitive but NOT allowlisted: distinguishes "visible"
+    // from merely "not sensitive", which sensitive-only fields cannot.
+    state = applicationReducer(state, {
+      type: 'SET_VALUE', fieldId: 'last_name', value: 'Menon',
       source: 'user', at: '2026-08-03T00:00:00.000Z',
     })
     const view = toOrchestratorView(state, [])
     const all = [...view.outstanding, ...view.settled]
     expect(all.find((f) => f.id === 'first_name')?.value).toBe('Kalyan')
+    expect(all.find((f) => f.id === 'last_name')?.value).toBeUndefined()
   })
 
   it('splits outstanding from settled by the same rule the panel uses', () => {
