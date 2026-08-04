@@ -8,7 +8,7 @@ import {
   applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
 import type { DocType } from '@/domain/field-id'
-import { toOrchestratorView } from '@/domain/orchestrator/view'
+import { PANEL_ONLY_THRESHOLD, toOrchestratorView } from '@/domain/orchestrator/view'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { runTurn, type TurnRequest, type TurnResult } from '@/server/orchestrator/service'
 import { getAuditLog } from '@/server/audit'
@@ -22,9 +22,6 @@ import type { Action, ApplicationState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; failure: Failure }
-
-/** Rejections at which the agent stops offering its own tools for a turn. */
-const PANEL_ONLY_THRESHOLD = 3
 
 /**
  * What a new application starts as. UPDATE_PROFILE moves it from here; the
@@ -126,10 +123,11 @@ export async function applyTurn(
   const closed = submittedRefusal(current)
   if (closed !== null) return { ok: false, failure: failure('submitted', closed) }
 
-  // Keyed off truthiness throughout: an empty string is "no text", the same
-  // as it not being sent, both for whether an applicant turn is appended and
-  // for what the model is told the applicant said.
-  const text = input.text ? input.text : null
+  // Keyed off truthiness throughout, after trimming: whitespace-only text is
+  // "no text", the same as it not being sent, both for whether an applicant
+  // turn is appended and for what the model is told the applicant said.
+  const trimmed = input.text?.trim()
+  const text = trimmed ? trimmed : null
 
   try {
     if (text) {
@@ -147,6 +145,11 @@ export async function applyTurn(
       })
     }
 
+    // The model call below is a real, possibly multi-second network round
+    // trip. Nothing holds a lock across it, so what commits next must not
+    // reduce from this pre-await snapshot — a concurrent SET_VALUE, upload,
+    // or SUBMIT landing meanwhile would otherwise be silently overwritten
+    // when this turn's writes land on top of it.
     const result = await runTurnSafely(input.modelForTurn, {
       view: toOrchestratorView(current, input.uploadedDocs),
       state: current,
@@ -157,18 +160,35 @@ export async function applyTurn(
       at: input.at,
     })
 
+    // Re-read from the store rather than reuse `current`: this is the state
+    // as it actually is now, after whatever landed during the await above.
+    const fresh = owned(id, ownerToken)
+    if (!fresh.ok) return fresh
+    current = fresh.value
+
+    // The same refusal the pre-await check made, re-run against the current
+    // record — a SUBMIT that landed during the model call answers exactly
+    // the 409 it would have if it had landed a moment earlier.
+    const closedNow = submittedRefusal(current)
+    if (closedNow !== null) return { ok: false, failure: failure('submitted', closedNow) }
+
     for (const action of result.actions) current = commit(current, action)
 
-    // Projected ahead of the RECORD_REJECTION loop below, which is what
-    // actually moves the stored count: the notice on this turn must reflect
-    // the count this turn produces, not the count before it.
+    // Rejections already on the record (from earlier turns) plus this one:
+    // the agent stops offering tools once either crosses the threshold, so a
+    // turn that lands after it was already reached must render the same way
+    // as the turn that reached it.
+    const alreadyPanelOnly = current.orchestratorRejections >= PANEL_ONLY_THRESHOLD
     const projected = current.orchestratorRejections + result.rejections.length
-    const droppingToPanelOnly = projected >= PANEL_ONLY_THRESHOLD
+    const panelOnly = alreadyPanelOnly || projected >= PANEL_ONLY_THRESHOLD
 
     const turn: Turn = {
       ...result.turn,
-      ...(droppingToPanelOnly && {
-        blocks: [...result.turn.blocks, { kind: 'notice', copyId: 'panel_only_notice' }],
+      seq: current.transcript.length + 1,
+      ...(panelOnly && {
+        // Replaces, not appends: "I'll step back" alongside an ask in the
+        // same breath would contradict the notice it sits next to.
+        blocks: [{ kind: 'notice', copyId: 'panel_only_notice' }],
       }),
       ...(result.rejections.length > 0 && { rejections: [...result.rejections] }),
     }
@@ -183,7 +203,14 @@ export async function applyTurn(
     if (error instanceof ApplicationSubmittedError) {
       return { ok: false, failure: failure('submitted', error.message) }
     }
-    throw error
+    // Mirrors applyAction: a throw partway through (a rogue stored field, a
+    // reducer refusal) is a 422 with a message, not a 500 with a stack trace
+    // — and it must not leave a half-written turn with no trail entry, which
+    // commit()'s audit-before-write ordering already guarantees.
+    return {
+      ok: false,
+      failure: failure('rejected', error instanceof Error ? error.message : 'Turn rejected'),
+    }
   }
 }
 

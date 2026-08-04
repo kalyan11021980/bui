@@ -14,6 +14,7 @@ const view: OrchestratorView = {
   documentsOutstanding: [],
   submitted: false,
   rulesVersion: 1,
+  panelOnly: false,
 }
 
 describe('systemPrompt', () => {

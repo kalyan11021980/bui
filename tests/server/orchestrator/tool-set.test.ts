@@ -14,6 +14,7 @@ const view = (over: Partial<OrchestratorView> = {}): OrchestratorView => ({
   documentsOutstanding: ['drivers_license'],
   submitted: false,
   rulesVersion: 1,
+  panelOnly: false,
   ...over,
 })
 
@@ -56,5 +57,10 @@ describe('activeToolsFor', () => {
     const bare = activeToolsFor(view({ outstanding: [], documentsOutstanding: [] }), false)
     expect(bare).toContain('explain')
     expect(bare).toContain('setProfile')
+  })
+
+  it('offers nothing once panelOnly, even with everything else still outstanding', () => {
+    expect(activeToolsFor(view(), false)).not.toEqual([])
+    expect(activeToolsFor(view({ panelOnly: true }), true)).toEqual([])
   })
 })

@@ -67,4 +67,16 @@ describe('toOrchestratorView', () => {
     const rogue = { ...broken, fields: { ...broken.fields, not_a_field: { value: 'x', status: 'confirmed' as const } } }
     expect(() => toOrchestratorView(rogue, [])).toThrow(/not_a_field/)
   })
+
+  it('is not panelOnly below the rejection threshold', () => {
+    const state = { ...seeded(), orchestratorRejections: 2 }
+    expect(toOrchestratorView(state, []).panelOnly).toBe(false)
+  })
+
+  it('is panelOnly at and beyond the rejection threshold', () => {
+    const atThreshold = { ...seeded(), orchestratorRejections: 3 }
+    const beyond = { ...seeded(), orchestratorRejections: 4 }
+    expect(toOrchestratorView(atThreshold, []).panelOnly).toBe(true)
+    expect(toOrchestratorView(beyond, []).panelOnly).toBe(true)
+  })
 })

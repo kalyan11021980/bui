@@ -7,6 +7,9 @@ import { parseReqKey } from '../requirements/key'
 import type { RequirementKey } from '../requirements/key'
 import type { ApplicantProfile } from '../requirements/rules'
 
+/** Rejections at which the agent stops offering its own tools for the rest of the application. */
+export const PANEL_ONLY_THRESHOLD = 3
+
 export type FieldView = {
   id: RequirementKey
   label: string
@@ -26,6 +29,8 @@ export type OrchestratorView = {
   documentsOutstanding: readonly DocType[]
   submitted: boolean
   rulesVersion: number
+  /** Once true, the agent offers no tools of its own — see PANEL_ONLY_THRESHOLD. */
+  panelOnly: boolean
 }
 
 /**
@@ -62,6 +67,7 @@ export function toOrchestratorView(
     documentsOutstanding: documentsToUpload(state.profile).filter((d) => !held.has(d)),
     submitted: state.submittedAt !== null,
     rulesVersion: state.rulesVersion,
+    panelOnly: state.orchestratorRejections >= PANEL_ONLY_THRESHOLD,
   }
 }
 
