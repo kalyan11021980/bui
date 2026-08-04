@@ -31,13 +31,20 @@ type Props = {
   disabled?: boolean
   /** Injectable: jsdom decodes no images and has no canvas. */
   prepare?: (file: File) => Promise<PreparedImage>
+  /**
+   * Namespaces the id for a second renderer of the same document type — the
+   * chat surface renders a `document_request` for a document the page-level
+   * upload list may already offer. Omitted, this returns exactly what it
+   * always has.
+   */
+  scope?: string
 }
 
 export function DocumentUpload({
-  docType, onRead, onChoose, disabled, prepare,
+  docType, onRead, onChoose, disabled, prepare, scope,
 }: Props) {
   const [notice, setNotice] = useState<string | null>(null)
-  const inputId = `upload-${docType}`
+  const inputId = scope ? `${scope}-upload-${docType}` : `upload-${docType}`
 
   const handle = async (file: File | undefined) => {
     if (!file) return

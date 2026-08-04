@@ -27,6 +27,9 @@ function stubFetch(respond: (call: Call) => { status: number; body: unknown }) {
   })
 }
 
+/** Runs immediately — fine for every test that isn't about ordering itself. */
+const runNow = (run: () => Promise<void>) => { void run() }
+
 beforeEach(() => { calls = [] })
 afterEach(() => { vi.unstubAllGlobals() })
 
@@ -34,14 +37,14 @@ describe('useConversation', () => {
   it('fires no request on mount', () => {
     stubFetch(() => ({ status: 200, body: {} }))
     const state = createApplication('app-1', PROFILE, OWNER)
-    renderHook(() => useConversation('app-1', OWNER, state, () => undefined))
+    renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
     expect(calls).toHaveLength(0)
   })
 
   it('ignores blank input — nothing to send is not a turn', () => {
     stubFetch(() => ({ status: 200, body: {} }))
     const state = createApplication('app-1', PROFILE, OWNER)
-    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined))
+    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
     act(() => result.current.send('   '))
     expect(calls).toHaveLength(0)
   })
@@ -54,7 +57,7 @@ describe('useConversation', () => {
     stubFetch(() => ({ status: 200, body: { state: after, turn: agentTurn } }))
 
     const onState = vi.fn()
-    const { result } = renderHook(() => useConversation('app-1', OWNER, state, onState))
+    const { result } = renderHook(() => useConversation('app-1', OWNER, state, onState, runNow))
 
     act(() => result.current.send('Hi'))
     expect(result.current.pending).toBe(true)
@@ -78,7 +81,7 @@ describe('useConversation', () => {
     const after: ApplicationState = { ...resumedState, transcript: [old1, old2, applicantTurn, agentTurn] }
     stubFetch(() => ({ status: 200, body: { state: after, turn: agentTurn } }))
 
-    const { result } = renderHook(() => useConversation('app-1', OWNER, resumedState, () => undefined))
+    const { result } = renderHook(() => useConversation('app-1', OWNER, resumedState, () => undefined, runNow))
     expect(result.current.turns).toEqual([])
 
     act(() => result.current.send('Hi'))
@@ -87,10 +90,10 @@ describe('useConversation', () => {
     expect(result.current.turns).toEqual([applicantTurn, agentTurn])
   })
 
-  it('falls back to a local degraded notice when the request never reaches a server', async () => {
+  it('falls back to a local degraded notice only when the request never reaches a server', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     const state = createApplication('app-1', PROFILE, OWNER)
-    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined))
+    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
 
     act(() => result.current.send('Hi'))
     await waitFor(() => expect(result.current.pending).toBe(false))
@@ -99,5 +102,88 @@ describe('useConversation', () => {
     expect(result.current.turns[0]).toMatchObject({
       role: 'agent', voice: null, blocks: [{ kind: 'notice', copyId: 'degraded_notice' }],
     })
+  })
+
+  it('adds nothing to the transcript for a real refusal — no vetted copy fits "closed" or "unknown owner"', async () => {
+    // status !== null means a server actually answered; degraded_notice's
+    // wording ("I can't reach my assistant") would be false here.
+    stubFetch(() => ({ status: 409, body: { error: 'This application has already been submitted' } }))
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+    act(() => result.current.send('Hi'))
+    await waitFor(() => expect(result.current.pending).toBe(false))
+
+    expect(result.current.turns).toEqual([])
+  })
+
+  it("gives a locally-made turn its own seq space, so a retry after a failure can never collide", async () => {
+    // First send: transport failure -> a local degraded turn (seq <= -1).
+    // Second send: succeeds, and the server's own transcript restarts its
+    // seq count at 1 (it never received the first request at all). Before
+    // the fix, both turns could land with the SAME seq, which TurnView keys
+    // on — a real React key collision, not just a cosmetic one.
+    let first = true
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, body: init.body ? JSON.parse(String(init.body)) : undefined })
+      if (first) { first = false; throw new TypeError('Failed to fetch') }
+      const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi again' }
+      const agentTurn: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Hello!', blocks: [] }
+      const after: ApplicationState = {
+        ...createApplication('app-1', PROFILE, OWNER), transcript: [applicantTurn, agentTurn],
+      }
+      return new Response(JSON.stringify({ state: after, turn: agentTurn }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      })
+    }))
+
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+    act(() => result.current.send('Hi'))
+    await waitFor(() => expect(result.current.pending).toBe(false))
+    expect(result.current.turns).toHaveLength(1)
+
+    act(() => result.current.send('Hi again'))
+    await waitFor(() => expect(result.current.pending).toBe(false))
+
+    const seqs = result.current.turns.map((t) => t.seq)
+    expect(new Set(seqs).size).toBe(seqs.length)
+    // The failed turn's seq must not collide with a real, positive one.
+    expect(seqs[0]).toBeLessThanOrEqual(-1)
+  })
+
+  it("routes the turn request through the caller's serialized queue, behind any write already enqueued", async () => {
+    const order: string[] = []
+    let releasePanelWrite: () => void = () => undefined
+    const panelWrite = new Promise<void>((resolve) => { releasePanelWrite = resolve })
+
+    const queue = { current: Promise.resolve() }
+    const runSerialized = (run: () => Promise<void>) => {
+      queue.current = queue.current.then(run, run).catch(() => undefined)
+    }
+
+    stubFetch((call) => { order.push(call.url); return { status: 200, body: {} } })
+
+    // Enqueue a slow panel write ahead of the turn — mirrors `readDocument`
+    // being enqueued while the applicant is still typing.
+    runSerialized(async () => { await panelWrite; order.push('panel-write-done') })
+
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const { result } = renderHook(
+      () => useConversation('app-1', OWNER, state, () => undefined, runSerialized),
+    )
+    act(() => result.current.send('Hi'))
+
+    // The turn's own fetch must not have gone out yet — it is queued
+    // behind the panel write, not racing it.
+    expect(calls).toHaveLength(0)
+
+    releasePanelWrite()
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0))
+
+    expect(order.indexOf('panel-write-done')).toBeLessThan(
+      order.findIndex((url) => url.endsWith('/turn')),
+    )
   })
 })

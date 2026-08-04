@@ -35,6 +35,15 @@ type Props = BlockHandlers & {
   state: ApplicationState
 }
 
+/**
+ * The guard only permits a `field_ask`/`document_request` for a field or
+ * document the panel is still showing too, so every id this file mints must
+ * be namespaced apart from the panel's own — otherwise two elements share
+ * one id, `<label for>` resolves to whichever is first in document order,
+ * and the chat's label ends up labelling the panel's box.
+ */
+const CHAT_SCOPE = 'chat'
+
 const noticeStyle: React.CSSProperties = {
   margin: '6px 0', fontSize: 14, color: COLOR.textPrimary,
 }
@@ -56,10 +65,19 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
       const { fieldId } = block
       const def = fieldDef(parseReqKey(fieldId).fieldId)
       const rationaleId = `chat-rationale-${fieldId}`
+      const label = displayLabel(fieldId)
       return (
-        <div style={{ margin: '10px 0' }}>
-          <label htmlFor={fieldInputId(fieldId)} style={labelStyle}>
-            {displayLabel(fieldId)}
+        // Mirrors FieldRow's own group/aria-describedby pairing, so the
+        // rationale's id is not merely passed to Rationale but actually
+        // referenced by something.
+        <div
+          role="group"
+          aria-label={label}
+          aria-describedby={rationaleId}
+          style={{ margin: '10px 0' }}
+        >
+          <label htmlFor={fieldInputId(fieldId, CHAT_SCOPE)} style={labelStyle}>
+            {label}
           </label>
           <FieldInput
             fieldId={fieldId}
@@ -67,6 +85,7 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
             state={state.fields[fieldId]}
             onChange={onChange}
             onClear={onClear}
+            scope={CHAT_SCOPE}
           />
           <Rationale field={def} id={rationaleId} />
         </div>
@@ -84,6 +103,7 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
         <DocumentUpload
           docType={docType}
           onRead={(image) => onReadDocument(docType, image)}
+          scope={CHAT_SCOPE}
         />
       )
     }

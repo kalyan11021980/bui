@@ -5,6 +5,8 @@ import { BlockView } from '@/ui/chat/blocks'
 import { createApplication } from '@/domain/application/reducer'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import { vettedCopy } from '@/domain/orchestrator/copy'
+import { FieldRow } from '@/ui/panel/FieldRow'
+import { DocumentUpload } from '@/ui/panel/DocumentUpload'
 
 const CONTROL = { selector: 'input, select, textarea' } as const
 
@@ -41,6 +43,33 @@ describe('BlockView — field_ask', () => {
     await userEvent.type(screen.getByLabelText(/first name/i, CONTROL), 'Ada')
     expect(onChange).toHaveBeenCalledWith('first_name', 'Ada')
   })
+
+  it("uses a distinct id from the panel's own row for the same field, so neither <label> mislabels the other", () => {
+    // The guard only ever permits a field_ask for an outstanding field, so
+    // the panel already renders a row for it — this collision is guaranteed
+    // by construction, not a corner case.
+    render(
+      <>
+        <FieldRow fieldId="first_name" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />
+        <BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />
+      </>,
+    )
+    const inputs = screen.getAllByLabelText(/first name/i, CONTROL)
+    expect(inputs).toHaveLength(2)
+    const ids = inputs.map((el) => el.id)
+    expect(ids.every((id) => id !== '')).toBe(true)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it('wires the group to the rationale it names, not a dangling id', () => {
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
+    const group = screen.getByRole('group', { name: /first name/i })
+    const describedBy = group.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy!)).toContainElement(
+      screen.getByText('Your account has to match the name on your ID'),
+    )
+  })
 })
 
 describe('BlockView — rationale', () => {
@@ -65,6 +94,20 @@ describe('BlockView — document_request', () => {
   it('renders the upload control for that document', () => {
     render(<BlockView block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />)
     expect(screen.getByLabelText(/photo of your driver's license/i)).toBeInTheDocument()
+  })
+
+  it("uses a distinct id from the page-level upload for the same document type", () => {
+    render(
+      <>
+        <DocumentUpload docType="drivers_license" onRead={vi.fn()} />
+        <BlockView block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />
+      </>,
+    )
+    const inputs = screen.getAllByLabelText(/photo of your driver's license/i)
+    expect(inputs).toHaveLength(2)
+    const ids = inputs.map((el) => el.id)
+    expect(ids.every((id) => id !== '')).toBe(true)
+    expect(new Set(ids).size).toBe(2)
   })
 })
 

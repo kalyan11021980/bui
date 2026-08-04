@@ -18,6 +18,8 @@ type Props = {
    * unrecord it is how the record ends up disagreeing with the screen.
    */
   onClear: (id: RequirementKey) => void
+  /** See `fieldInputId` — set when this is not the panel's own copy of the field. */
+  scope?: string
 }
 
 function toInputValue(value: unknown): string {
@@ -34,7 +36,7 @@ function toInputValue(value: unknown): string {
  * holding the last value that was, or the applicant is left attesting to
  * something no longer in front of them, still counted as done.
  */
-export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
+export function FieldInput({ fieldId, def, state, onChange, onClear, scope }: Props) {
   const external = toInputValue(state?.value)
   const [draft, setDraft] = useState(external)
   const [lastExternal, setLastExternal] = useState(external)
@@ -91,11 +93,12 @@ export function FieldInput({ fieldId, def, state, onChange, onClear }: Props) {
           // does not change the state model.
           if (names.length > 0) onChange(fieldId, names)
         }}
+        {...(scope !== undefined && { scope })}
       />
 
       {error && (
         <p
-          id={fieldErrorId(fieldId)}
+          id={fieldErrorId(fieldId, scope)}
           role="alert"
           style={{
             fontSize: 13, margin: '4px 0 0', padding: '4px 8px',

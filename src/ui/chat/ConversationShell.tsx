@@ -10,12 +10,18 @@ import { TurnView } from './TurnView'
 
 type Props = BlockHandlers & {
   applicationId: string
-  /** Null until the application has started; the composer stays disabled. */
+  /** Null until the application has started; sending stays disabled. */
   ownerToken: string | null
   state: ApplicationState
   /** Adopts the state a completed turn returned — a `setProfile` or `askFor`
    *  tool call is already committed server-side by the time it arrives. */
   onState: (state: ApplicationState) => void
+  /**
+   * `useApplication`'s own write queue. The turn request is routed through
+   * it — see `useConversation`'s own comment for why a whole-state adoption
+   * needs the same ordering guarantee `readDocument` already relies on it for.
+   */
+  runSerialized: (run: () => Promise<void>) => void
 }
 
 const openingStyle: React.CSSProperties = {
@@ -34,13 +40,22 @@ const composerStyle: React.CSSProperties = {
  * `useConversation`.
  */
 export function ConversationShell({
-  applicationId, ownerToken, state, onChange, onClear, onReadDocument, onState,
+  applicationId, ownerToken, state, onChange, onClear, onReadDocument, onState, runSerialized,
 }: Props) {
-  const { turns, pending, send } = useConversation(applicationId, ownerToken, state, onState)
+  const { turns, pending, send } = useConversation(
+    applicationId, ownerToken, state, onState, runSerialized,
+  )
   const [draft, setDraft] = useState('')
+  const closed = state.submittedAt !== null
+  // Neither element below is ever given the `disabled` attribute: disabling
+  // an element that holds focus moves focus to <body> and nothing restores
+  // it (§9.1 — "focus is never stolen by an update"). Sending is refused
+  // here instead, so the control stays focusable throughout.
+  const sendable = !pending && ownerToken !== null && !closed
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (!sendable) return
     const text = draft.trim()
     if (text === '') return
     setDraft('')
@@ -75,16 +90,16 @@ export function ConversationShell({
         <input
           id="chat-composer"
           value={draft}
-          disabled={pending || ownerToken === null}
           onChange={(event) => setDraft(event.target.value)}
           style={composerStyle}
         />
         <button
           type="submit"
-          disabled={pending || ownerToken === null || draft.trim() === ''}
+          aria-disabled={!sendable || draft.trim() === ''}
           style={{
             background: COLOR.primary, color: COLOR.surface, border: 'none',
             padding: '6px 14px', cursor: 'pointer',
+            opacity: !sendable || draft.trim() === '' ? 0.6 : 1,
           }}
         >
           Send

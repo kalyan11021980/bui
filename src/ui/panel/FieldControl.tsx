@@ -10,12 +10,22 @@ import { COLOR } from '@/ui/theme/tokens'
  * labelled "License number" inputs. `#` is replaced because it is legal in an
  * HTML id but must be escaped in every CSS selector that touches it.
  */
-export function fieldInputId(fieldId: RequirementKey): string {
-  return `field-${fieldId.replace('#', '--')}`
+/**
+ * `scope` namespaces the id for a second renderer of the same field — the
+ * chat surface renders a `field_ask` for a field the panel is already
+ * showing a row for (the guard only permits an ask for an outstanding
+ * field, so the panel's row for it always exists too). Two elements sharing
+ * one id is invalid HTML and `<label for>` resolves to whichever is first in
+ * document order, mislabelling the other — omitted, this returns exactly
+ * what it always has.
+ */
+export function fieldInputId(fieldId: RequirementKey, scope?: string): string {
+  const base = `field-${fieldId.replace('#', '--')}`
+  return scope ? `${scope}-${base}` : base
 }
 
-export function fieldErrorId(fieldId: RequirementKey): string {
-  return `${fieldInputId(fieldId)}-error`
+export function fieldErrorId(fieldId: RequirementKey, scope?: string): string {
+  return `${fieldInputId(fieldId, scope)}-error`
 }
 
 function inputTypeFor(type: FieldDef['type']): string {
@@ -41,17 +51,19 @@ type Props = {
   error: string | null
   onText: (next: string) => void
   onFiles: (names: string[]) => void
+  /** See `fieldInputId` — set when this is not the panel's own copy of the field. */
+  scope?: string
 }
 
 /** The element itself. Validation and draft state live in FieldInput. */
-export function FieldControl({ fieldId, def, draft, error, onText, onFiles }: Props) {
+export function FieldControl({ fieldId, def, draft, error, onText, onFiles, scope }: Props) {
   const options = optionsFor(def)
 
   const shared = {
-    id: fieldInputId(fieldId),
+    id: fieldInputId(fieldId, scope),
     name: fieldId,
     'aria-invalid': error !== null,
-    ...(error !== null && { 'aria-describedby': fieldErrorId(fieldId) }),
+    ...(error !== null && { 'aria-describedby': fieldErrorId(fieldId, scope) }),
     style: {
       width: '100%', boxSizing: 'border-box' as const, padding: '8px 10px',
       fontSize: 15, color: COLOR.textPrimary, background: COLOR.surface,

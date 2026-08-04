@@ -25,17 +25,32 @@ export type UseConversation = {
  * already committed server-side by the time the response arrives) via
  * `onState`, rather than reducing anything locally the way `useApplication`
  * does for panel edits.
+ *
+ * `runSerialized` is `useApplication`'s own write queue (its `runSerialized`
+ * field). The turn request is routed through it rather than fired directly,
+ * for the same reason `readDocument` is: `applyTurn` re-reads state after its
+ * model call, but that only narrows the window against a panel write that
+ * has already landed — one still in flight (queued, not yet sent) is not
+ * protected by it. Running the turn request through the same queue the panel
+ * writes use means it is never even SENT until every write queued ahead of
+ * it has been sent and answered, so the server has already seen them.
  */
 export function useConversation(
   applicationId: string,
   ownerToken: string | null,
   initialState: ApplicationState,
   onState: (state: ApplicationState) => void,
+  runSerialized: (run: () => Promise<void>) => void,
 ): UseConversation {
   const [turns, setTurns] = useState<readonly Turn[]>([])
   const [pending, setPending] = useState(false)
   const seen = useRef(initialState.transcript.length)
   const inFlight = useRef(false)
+  // Turns this hook fabricates locally (a transport failure) get their own
+  // key space, strictly below every real Turn.seq (which starts at 1 and
+  // only grows) — so a locally-made turn can never collide with, or be
+  // mistaken for, one the server produced.
+  const localSeq = useRef(0)
 
   const send = (text: string) => {
     const trimmed = text.trim()
@@ -43,15 +58,23 @@ export function useConversation(
     inFlight.current = true
     setPending(true)
 
-    void sendTurn(applicationId, ownerToken, trimmed).then((result) => {
+    runSerialized(async () => {
+      const result = await sendTurn(applicationId, ownerToken, trimmed)
       inFlight.current = false
       setPending(false)
 
       if (!result.ok) {
-        // Never reached a server, or was refused outright (closed, unknown).
-        // A vetted notice, same as a degraded model turn — no retry storm,
-        // no error the applicant did not write.
-        setTurns((held) => [...held, degradedTurn(seen.current + held.length + 1)])
+        // `status === null` means the request never reached a server at all
+        // — the one case `degraded_notice`'s wording ("I can't reach my
+        // assistant") is actually true. Any other refusal (closed
+        // application, wrong or unknown owner) got a real answer back, just
+        // not one this vetted copy id describes, and there is no other
+        // vetted copy for it — so nothing is added to the transcript rather
+        // than putting the wrong words in the agent's mouth.
+        if (result.status === null) {
+          localSeq.current -= 1
+          setTurns((held) => [...held, degradedTurn(localSeq.current)])
+        }
         return
       }
 

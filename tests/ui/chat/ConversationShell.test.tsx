@@ -10,10 +10,10 @@ import type { Turn } from '@/domain/orchestrator/transcript'
 import { sendAction } from '@/ui/client/application-api'
 
 /**
- * The shell against a stubbed server. The most important test here is the
- * last one: a keystroke inside a field_ask control must reach the panel's
- * own write path (`/actions`) and never the turn endpoint (`/turn`) — the §4
- * guarantee, at the UI layer.
+ * The shell against a stubbed server. The most important test here is
+ * "keystrokes ... never the turn endpoint": a keystroke inside a field_ask
+ * control must reach the panel's own write path (`/actions`) and never the
+ * turn endpoint (`/turn`) — the §4 guarantee, at the UI layer.
  */
 
 const AT = '2026-08-04T00:00:00.000Z'
@@ -37,11 +37,18 @@ function stubFetch(respond: (call: Call) => { status: number; body: unknown }) {
   })
 }
 
-const noHandlers: BlockHandlers & { onState: (state: ApplicationState) => void } = {
+/** Runs immediately — every test here is unrelated to queue ordering itself. */
+const runNow = (run: () => Promise<void>) => { void run() }
+
+const noHandlers: BlockHandlers & {
+  onState: (state: ApplicationState) => void
+  runSerialized: (run: () => Promise<void>) => void
+} = {
   onChange: () => undefined,
   onClear: () => undefined,
   onReadDocument: () => undefined,
   onState: () => undefined,
+  runSerialized: runNow,
 }
 
 beforeEach(() => { calls = [] })
@@ -139,6 +146,58 @@ describe('ConversationShell', () => {
     await userEvent.type(input, 'Ada')
 
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/actions'))).toBe(true))
+    expect(calls.some((c) => c.url.endsWith('/turn'))).toBe(false)
+  })
+
+  it('keeps focus on Send through a pending turn — never stolen by the update (§9.1)', async () => {
+    let resolveTurn: (response: Response) => void = () => undefined
+    const deferred = new Promise<Response>((resolve) => { resolveTurn = resolve })
+    const state = createApplication('app-1', PROFILE, OWNER)
+
+    vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+      calls.push({ url, body: init.body ? JSON.parse(String(init.body)) : undefined })
+      if (url.endsWith('/turn')) return deferred
+      return Promise.resolve(new Response(JSON.stringify(state), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+    }))
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    const sendButton = screen.getByRole('button', { name: /send/i })
+    await userEvent.click(sendButton)
+
+    // Mid-flight: the button is aria-disabled, but never DOM-disabled, so
+    // focus stays exactly where the applicant put it.
+    expect(sendButton).toHaveFocus()
+    expect(sendButton).not.toBeDisabled()
+
+    const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const agentTurn: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Hello!', blocks: [] }
+    const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+    resolveTurn(new Response(JSON.stringify({ state: after, turn: agentTurn }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+
+    await screen.findByText('Hello!')
+    expect(sendButton).toHaveFocus()
+  })
+
+  it('refuses to send once the application is submitted, without disabling the composer', async () => {
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const submitted: ApplicationState = { ...state, submittedAt: AT }
+    stubFetch(() => ({ status: 200, body: {} }))
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={submitted} {...noHandlers} />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
     expect(calls.some((c) => c.url.endsWith('/turn'))).toBe(false)
   })
 })

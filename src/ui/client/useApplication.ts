@@ -51,6 +51,15 @@ export type UseApplication = {
   readDocument: (docType: DocType, image: PreparedImage) => void
   /** Drops what was said about the last photo, once there is a new one. */
   forgetDocumentNotice: () => void
+  /**
+   * The serialized queue every write above already runs through, exposed so
+   * a caller outside this hook (the conversational shell's turn requests)
+   * can order its own writes against the panel's rather than racing them.
+   * `readDocument` is the reason this queue exists at all — see its own
+   * comment — and a turn adopting a whole `ApplicationState` is exactly the
+   * same shape of hazard.
+   */
+  runSerialized: (run: () => Promise<void>) => void
 }
 
 export function useApplication(): UseApplication {
@@ -165,6 +174,7 @@ export function useApplication(): UseApplication {
     state, documents: docImages, notice, outOfStep, carry,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
+    runSerialized: enqueue,
   }
 }
 
