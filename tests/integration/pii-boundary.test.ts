@@ -62,9 +62,7 @@ describe('no field value reaches the model', () => {
   beforeEach(async () => { payload = await capturedPayload() })
 
   it('transmits no value of any field lacking orchestratorVisible', () => {
-    const hidden = ALL_FIELDS.filter(
-      (d) => (d as { orchestratorVisible?: boolean }).orchestratorVisible !== true,
-    )
+    const hidden = ALL_FIELDS.filter((d) => d.orchestratorVisible !== true)
     expect(hidden.length).toBeGreaterThan(20)
     for (const def of hidden) {
       expect(payload, `leaked ${def.id}`).not.toContain(valueFor(def.id))
@@ -72,9 +70,7 @@ describe('no field value reaches the model', () => {
   })
 
   it('transmits the value of an orchestratorVisible field, proving it can see values at all', () => {
-    const visible = ALL_FIELDS.filter(
-      (d) => (d as { orchestratorVisible?: boolean }).orchestratorVisible === true,
-    )
+    const visible = ALL_FIELDS.filter((d) => d.orchestratorVisible === true)
     // If this is ever zero, the test above is vacuous and must be rewritten.
     expect(visible.length).toBeGreaterThan(0)
     for (const def of visible) {
