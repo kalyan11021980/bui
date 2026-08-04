@@ -10,8 +10,8 @@ const PASSING = [
 const FAILING: ReadonlyArray<[string, string]> = [
   ['You have 3 things left.', 'numeral'],
   ['Almost ninety percent done.', 'percentage'],
-  ['This is 90% done.', 'numeral'],
-  ['Required under 26 U.S.C. for reporting.', 'numeral'],
+  ['This is 90% done.', 'percentage'],
+  ['Required under 26 U.S.C. for reporting.', 'statute'],
   ['See § 1234 for details.', 'statute'],
   ['Refer to the CFR for this one.', 'statute'],
   ['You must provide this.', 'legal_claim'],

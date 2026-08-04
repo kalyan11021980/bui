@@ -27,9 +27,9 @@ const LEGAL_CLAIM = [
 
 export function lintVoice(text: string): VoiceLintResult {
   if (text.length > MAX_LENGTH) return { ok: false, violation: 'length' }
-  if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }
-  if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
   if (STATUTE.test(text)) return { ok: false, violation: 'statute' }
+  if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
+  if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }
   for (const pattern of LEGAL_CLAIM) {
     if (pattern.test(text)) return { ok: false, violation: 'legal_claim' }
   }
