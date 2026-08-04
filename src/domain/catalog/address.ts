@@ -17,6 +17,7 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     authority: 'IAA_POLICY',
     validation: z.string().min(1, 'Enter your street address'),
     derivableFrom: ['drivers_license', 'state_id'],
+    neverBulkConfirm: true,
   }),
   defineField({
     id: 'addr_city',
@@ -27,6 +28,7 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     authority: 'IAA_POLICY',
     validation: z.string().min(1, 'Enter your city'),
     derivableFrom: ['drivers_license', 'state_id'],
+    neverBulkConfirm: true,
   }),
   defineField({
     id: 'addr_state',
@@ -38,6 +40,7 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     validation: z.string().length(2, 'Select your state'),
     derivableFrom: ['drivers_license', 'state_id'],
     orchestratorVisible: true,
+    neverBulkConfirm: true,
   }),
   defineField({
     id: 'addr_zip',
@@ -48,5 +51,6 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     authority: 'IAA_POLICY',
     validation: zipSchema,
     derivableFrom: ['drivers_license', 'state_id'],
+    neverBulkConfirm: true,
   }),
 ]

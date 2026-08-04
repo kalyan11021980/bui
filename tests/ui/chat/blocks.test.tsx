@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BlockView } from '@/ui/chat/blocks'
 import { createApplication } from '@/domain/application/reducer'
+import type { ApplicationState, FieldState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import { FieldRow } from '@/ui/panel/FieldRow'
@@ -69,6 +70,61 @@ describe('BlockView — field_ask', () => {
     expect(document.getElementById(describedBy!)).toContainElement(
       screen.getByText('Your account has to match the name on your ID'),
     )
+  })
+})
+
+describe('BlockView — field_ask, OCR-derived address (automation-bias guard)', () => {
+  function withField(fieldId: string, field: FieldState): ApplicationState {
+    return { ...state, fields: { ...state.fields, [fieldId]: field } }
+  }
+
+  it('asks whether an OCR-derived address is still current, rather than presenting it as settled', () => {
+    const ocrState = withField('addr_line1', {
+      value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
+    })
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
+    expect(screen.getByText(vettedCopy('address_still_current'))).toBeInTheDocument()
+  })
+
+  it('does not ask the question for an address field with nothing entered yet', () => {
+    // The field carries no value and no provenance — the case the guard must
+    // NOT fire for, or the question would be meaningless noise on every blank
+    // address field, not just an OCR-derived one.
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={state} {...handlers} />)
+    expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
+  })
+
+  it('does not ask the question for an address field the applicant typed themselves', () => {
+    const typedState = withField('addr_line1', {
+      value: '123 Main St', status: 'confirmed', provenance: { source: 'user' },
+    })
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={typedState} {...handlers} />)
+    expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
+  })
+
+  it('does not ask the question for a non-address field, even one read by OCR', () => {
+    // Proves the gate is on "address field", not merely "any OCR-sourced
+    // value" — first_name is OCR-derived here but is not an address.
+    const ocrName = withField('first_name', {
+      value: 'Ada', status: 'derived', provenance: { source: 'ocr' },
+    })
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={ocrName} {...handlers} />)
+    expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
+  })
+
+  it('offers the affirm and change options with equal visual weight', () => {
+    const ocrState = withField('addr_line1', {
+      value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
+    })
+    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons).toHaveLength(2)
+    const [first, second] = buttons
+    // Same style object, not one primary + one secondary like FieldRow's
+    // "Looks right"/"Fix this" — that asymmetry is exactly what nudges bulk
+    // acceptance, which this question exists to avoid.
+    expect(getComputedStyle(first!).backgroundColor).toBe(getComputedStyle(second!).backgroundColor)
+    expect(getComputedStyle(first!).color).toBe(getComputedStyle(second!).color)
   })
 })
 

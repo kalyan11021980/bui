@@ -23,6 +23,13 @@ type FieldDefBase<T> = {
   destination?: string
   validation: ZodType<T>
   derivableFrom?: readonly DocType[]
+  /**
+   * Address, legal name and taxpayer ID: no bulk-confirm affordance exists
+   * yet, so this constrains nothing today. It is a guard placed ahead of
+   * the thing it guards — when a bulk affordance is built, it cannot
+   * include a field marked here.
+   */
+  neverBulkConfirm?: boolean
 }
 
 /**

@@ -53,6 +53,14 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', color: COLOR.textPrimary, marginBottom: 2,
 }
 
+// Deliberately identical for both buttons: an automation-bias guard that
+// gave one option more visual weight than the other would just be nudging
+// the applicant toward whichever one that was.
+const stillCurrentOptionStyle: React.CSSProperties = {
+  background: COLOR.surface, color: COLOR.primary,
+  border: `1px solid ${COLOR.primary}`, padding: '6px 12px', cursor: 'pointer',
+}
+
 /**
  * The only place a Block turns into pixels. A discriminated, exhaustive
  * switch over `Block['kind']` — every case delegates to an existing panel
@@ -66,6 +74,10 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
       const def = fieldDef(parseReqKey(fieldId).fieldId)
       const rationaleId = `chat-rationale-${fieldId}`
       const label = displayLabel(fieldId)
+      const fieldState = state.fields[fieldId]
+      // §10.4: an OCR-derived address is asked about, never presented as
+      // settled fact — regardless of how confident the read was.
+      const askIfStillCurrent = def.section === 'address' && fieldState?.provenance?.source === 'ocr'
       return (
         // Mirrors FieldRow's own group/aria-describedby pairing, so the
         // rationale's id is not merely passed to Rationale but actually
@@ -79,6 +91,29 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
           <label htmlFor={fieldInputId(fieldId, CHAT_SCOPE)} style={labelStyle}>
             {label}
           </label>
+          {askIfStillCurrent && (
+            <div style={{ margin: '4px 0 8px' }}>
+              <p style={noticeStyle}>{vettedCopy('address_still_current')}</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  style={stillCurrentOptionStyle}
+                  onClick={() => {
+                    if (fieldState?.value != null) onChange(fieldId, fieldState.value)
+                  }}
+                >
+                  Yes, still current
+                </button>
+                <button
+                  type="button"
+                  style={stillCurrentOptionStyle}
+                  onClick={() => onClear(fieldId)}
+                >
+                  No, let me update it
+                </button>
+              </div>
+            </div>
+          )}
           <FieldInput
             fieldId={fieldId}
             def={def}

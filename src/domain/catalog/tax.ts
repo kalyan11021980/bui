@@ -18,5 +18,6 @@ export const TAX_FIELDS: readonly FieldDef[] = [
       .string()
       .regex(/^(\d{3}-?\d{2}-?\d{4}|\d{2}-?\d{7})$/, 'Enter an SSN or EIN'),
     sensitive: true,
+    neverBulkConfirm: true,
   }),
 ]

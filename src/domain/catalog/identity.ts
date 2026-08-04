@@ -13,6 +13,7 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     validation: z.string().min(1, 'Enter your first name'),
     derivableFrom: ['drivers_license', 'state_id', 'passport'],
     orchestratorVisible: true,
+    neverBulkConfirm: true,
   }),
   defineField({
     id: 'last_name',
@@ -23,6 +24,7 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     authority: 'FEDERAL_KYC',
     validation: z.string().min(1, 'Enter your last name'),
     derivableFrom: ['drivers_license', 'state_id', 'passport'],
+    neverBulkConfirm: true,
   }),
   defineField({
     id: 'dl_number',
