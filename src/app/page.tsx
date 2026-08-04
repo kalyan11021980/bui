@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import { documentsToUpload } from '@/domain/requirements/documents'
+import { ConversationShell } from '@/ui/chat/ConversationShell'
 import { useApplication } from '@/ui/client/useApplication'
-import { ProfileControls } from '@/ui/demo/ProfileControls'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import { DocumentUpload } from '@/ui/panel/DocumentUpload'
 import { revealField } from '@/ui/panel/reveal'
@@ -51,12 +51,6 @@ export default function Page() {
 
   return (
     <main style={{ padding: 24 }}>
-      <ProfileControls
-        profile={state.profile}
-        onChange={app.updateProfile}
-        disabled={closed}
-      />
-
       {docTypes.map((docType) => (
         <DocumentUpload
           key={docType}
@@ -79,20 +73,34 @@ export default function Page() {
         </p>
       )}
 
-      <ApplicationPanel
-        state={state}
-        onSubmit={submit}
-        {...(!closed && {
-          onConfirm: app.confirm,
-          // "Fix this" moves the caret rather than mutating: the value is
-          // already editable in place.
-          onEdit: revealField,
-          onChange: app.change,
-          onClear: app.clear,
-        })}
-        {...(app.carry && !closed && { carry: app.carry })}
-        documents={app.documents}
-      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
+        <ApplicationPanel
+          state={state}
+          onSubmit={submit}
+          {...(!closed && {
+            onConfirm: app.confirm,
+            // "Fix this" moves the caret rather than mutating: the value is
+            // already editable in place.
+            onEdit: revealField,
+            onChange: app.change,
+            onClear: app.clear,
+            onProfileChange: app.updateProfile,
+          })}
+          {...(app.carry && !closed && { carry: app.carry })}
+          documents={app.documents}
+        />
+
+        <ConversationShell
+          applicationId={state.id}
+          ownerToken={app.ownerToken}
+          state={state}
+          onChange={app.change}
+          onClear={app.clear}
+          onReadDocument={app.readDocument}
+          onState={app.adoptTurnState}
+          runSerialized={app.runSerialized}
+        />
+      </div>
 
       {/* The attempt is always allowed; the answer is what is outstanding, or
           that the application is closed. */}

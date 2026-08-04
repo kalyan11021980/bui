@@ -3,10 +3,15 @@
 import { useState } from 'react'
 import type { ApplicationState } from '@/domain/application/state'
 import { vettedCopy } from '@/domain/orchestrator/copy'
+import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import { COLOR } from '@/ui/theme/tokens'
 import type { BlockHandlers } from './blocks'
 import { TurnView } from './TurnView'
+
+/** Stable references, so a no-op swap is not a re-render on every keystroke. */
+const NOOP_CHANGE = (_id: RequirementKey, _value: unknown): void => undefined
+const NOOP_CLEAR = (_id: RequirementKey): void => undefined
 
 type Props = BlockHandlers & {
   applicationId: string
@@ -47,6 +52,13 @@ export function ConversationShell({
   )
   const [draft, setDraft] = useState('')
   const closed = state.submittedAt !== null
+  // A field_ask block from an earlier turn stays on screen after submission —
+  // history is not pruned — and the reducer refuses every change once
+  // submitted. Left unguarded, reopening one of those old boxes would throw
+  // instead of doing nothing, the same hazard the panel avoids by dropping
+  // its own onChange/onClear once closed.
+  const blockChange = closed ? NOOP_CHANGE : onChange
+  const blockClear = closed ? NOOP_CLEAR : onClear
   // Neither element below is ever given the `disabled` attribute: disabling
   // an element that holds focus moves focus to <body> and nothing restores
   // it (§9.1 — "focus is never stolen by an update"). Sending is refused
@@ -76,8 +88,8 @@ export function ConversationShell({
             key={turn.seq}
             turn={turn}
             state={state}
-            onChange={onChange}
-            onClear={onClear}
+            onChange={blockChange}
+            onClear={blockClear}
             onReadDocument={onReadDocument}
           />
         ))}

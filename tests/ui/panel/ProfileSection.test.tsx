@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ProfileControls } from '@/ui/demo/ProfileControls'
+import { ProfileSection } from '@/ui/panel/ProfileSection'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 const business: ApplicantProfile = {
@@ -16,13 +16,13 @@ const business: ApplicantProfile = {
 
 const individual: ApplicantProfile = { ...business, applicantType: 'individual', licenses: [] }
 
-function setup(profile: ApplicantProfile, disabled = false) {
+function setup(profile: ApplicantProfile) {
   const onChange = vi.fn()
-  render(<ProfileControls profile={profile} onChange={onChange} disabled={disabled} />)
+  render(<ProfileSection profile={profile} onChange={onChange} />)
   return { onChange, user: userEvent.setup() }
 }
 
-describe('ProfileControls', () => {
+describe('ProfileSection', () => {
   it('shows the profile currently driving the requirements', () => {
     setup(business)
     expect(screen.getByLabelText(/applicant/i)).toHaveValue('business')
@@ -76,18 +76,15 @@ describe('ProfileControls', () => {
     expect(screen.queryByLabelText(/licence/i)).not.toBeInTheDocument()
   })
 
-  it('disables every control once the application is closed', () => {
-    setup(business, true)
-    expect(screen.getByLabelText(/applicant/i)).toBeDisabled()
-    expect(screen.getByLabelText(/id form/i)).toBeDisabled()
-    expect(screen.getByLabelText(/state/i)).toBeDisabled()
-    expect(screen.getByLabelText(/gsa/i)).toBeDisabled()
-    expect(screen.getByLabelText(/licence/i)).toBeDisabled()
-  })
-
-  it('says it is demo scaffolding, not part of the registration', () => {
-    // A real applicant never sets these — they are engine inputs.
-    setup(business)
-    expect(screen.getByRole('group')).toHaveAccessibleName(/demo/i)
+  it('falls back to plain text once the application is closed, staying visible but not editable', () => {
+    render(<ProfileSection profile={business} />)
+    // Still visible: a mistaken answer would otherwise be uncorrectable
+    // without starting over, so it must be readable even while closed.
+    expect(screen.getByText('Business')).toBeInTheDocument()
+    expect(screen.getByText('GA')).toBeInTheDocument()
+    expect(screen.getAllByText('No')).toHaveLength(2)
+    // Not editable: no control left to drive a change through.
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
   })
 })

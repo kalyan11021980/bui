@@ -149,6 +149,52 @@ describe('ConversationShell', () => {
     expect(calls.some((c) => c.url.endsWith('/turn'))).toBe(false)
   })
 
+  it('stops a stale field_ask box from reaching the reducer once the application closes', async () => {
+    // History is not pruned — see useConversation's own comment — so a
+    // field_ask box asked before submission is still on screen after it. The
+    // reducer refuses every write once closed by throwing; this box must not
+    // still be wired to it, or reopening it crashes instead of doing nothing.
+    const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const agentTurn: Turn = {
+      seq: 2, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'field_ask', fieldId: 'first_name' }],
+    }
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+
+    stubFetch((call) =>
+      call.url.endsWith('/turn')
+        ? { status: 200, body: { state: after, turn: agentTurn } }
+        : { status: 200, body: after },
+    )
+
+    const onChange = vi.fn()
+
+    const { rerender } = render(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={state}
+        {...noHandlers} onChange={onChange}
+      />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    const input = await screen.findByLabelText(/first name/i, { selector: 'input, select, textarea' })
+
+    // The panel's own submit closed the application — nothing this shell did.
+    const closed: ApplicationState = { ...after, submittedAt: AT }
+    rerender(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={closed}
+        {...noHandlers} onChange={onChange}
+      />,
+    )
+
+    await userEvent.type(input, 'Ada')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('keeps focus on Send through a pending turn — never stolen by the update (§9.1)', async () => {
     let resolveTurn: (response: Response) => void = () => undefined
     const deferred = new Promise<Response>((resolve) => { resolveTurn = resolve })

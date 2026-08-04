@@ -43,6 +43,8 @@ export type UseApplication = {
   /** The server is behind what is on screen, and the applicant should know. */
   outOfStep: boolean
   carry: CarryNotice | null
+  /** Null until the application has started — see `ConversationShell`'s own prop. */
+  ownerToken: string | null
   confirm: (id: RequirementKey) => void
   change: (id: RequirementKey, value: unknown) => void
   clear: (id: RequirementKey) => void
@@ -51,6 +53,13 @@ export type UseApplication = {
   readDocument: (docType: DocType, image: PreparedImage) => void
   /** Drops what was said about the last photo, once there is a new one. */
   forgetDocumentNotice: () => void
+  /**
+   * Adopts the state a completed turn returned. Unlike `dispatch`, nothing is
+   * reduced locally first — a `setProfile` or `askFor` tool call is already
+   * committed server-side by the time it arrives, so the whole state is taken
+   * as given.
+   */
+  adoptTurnState: (state: ApplicationState) => void
   /**
    * The serialized queue every write above already runs through, exposed so
    * a caller outside this hook (the conversational shell's turn requests)
@@ -172,8 +181,10 @@ export function useApplication(): UseApplication {
 
   return {
     state, documents: docImages, notice, outOfStep, carry,
+    ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
+    adoptTurnState: setState,
     runSerialized: enqueue,
   }
 }

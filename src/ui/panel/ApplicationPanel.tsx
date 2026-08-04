@@ -3,10 +3,12 @@ import type { ApplicationState } from '@/domain/application/state'
 import type { CarryNotice } from '@/domain/application/carry'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { requiredFields } from '@/domain/requirements/engine'
+import type { ApplicantProfile } from '@/domain/requirements/rules'
 import { groupIntoSections } from '@/domain/requirements/sections'
 import { COLOR } from '@/ui/theme/tokens'
 import type { DocumentImages } from './document-images'
 import { FieldRow } from './FieldRow'
+import { ProfileSection } from './ProfileSection'
 import { ProgressSummary } from './ProgressSummary'
 
 /** A pair, for the reason FieldRow spells out. */
@@ -26,6 +28,8 @@ type Props = EditHandlers & {
   carry?: CarryNotice
   /** The uploaded documents, if the browser still holds them — empty after a reload. */
   documents?: DocumentImages
+  /** Absent once the application is closed — the profile section falls back to plain text. */
+  onProfileChange?: (patch: Partial<ApplicantProfile>) => void
 }
 
 /**
@@ -34,7 +38,9 @@ type Props = EditHandlers & {
  * catalog's own `section`, in the order the requirements engine emits them.
  */
 export function ApplicationPanel(props: Props) {
-  const { state, onConfirm, onEdit, onSubmit, carry, documents } = props
+  const {
+    state, onConfirm, onEdit, onSubmit, carry, documents, onProfileChange,
+  } = props
   const required = requiredFields(state.profile)
   const outstanding = new Set(outstandingFields(state))
   const done = required.length - outstanding.size
@@ -59,6 +65,11 @@ export function ApplicationPanel(props: Props) {
       </h2>
 
       <div style={{ padding: 14 }}>
+        <ProfileSection
+          profile={state.profile}
+          {...(onProfileChange && { onChange: onProfileChange })}
+        />
+
         {sections.map((section) => {
           const headingId = `section-${section.id.replace('#', '--')}`
           const doneHere = section.fields.filter((id) => !outstanding.has(id)).length
