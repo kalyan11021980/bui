@@ -42,12 +42,28 @@ Five document types, three extraction problems.
 
 | Family | `DocType` | Structure available | Fields unlocked |
 |---|---|---|---|
-| AAMVA card | `drivers_license`, `state_id` | Printed field codes (`4d LIC#`, `3 DOB`, `4b EXP`) | 7 identity fields and 4 address fields |
-| Machine-readable zone | `passport` | Fixed 44-character lines, **check digits** | 5 identity fields, self-verifying |
-| Labelled document | `dealer_license`, `proof_of_residency` | Labels only, no layout | 9 licence and business fields; residency address |
+| AAMVA card | `drivers_license`, `state_id` | Printed field codes (`4d LIC#`, `3 DOB`, `4b EXP`) | 5 identity fields and 4 address fields |
+| Machine-readable zone | `passport` | Fixed 44-character lines, **check digits** | 6 identity fields, self-verifying |
+| Labelled document | `dealer_license`, `proof_of_residency` | Labels only, no layout | 4 licence and business fields; nothing from a proof of residency |
 
 The third family is the weak one and is marked as a seam throughout. If its measured
 recall is poor it can be cut into a Phase 2b without disturbing the other two.
+
+**As built, the counts moved.** AAMVA emits five identity fields, not seven: the number
+(under whichever name the declared document owes — see 3.2), `dob`, `dl_expiry`,
+`last_name`, `first_name`. `id_state` and `id_country` are hand-typed; no strategy reads
+an issuing authority off a card. MRZ emits six, having gained `passport_number` once the
+catalog grew a field for it. The labelled strategy reads four of the nine a dealer licence
+prints, measured and argued in
+`docs/superpowers/decisions/2026-08-02-labelled-recall.md` — the record argues against
+harvesting three more printed-but-unread labels to flatter the number.
+
+**A proof of residency yields nothing, by catalog decision.** The only field naming
+`proof_of_residency` in `derivableFrom` is the upload field itself, a `type: 'file'`
+whose schema no text candidate can satisfy. The document is still asked for and still
+accepted — it is evidence a human reviewer reads — but nothing is pre-filled from it,
+and an end-to-end test pins that zero so a future `derivableFrom` cannot be added
+without thinking through what a utility bill may assert about the person holding it.
 
 ### 3.1 The passport is the strongest document here, not the exotic one
 
@@ -56,6 +72,20 @@ expiry and a composite of all three. That makes it the only document in the set 
 verify its own reading. The `I`→`1` substitution class that produced the CA failure fails
 a checksum instead of passing silently. Where a card gives us a plausible value, a
 passport gives us a value we can prove was read correctly.
+
+### 3.2 Which documents an applicant is asked for
+
+The profile carries `idForm` — `drivers_license`, `state_id` or `passport` — declared
+rather than inferred, because it decides which number the applicant owes: `dl_number`,
+`id_number` or `passport_number`. Filing an ID card number under "Driver's license
+number" misdescribes it to the human who later reads the record. This added two catalog
+fields and took `RULES_VERSION` to 3.
+
+`documentsToUpload` (`src/domain/requirements/documents.ts`) answers which photographs
+to ask for: the declared ID, plus a dealer licence when the profile holds any licence,
+plus a proof of address when the applicant says their address is not the one on their
+ID. Never more. A photograph of a document nothing in the application asks about is one
+the applicant went and found for nothing.
 
 ## 4. Architecture
 
@@ -90,22 +120,31 @@ src/domain/ocr/
   grounding.ts          exists: parse, IoU, findValue
   geometry.ts           new: normalised model space → original-image pixels
   quality.ts            new: pixel width → quality band
-  confidence.ts         new: evidence → score
+  confidence.ts         new: evidence → score, and the cross-pass veto
   extract/
-    index.ts            new: DocType → strategy, and the Candidate type
-    aamva.ts            new: label-anchored card extraction
+    index.ts            new: DocType → strategy, derivable(), parseCandidates()
+    types.ts            new: Candidate, Evidence, the glyph-ambiguity signal
+    aamva.ts            new: label-anchored card extraction, address re-spacing
     mrz.ts              new: TD3 fixed-offset parse and check digits
     labelled.ts         new: synonym-table extraction for unstructured documents
     synonyms.ts         new: the label tables, data not code
 
-src/server/ocr/
-  client.ts             exists: HTTP transport
-  service.ts            new: OcrService — read, and the fixture-backed provider seam
+src/domain/requirements/
+  documents.ts          new: profile → the documents to ask for
+
+src/server/
+  document-service.ts   new: ingest — read, extract, score, dispatch
+  image-size.ts         new: PNG/JPEG header sniffing and the payload cap
+  ownership.ts          new: the owner-token capability check
+  ocr/client.ts         exists: HTTP transport
+  ocr/service.ts        new: OcrService — read, and the fixture-backed provider seam
 
 src/ui/panel/
-  Provenance.tsx        extend: confidence and crop
+  Provenance.tsx        extend: confidence, and the crop for this field's document
   DocumentCrop.tsx      new: clip the client-held original to a box
   DocumentUpload.tsx    new: file input, pre-flight, quality copy
+  document-images.ts    new: the photos this browser holds, by document id
+  prepare-image.ts      new: decode, apply EXIF orientation, re-encode to JPEG
 ```
 
 ### 4.2 On the service shape
@@ -119,6 +158,16 @@ The reason is testability. Reading needs a server; interpreting needs only a rec
 response. Fusing them would make every extraction test require LM Studio, which the
 testing rules forbid. The composed result still has the sketched shape at the service
 boundary, so nothing downstream notices.
+
+### 4.3 Ownership, added mid-phase
+
+Every route now requires an owner token: a capability handed out once, with the response
+that creates the application, and presented on every later call. It is not
+authentication — no session, no login, no identity behind it. It only makes knowing an
+application id insufficient to read or change the record, which matters more once that
+record holds a name, a date of birth and an address read off a photograph. A caller who
+cannot produce the token gets the same 404 an unknown id gets; 403 would confirm the id
+exists, which is the same leak wearing a smaller hat.
 
 ## 5. Quality bands
 
@@ -149,6 +198,21 @@ plus a kitchen table. Two checks:
 
 The second check is what makes the first honest.
 
+**Where the width comes from changed.** This design assumed a browser-measured width
+sent up with the image. The built route refuses a caller-supplied size and sniffs the
+dimensions out of the PNG or JPEG header itself (`src/server/image-size.ts`): a size the
+caller states is a size the caller can lie about, and every band decision — including
+"do not call OCR at all" — hangs off it. The browser still measures its own copy, but
+only to scale crops with. The same module caps the payload at 8 MB before it is
+allocated.
+
+The client re-encodes before upload (`src/ui/panel/prepare-image.ts`): it decodes with
+`imageOrientation: 'from-image'` and re-encodes to JPEG through a canvas, so an EXIF
+rotation flag is baked into the pixels. Without it a phone photo reads sideways, and
+every box would be placed against an orientation the server never saw. There is no
+client-side downscale yet, so a very high-megapixel capture can still exceed the 8 MB
+cap.
+
 ## 6. Extraction
 
 Deterministic, per-family strategies. No model is involved in turning text into fields.
@@ -178,27 +242,52 @@ number twice and value-alone selection picks the wrong occurrence about half the
 
 | Field | Anchors |
 |---|---|
-| `dl_number` | `4d`, `LIC#`, `DLN`, `LIC NO`, `DL NO` |
+| `dl_number` / `id_number` | `4d`, `LIC#`, `DLN`, `LIC NO`, `DL NO` |
 | `dob` | `3`, `DOB` |
 | `dl_expiry` | `4b`, `EXP` |
 | `last_name` | `1`, `LN` |
 | `first_name` | `2`, `FN` |
 | `addr_line1`, `addr_city`, `addr_state`, `addr_zip` | `8` |
-| `id_state` | issuing authority text |
+
+**`id_state` is not on this list any more.** The design originally claimed it from
+"issuing authority text". Nothing reads it: the authority line is printed differently on
+every card and no anchor survived the specimen set. It is required of every non-passport
+applicant and is typed in. Its `derivableFrom` has been removed rather than left
+claiming a read that never happens, and `id_country` has been narrowed to `passport`,
+the only document any strategy reads a country code off.
+
+The document number is emitted under one key per document type: a strategy reads the
+number, and the catalog's `derivableFrom` decides whether it lands as `dl_number` or
+`id_number`. The strategy is never told which document it is reading.
 
 Two behaviours from the gate are handled explicitly. Cards merge label into value, so
 `4dLIC#WDLJK00580GF` arrives as one detection and the label prefix is stripped after
 anchoring. Address arrives as a multi-line block under a single code and is split by line
-before being mapped to the four address fields. `addr_line2` is deliberately not
-extracted — apartment and unit lines are the least reliably printed and the most reliably
-wrong, and the catalog already declines to declare it derivable.
+before being mapped to the four address fields. `addr_line2` is not extracted, and has
+since been dropped from the catalog altogether — apartment and unit lines are the least
+reliably printed and the most reliably wrong, and the requirements engine never asked
+for it under any profile.
 
-**One catalog reconciliation.** The four address fields declare `derivableFrom:
-['drivers_license']` but not `'state_id'`, while the seven identity fields declare both. A
-state ID prints an address exactly as a licence does, so this looks like an omission
-rather than a decision. The plan confirms it against the specimen set and, if it is an
-omission, corrects the catalog — the extractor must not derive a field the catalog says is
-not derivable from that document.
+**The catalog reconciliation resolved.** A state ID does print an address exactly as a
+licence does, so it was an omission: `'state_id'` was added to the four address fields.
+
+### 6.1.1 Address re-spacing, added at task 15
+
+Grounded output runs an address together with no spaces at all —
+`123STREETADDRESS`, `YOURCITY`. That is the string that would have been shown to the
+applicant, and the string cross-pass agreement was scored against, so every re-spaced
+address disagreed with the plain pass on a spacing artefact rather than a misread.
+
+`respaceAddress` borrows word breaks from the plain pass by aligning the value's letters
+against it. It is the one place in the pipeline that **rewrites an applicant-visible
+value**, so it is deliberately narrow: spaces are only ever added, never removed;
+characters are never substituted, so a wrong glyph the grounded pass read stays wrong and
+visible; and where no plausible alignment exists the value is left exactly as extracted.
+An ugly unspaced value is safe, and guessing word breaks against unrelated text is not.
+
+It runs between `parseCandidates` and `withCrossPass` — after parsing, before scoring —
+so agreement is checked against the value the applicant will actually see. Corpus recall
+is graded on the spaced string for the same reason.
 
 ### 6.2 Passports
 
@@ -215,11 +304,16 @@ rather than assuming it. If it comes out poor, this strategy is the piece that g
 swapped for a local structuring model behind the same interface — which is the entire
 reason the strategies sit behind an interface.
 
+**Measured: four fields off a dealer licence** — `license_number`, `license_effective`,
+`license_expiry`, `biz_legal_name` — at 0.69–0.89 confidence. The strategy is registered
+for `dealer_license` only. It was also registered for `proof_of_residency`, which was
+inert wiring: no catalog field is derivable from a utility bill, so the call always
+returned nothing. That registration has been removed rather than left reading as live.
+
 ## 7. Confidence
 
-The interface rule is that confidence drives display: high-confidence extractions collapse
-to a quiet row, low-confidence ones surface with the crop. **DeepSeek-OCR returns no
-confidence score.** Grounded output is text and a box, nothing more.
+**DeepSeek-OCR returns no confidence score.** Grounded output is text and a box, nothing
+more.
 
 Token logprobs were considered and rejected. The failure that matters — `I` read as `1` —
 is a *high*-probability substitution, so a logprob-derived score would rate the single
@@ -253,12 +347,39 @@ Scoring is a pure function over these signals and is the phase's most sabotage-t
 unit. The specific weights belong in the implementation plan, tuned against the specimen
 set; what this design fixes is that **no signal is the model's own opinion of itself.**
 
+**Cross-pass disagreement is a veto, not a weight.** A subtraction large enough to always
+out-vote a checksum plus a label plus a box also saturates the clamp and cancels every
+other signal, including the glyph check. So an explicit disagreement caps the score below
+the quiet threshold instead: no sum of the other signals can buy back past it. A `null`
+disagreement — one pass silent — is not a disagreement and does nothing.
+
+**Checksum has no failing branch.** A failed check digit suppresses the field where it is
+read (6.2), so a value that reaches scoring has never failed one. The type says so:
+`checksumValid` is `true | null`.
+
 ### 7.1 Confidence never removes a confirmation
 
 High confidence makes a row quiet. It does not make it confirmed. Address, legal name and
 taxpayer ID keep individual, deliberate confirmation regardless of score, and no bulk
 confirmation exists at any confidence. The gate's recommendation is unchanged: the `I`→`1`
 failure is exactly what a "looks right, tick it" flow waves through.
+
+### 7.2 What the crop keys off, in the end
+
+This design said high-confidence extractions collapse to a quiet row and low-confidence
+ones surface with the crop. The build separates the two decisions, and the design is
+corrected here rather than left standing:
+
+- **Confidence changes the sentence.** Below the quiet threshold the row reads "from your
+  document — the photo was hard to read here". Above it, just "from your document".
+- **A box being recorded is what produces a crop.** A passport reaches band `full` and
+  carries no box at all, because the MRZ is parsed by offset rather than located; a
+  confidence-keyed crop would promise one and have nothing to draw. Below the crop floor,
+  and for a box the size of the whole card, no box is recorded either.
+
+Tying the crop to confidence would mean a high-confidence value showing no crop while the
+box sat unused in the record, and a low-confidence value with no box showing an empty
+affordance. Two independent facts, two independent displays.
 
 ## 8. Documents and crops
 
@@ -271,11 +392,29 @@ The cost is that crops do not survive a reload: the box coordinates persist in
 `FieldState.provenance`, the pixels do not. That lands in the already-supported degraded
 mode — text attribution plus confidence, no layout change, no broken affordance.
 
+### 8.1 A crop comes from the document its value was read from, and no other
+
+Server state is cumulative and an applicant may upload more than one document — an ID and
+a proof of address, or simply a second attempt. Every field records the `documentId` of
+the upload it was filled from, and the browser holds each photograph under that same id.
+`Provenance` looks the field's own document up: found, it clips that photograph; not
+found, it renders no crop and leaves the sentence and the confidence exactly as they are.
+
+The rule this enforces is that a crop is an assertion — *this value was read from these
+pixels* — and an assertion made about the wrong document is worse than one not made at
+all. Holding a single image and clipping whatever the browser most recently received
+would repaint every earlier field with the newest document's pixels, under a label saying
+they came from it.
+
+The degraded path is not new: it is the same one a reload already lands in, so a field
+whose photograph this browser never held, or no longer holds, has always had somewhere
+to go.
+
 Phase 4's reviewer will need durable documents, and that is the right phase to answer
 retention, encryption and expiry in. Deciding it here would drag a compliance question
 into a phase whose real risk is elsewhere.
 
-### 8.1 Coordinate mapping is the sharpest technical risk
+### 8.2 Coordinate mapping is the sharpest technical risk
 
 Grounding coordinates are normalised 0–1000 against the model's own square input. The gate
 compared boxes in that normalised space and never mapped them back, so **the mapping to
@@ -291,6 +430,11 @@ positions across several aspect ratios, map the returned boxes back, and compare
 truth. A property test then asserts round-tripping for any input size, as the testing
 rules require.
 
+**Settled: the server does not pad.** `FIT_MODEL` is `'stretch'`, measured that way. The
+`pad` branch of `toPixels` is kept and tested even though production cannot reach it, so
+re-calibrating against a different provider is a one-constant change rather than a
+rewrite.
+
 ## 9. Failure and degraded modes
 
 | Situation | Behaviour |
@@ -302,16 +446,27 @@ rules require.
 | Checksum fails | Field not emitted. Asked for normally. |
 | Value fails its schema | Field not emitted. A malformed read is not a low-confidence read. |
 | Image below the floor | Re-take asked for before any call is made. |
+| Image over 8 MB | Refused before it is allocated. The route's schema refuses it first, so the message an applicant sees is the generic malformed one rather than the written-for-a-person "send one under 8 MB". |
+| Another document uploaded | Earlier fields keep their own document's crop. A field whose photograph this browser does not hold shows no crop. |
+| Caller cannot produce the owner token | 404, the same answer an unknown id gets. |
 
 The single rule underneath: **an unfilled field is the normal case, not a failure.** Every
 degraded mode collapses to the Phase 1 experience, which is complete and works.
 
 ## 10. Testing
 
-Extending the Phase 1 suite, which stands at 356 tests.
+Extending the Phase 1 suite, which stood at 356 tests; the branch ends at 741 passing.
 
 - **No test requires LM Studio.** Provider responses are recorded fixtures. The one
   gate-style test that does hit the server is opt-in and skipped by default.
+- **Every document type ingested end to end**, asserting fields actually filled per type.
+  The test imports no strategy module: a strategy registers itself as an import side
+  effect, and importing one into the test registers it in the test's own module graph,
+  hiding a missing import that would leave the running server reading nothing.
+- **Two different documents in one session** — an earlier field must never show the later
+  document's pixels.
+- **Corpus recall graded on the spaced value**, the string the applicant is shown, so a
+  re-spacing regression moves the number that decides whether the extractor works.
 - **Coordinate round-trip** — property test that boxes map back to original-image space
   for any input size and aspect ratio.
 - **Per-strategy extraction** — each specimen's known values, asserted field by field.
@@ -355,9 +510,26 @@ It does not block this phase. It decides the **production** OCR target — LM St
 `mlx-vlm` sidecar — which sits behind the provider seam and changes no other module. The
 work is planned so Axis B can run alongside it.
 
+**Still open at the end of the phase, and now gating production enablement rather than
+merge.** Every number this phase produced — the confidence distribution, the quiet
+threshold at 0.8, the recall totals — is a flat-scan number. Glare, skew and defocus will
+move that distribution, and the threshold should be expected to need retuning. Fold a
+genuine phone capture of the same physical card into the same sitting: the EXIF
+orientation handling is pinned by a unit test and confirmed in one browser run, which is
+not the same as a device test.
+
 **Compliance sign-off**, carried over: `STATE_RULES` for GA and OH are `signedOff: false`,
 and tax-id-is-business-only was never ruled on. Not a developer's call, and not blocking
-development.
+development. Worth stating plainly, though: `signedOff` is read by nothing at runtime, so
+Ohio's `oh_foreign_buyer_form` is being required of real out-of-state applicants today on
+an encoding no compliance owner has checked. A test fires the day someone sets it true.
 
-**Labelled-document recall**, to be measured rather than assumed, with a Phase 2b split as
-the response if it is poor.
+**Labelled-document recall**, measured rather than assumed: four fields, argued in its own
+decision record. No Phase 2b split — the family ships, reachable from the panel, at four
+of the nine a dealer licence prints.
+
+**Select fields render as free-text inputs.** Seven of eight `type: 'select'` fields have
+`z.string()` validation rather than `z.enum`, so the control falls through to a text
+input while the copy says "Select the issuing state". A Phase 1 carry-over this phase did
+not touch, made more visible by `addr_state` now arriving from OCR and `id_state` being
+required of every non-passport applicant with nothing to read it from.
