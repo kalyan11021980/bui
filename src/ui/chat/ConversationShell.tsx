@@ -12,6 +12,7 @@ import { TurnView } from './TurnView'
 /** Stable references, so a no-op swap is not a re-render on every keystroke. */
 const NOOP_CHANGE = (_id: RequirementKey, _value: unknown): void => undefined
 const NOOP_CLEAR = (_id: RequirementKey): void => undefined
+const NOOP_CONFIRM = (_id: RequirementKey): void => undefined
 
 type Props = BlockHandlers & {
   applicationId: string
@@ -45,7 +46,7 @@ const composerStyle: React.CSSProperties = {
  * `useConversation`.
  */
 export function ConversationShell({
-  applicationId, ownerToken, state, onChange, onClear, onReadDocument, onState, runSerialized,
+  applicationId, ownerToken, state, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
 }: Props) {
   const { turns, pending, send } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
@@ -59,6 +60,7 @@ export function ConversationShell({
   // its own onChange/onClear once closed.
   const blockChange = closed ? NOOP_CHANGE : onChange
   const blockClear = closed ? NOOP_CLEAR : onClear
+  const blockConfirm = closed ? NOOP_CONFIRM : onConfirm
   // Neither element below is ever given the `disabled` attribute: disabling
   // an element that holds focus moves focus to <body> and nothing restores
   // it (§9.1 — "focus is never stolen by an update"). Sending is refused
@@ -90,6 +92,7 @@ export function ConversationShell({
             state={state}
             onChange={blockChange}
             onClear={blockClear}
+            onConfirm={blockConfirm}
             onReadDocument={onReadDocument}
           />
         ))}

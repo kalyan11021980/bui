@@ -27,6 +27,10 @@ import { COLOR } from '@/ui/theme/tokens'
 export type BlockHandlers = {
   onChange: (id: RequirementKey, value: unknown) => void
   onClear: (id: RequirementKey) => void
+  /** Flips status to `confirmed` without touching provenance — see the
+   *  still-current question in the `field_ask` case, which must be able to
+   *  record "the applicant confirmed this" without erasing "this was OCR". */
+  onConfirm: (id: RequirementKey) => void
   onReadDocument: (docType: DocType, image: PreparedImage) => void
 }
 
@@ -67,7 +71,7 @@ const stillCurrentOptionStyle: React.CSSProperties = {
  * component rather than a new input, because a second input path is a
  * second place a value could go.
  */
-export function BlockView({ block, state, onChange, onClear, onReadDocument }: Props) {
+export function BlockView({ block, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
   switch (block.kind) {
     case 'field_ask': {
       const { fieldId } = block
@@ -98,9 +102,7 @@ export function BlockView({ block, state, onChange, onClear, onReadDocument }: P
                 <button
                   type="button"
                   style={stillCurrentOptionStyle}
-                  onClick={() => {
-                    if (fieldState?.value != null) onChange(fieldId, fieldState.value)
-                  }}
+                  onClick={() => onConfirm(fieldId)}
                 >
                   Yes, still current
                 </button>

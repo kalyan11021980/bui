@@ -11,7 +11,7 @@ const PROFILE: ApplicantProfile = {
 }
 const state = createApplication('app-1', PROFILE, 'owner-token-1')
 const AT = '2026-08-04T00:00:00.000Z'
-const handlers = { onChange: vi.fn(), onClear: vi.fn(), onReadDocument: vi.fn() }
+const handlers = { onChange: vi.fn(), onClear: vi.fn(), onConfirm: vi.fn(), onReadDocument: vi.fn() }
 
 describe('TurnView — agent turns', () => {
   it('renders the voice when present', () => {

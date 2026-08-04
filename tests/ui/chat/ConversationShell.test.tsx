@@ -46,6 +46,7 @@ const noHandlers: BlockHandlers & {
 } = {
   onChange: () => undefined,
   onClear: () => undefined,
+  onConfirm: () => undefined,
   onReadDocument: () => undefined,
   onState: () => undefined,
   runSerialized: runNow,

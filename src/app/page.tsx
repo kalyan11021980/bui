@@ -96,6 +96,7 @@ export default function Page() {
           state={state}
           onChange={app.change}
           onClear={app.clear}
+          onConfirm={app.confirm}
           onReadDocument={app.readDocument}
           onState={app.adoptTurnState}
           runSerialized={app.runSerialized}

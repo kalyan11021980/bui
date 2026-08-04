@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BlockView } from '@/ui/chat/blocks'
-import { createApplication } from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import type { ApplicationState, FieldState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import { vettedCopy } from '@/domain/orchestrator/copy'
@@ -17,7 +17,7 @@ const PROFILE: ApplicantProfile = {
 }
 const state = createApplication('app-1', PROFILE, 'owner-token-1')
 
-const handlers = { onChange: vi.fn(), onClear: vi.fn(), onReadDocument: vi.fn() }
+const handlers = { onChange: vi.fn(), onClear: vi.fn(), onConfirm: vi.fn(), onReadDocument: vi.fn() }
 
 describe('BlockView — field_ask', () => {
   it("renders the field's real input control, labelled", () => {
@@ -38,7 +38,7 @@ describe('BlockView — field_ask', () => {
     render(
       <BlockView
         block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state}
-        onChange={onChange} onClear={vi.fn()} onReadDocument={vi.fn()}
+        onChange={onChange} onClear={vi.fn()} onConfirm={vi.fn()} onReadDocument={vi.fn()}
       />,
     )
     await userEvent.type(screen.getByLabelText(/first name/i, CONTROL), 'Ada')
@@ -110,6 +110,37 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     })
     render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={ocrName} {...handlers} />)
     expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
+  })
+
+  it('affirming goes through CONFIRM, not a value re-submit, so OCR provenance survives', async () => {
+    // The regression this guards: SET_VALUE (what onChange dispatches)
+    // unconditionally overwrites provenance, so re-submitting the same
+    // value under source 'user' would make a machine-read address
+    // indistinguishable from one the applicant typed from scratch — exactly
+    // the evidence this question exists to preserve. onChange/onClear stay
+    // real vi.fn()s so a regression back to calling onChange would be
+    // visible below; only onConfirm runs through the actual reducer.
+    const ocrState = withField('addr_line1', {
+      value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
+    })
+    const onChange = vi.fn()
+    let afterConfirm: ApplicationState | undefined
+    const onConfirm = (id: string) => {
+      afterConfirm = applicationReducer(ocrState, {
+        type: 'CONFIRM', fieldId: id, at: '2026-08-04T00:00:00.000Z', shownCopyHash: 'catalog-v1',
+      })
+    }
+    render(
+      <BlockView
+        block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState}
+        onChange={onChange} onClear={vi.fn()} onConfirm={onConfirm} onReadDocument={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, still current' }))
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(afterConfirm!.fields.addr_line1?.status).toBe('confirmed')
+    expect(afterConfirm!.fields.addr_line1?.provenance?.source).toBe('ocr')
   })
 
   it('offers the affirm and change options with equal visual weight', () => {

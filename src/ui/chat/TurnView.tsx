@@ -24,7 +24,7 @@ const applicantStyle: React.CSSProperties = {
  * then its blocks; a dropped or absent voice renders nothing in its place —
  * no placeholder, no empty bubble.
  */
-export function TurnView({ turn, state, onChange, onClear, onReadDocument }: Props) {
+export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
   if (turn.role === 'applicant') {
     return <p style={applicantStyle}>{turn.text}</p>
   }
@@ -39,6 +39,7 @@ export function TurnView({ turn, state, onChange, onClear, onReadDocument }: Pro
           state={state}
           onChange={onChange}
           onClear={onClear}
+          onConfirm={onConfirm}
           onReadDocument={onReadDocument}
         />
       ))}
