@@ -15,7 +15,9 @@ const KIND: Record<Action['type'], AuditKind> = {
   SUPERSEDE: 'superseded',
   UPDATE_PROFILE: 'profile_updated',
   SUBMIT: 'submitted',
-  // Content beyond `kind` is Task 6's concern (auditing turns).
+  // Turn content belongs inside this method's per-kind branches, not a second
+  // append call: commit() is the only write path, and a second one would log
+  // the same turn twice.
   APPEND_TURN: 'turn_appended',
   RECORD_REJECTION: 'rejection_recorded',
 }
