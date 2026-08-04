@@ -1,6 +1,7 @@
 import type { Action, ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
 import type { QualityBand } from '@/domain/ocr/quality'
+import type { Turn } from '@/domain/orchestrator/transcript'
 import type { RequirementKey } from '@/domain/requirements/key'
 
 /**
@@ -39,6 +40,21 @@ export function sendAction(
   action: Action,
 ): Promise<ApiResult<ApplicationState>> {
   return post<ApplicationState>(`/api/application/${id}/actions`, ownerToken, { action })
+}
+
+export type TurnOutcome = { state: ApplicationState; turn: Turn }
+
+/**
+ * The conversation's one outbound call. `text` is the applicant's own words,
+ * never a field value — the composer is for intent, and the route's schema
+ * accepts nothing else.
+ */
+export function sendTurn(
+  id: string,
+  ownerToken: string | null,
+  text: string,
+): Promise<ApiResult<TurnOutcome>> {
+  return post<TurnOutcome>(`/api/application/${id}/turn`, ownerToken, { text })
 }
 
 /**
