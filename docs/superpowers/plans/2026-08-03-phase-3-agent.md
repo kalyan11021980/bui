@@ -225,8 +225,8 @@ const PASSING = [
 const FAILING: ReadonlyArray<[string, string]> = [
   ['You have 3 things left.', 'numeral'],
   ['Almost ninety percent done.', 'percentage'],
-  ['This is 90% done.', 'numeral'],
-  ['Required under 26 U.S.C. for reporting.', 'numeral'],
+  ['This is 90% done.', 'percentage'],
+  ['Required under 26 U.S.C. for reporting.', 'statute'],
   ['See § 1234 for details.', 'statute'],
   ['Refer to the CFR for this one.', 'statute'],
   ['You must provide this.', 'legal_claim'],
@@ -295,13 +295,17 @@ const LEGAL_CLAIM = [
   /\bwe are required to\b/i,
 ]
 
+/**
+ * Most specific first. A statute reference and a percentage both contain
+ * digits, so a numeral-first order could never report either — and the
+ * narrower diagnosis is the useful one when tuning the rules against real
+ * output.
+ */
 export function lintVoice(text: string): VoiceLintResult {
   if (text.length > MAX_LENGTH) return { ok: false, violation: 'length' }
-  // Before the numeral check: "90%" is both, and naming it a percentage is
-  // the more useful diagnosis.
-  if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }
-  if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
   if (STATUTE.test(text)) return { ok: false, violation: 'statute' }
+  if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
+  if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }
   for (const pattern of LEGAL_CLAIM) {
     if (pattern.test(text)) return { ok: false, violation: 'legal_claim' }
   }
@@ -309,7 +313,7 @@ export function lintVoice(text: string): VoiceLintResult {
 }
 ```
 
-Note the ordering: `'This is 90% done.'` is expected to report `numeral`, and `'Almost ninety percent done.'` reports `percentage`. The test above encodes exactly that.
+The order is load-bearing and the test data encodes it: `'See § 1234 for details.'` and `'Required under 26 U.S.C. for reporting.'` both contain digits but report `statute`; `'This is 90% done.'` reports `percentage`; `'You have 3 things left.'` reaches `numeral` because nothing narrower matches. Every one of these still rejects — only the label differs.
 
 - [ ] **Step 4: Run and confirm pass**
 
