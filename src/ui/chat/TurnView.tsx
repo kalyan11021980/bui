@@ -37,6 +37,7 @@ export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocu
           key={`${block.kind}-${index}`}
           block={block}
           state={state}
+          seq={turn.seq}
           onChange={onChange}
           onClear={onClear}
           onConfirm={onConfirm}

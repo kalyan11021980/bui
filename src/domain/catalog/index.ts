@@ -1,5 +1,5 @@
 import type { FieldDef } from '../field-def'
-import type { FieldId } from '../field-id'
+import type { DocType, FieldId } from '../field-id'
 import { PREFERENCE_FIELDS } from './preferences'
 import { IDENTITY_FIELDS } from './identity'
 import { ADDRESS_FIELDS } from './address'
@@ -30,6 +30,15 @@ export function fieldDef(id: FieldId): FieldDef {
   const def = CATALOG.get(id)
   if (!def) throw new Error(`Unknown field: ${String(id)}`)
   return def
+}
+
+/**
+ * Whether photographing this document stands in for a sensitive field — e.g.
+ * a driver's license backs `dl_number`. Voice suppression treats a
+ * `document_request` the same as the `field_ask` it substitutes for.
+ */
+export function docTypeBacksSensitiveField(docType: DocType): boolean {
+  return ALL_FIELDS.some((f) => f.sensitive === true && f.derivableFrom?.includes(docType))
 }
 
 export {

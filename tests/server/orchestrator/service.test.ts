@@ -68,6 +68,31 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBe('sensitive')
   })
 
+  it('suppresses voice when the accepted document_request backs a sensitive field', async () => {
+    // drivers_license is PROFILE's idForm, so it is in documentsToUpload
+    // already, and it backs dl_number/dob — both sensitive.
+    const { turn } = await run('Photograph it for me.', [
+      { toolName: 'requestDocument', input: { docType: 'drivers_license' } },
+    ])
+    expect(turn.blocks).toContainEqual({ kind: 'document_request', docType: 'drivers_license' })
+    expect(turn.voice).toBeNull()
+    expect(turn.voiceDropped).toBe('sensitive')
+  })
+
+  it('keeps voice for a document_request that backs no sensitive field', async () => {
+    // dealer_license backs only business/license fields, none of which are
+    // marked sensitive — the contrast case that proves suppression is keyed
+    // on the document, not merely "any document_request".
+    const licensedProfile = { ...PROFILE, licenses: ['dealer' as const] }
+    const state = createApplication('app-1', licensedProfile, 'tok')
+    const { turn } = await run('Right — a couple more.', [
+      { toolName: 'requestDocument', input: { docType: 'dealer_license' } },
+    ], state)
+    expect(turn.blocks).toContainEqual({ kind: 'document_request', docType: 'dealer_license' })
+    expect(turn.voice).toBe('Right — a couple more.')
+    expect(turn.voiceDropped).toBeUndefined()
+  })
+
   it('still falls back when only an action survives, so the screen is never empty', async () => {
     const { turn, actions } = await run('Got it, one sec.', [
       { toolName: 'setProfile', input: { patch: { wantsGsa: true } } },

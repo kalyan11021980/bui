@@ -6,7 +6,7 @@ import type { Block, Turn } from '@/domain/orchestrator/transcript'
 import { lintVoice } from '@/domain/orchestrator/voice-lint'
 import type { OrchestratorView } from '@/domain/orchestrator/view'
 import type { DocType } from '@/domain/field-id'
-import { fieldDef } from '@/domain/catalog'
+import { docTypeBacksSensitiveField, fieldDef } from '@/domain/catalog'
 import { parseReqKey } from '@/domain/requirements/key'
 import { messagesFor, systemPrompt } from './prompt'
 import { activeToolsFor, buildToolSet } from './tool-set'
@@ -92,11 +92,16 @@ function decideVoice(
   text: string,
   blocks: readonly Block[],
 ): { text: string | null; dropped?: 'lint' | 'sensitive' } {
-  // A rationale is as much "about a sensitive field" as an ask for it.
-  const touchesSensitive = blocks.some(
-    (b) => (b.kind === 'field_ask' || b.kind === 'rationale')
-      && fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true,
-  )
+  // A rationale is as much "about a sensitive field" as an ask for it, and a
+  // document_request that backs one (e.g. proof_of_residency, or an ID photo
+  // that backs dl_number/id_number/passport_number/dob) is too.
+  const touchesSensitive = blocks.some((b) => {
+    if (b.kind === 'field_ask' || b.kind === 'rationale') {
+      return fieldDef(parseReqKey(b.fieldId).fieldId).sensitive === true
+    }
+    if (b.kind === 'document_request') return docTypeBacksSensitiveField(b.docType)
+    return false
+  })
   if (touchesSensitive) return { text: null, dropped: 'sensitive' }
 
   const trimmed = text.trim()

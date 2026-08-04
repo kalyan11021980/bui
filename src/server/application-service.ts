@@ -226,7 +226,13 @@ async function runTurnSafely(
   try {
     const { model, effort, isAnthropic } = modelForTurn()
     return await runTurn({ ...rest, model, effort, isAnthropic })
-  } catch {
+  } catch (error) {
+    // Server-side only: the applicant still gets the vetted degraded_notice
+    // below, never this. Without this line a bad model call is
+    // indistinguishable from a bad `guardToolCall`/`decideVoice` — both
+    // degrade identically and the operator is left curling the model
+    // endpoint to find out which.
+    console.error('[runTurnSafely] model turn failed:', error)
     const seq = rest.transcript.reduce((max, t) => Math.max(max, t.seq), 0) + 1
     return {
       turn: {

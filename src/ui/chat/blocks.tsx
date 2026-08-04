@@ -37,6 +37,8 @@ export type BlockHandlers = {
 type Props = BlockHandlers & {
   block: Block
   state: ApplicationState
+  /** The turn this block belongs to — see `chatScope`. */
+  seq: number
 }
 
 /**
@@ -45,8 +47,15 @@ type Props = BlockHandlers & {
  * be namespaced apart from the panel's own — otherwise two elements share
  * one id, `<label for>` resolves to whichever is first in document order,
  * and the chat's label ends up labelling the panel's box.
+ *
+ * `seq` is folded in too: `useConversation` never prunes history, and the
+ * same outstanding field can be re-asked turn after turn (see
+ * orchestrator/service.ts's fallback), so scope-by-field-alone still
+ * collides with itself once a second turn asks the same thing.
  */
-const CHAT_SCOPE = 'chat'
+function chatScope(seq: number): string {
+  return `chat-${seq}`
+}
 
 const noticeStyle: React.CSSProperties = {
   margin: '6px 0', fontSize: 14, color: COLOR.textPrimary,
@@ -71,12 +80,13 @@ const stillCurrentOptionStyle: React.CSSProperties = {
  * component rather than a new input, because a second input path is a
  * second place a value could go.
  */
-export function BlockView({ block, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
+export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onReadDocument }: Props) {
+  const scope = chatScope(seq)
   switch (block.kind) {
     case 'field_ask': {
       const { fieldId } = block
       const def = fieldDef(parseReqKey(fieldId).fieldId)
-      const rationaleId = `chat-rationale-${fieldId}`
+      const rationaleId = `${scope}-rationale-${fieldId}`
       const label = displayLabel(fieldId)
       const fieldState = state.fields[fieldId]
       // §10.4: an OCR-derived address is asked about, never presented as
@@ -92,7 +102,7 @@ export function BlockView({ block, state, onChange, onClear, onConfirm, onReadDo
           aria-describedby={rationaleId}
           style={{ margin: '10px 0' }}
         >
-          <label htmlFor={fieldInputId(fieldId, CHAT_SCOPE)} style={labelStyle}>
+          <label htmlFor={fieldInputId(fieldId, scope)} style={labelStyle}>
             {label}
           </label>
           {askIfStillCurrent && (
@@ -122,7 +132,7 @@ export function BlockView({ block, state, onChange, onClear, onConfirm, onReadDo
             state={state.fields[fieldId]}
             onChange={onChange}
             onClear={onClear}
-            scope={CHAT_SCOPE}
+            scope={scope}
           />
           <Rationale field={def} id={rationaleId} />
         </div>
@@ -140,7 +150,7 @@ export function BlockView({ block, state, onChange, onClear, onConfirm, onReadDo
         <DocumentUpload
           docType={docType}
           onRead={(image) => onReadDocument(docType, image)}
-          scope={CHAT_SCOPE}
+          scope={scope}
         />
       )
     }

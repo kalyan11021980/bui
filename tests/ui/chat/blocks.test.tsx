@@ -21,13 +21,13 @@ const handlers = { onChange: vi.fn(), onClear: vi.fn(), onConfirm: vi.fn(), onRe
 
 describe('BlockView — field_ask', () => {
   it("renders the field's real input control, labelled", () => {
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
     const input = screen.getByLabelText(/first name/i, CONTROL)
     expect(input).toHaveAttribute('type', 'text')
   })
 
   it('renders the vetted rationale beside the control', () => {
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
     // Verbatim catalog copy, not a paraphrase.
     expect(screen.getByText('Your account has to match the name on your ID')).toBeInTheDocument()
     expect(screen.getByText(/required by federal identity rules/i)).toBeInTheDocument()
@@ -37,7 +37,7 @@ describe('BlockView — field_ask', () => {
     const onChange = vi.fn()
     render(
       <BlockView
-        block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state}
+        seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state}
         onChange={onChange} onClear={vi.fn()} onConfirm={vi.fn()} onReadDocument={vi.fn()}
       />,
     )
@@ -52,7 +52,24 @@ describe('BlockView — field_ask', () => {
     render(
       <>
         <FieldRow fieldId="first_name" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />
-        <BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />
+        <BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />
+      </>,
+    )
+    const inputs = screen.getAllByLabelText(/first name/i, CONTROL)
+    expect(inputs).toHaveLength(2)
+    const ids = inputs.map((el) => el.id)
+    expect(ids.every((id) => id !== '')).toBe(true)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it('uses a distinct id across two turns asking the same field, so the second re-ask does not collide with the first', () => {
+    // useConversation never prunes history, and the fallback in
+    // orchestrator/service.ts can re-ask the same outstanding field on
+    // consecutive turns — both renders end up in the DOM at once.
+    render(
+      <>
+        <BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />
+        <BlockView seq={2} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />
       </>,
     )
     const inputs = screen.getAllByLabelText(/first name/i, CONTROL)
@@ -63,7 +80,7 @@ describe('BlockView — field_ask', () => {
   })
 
   it('wires the group to the rationale it names, not a dangling id', () => {
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={state} {...handlers} />)
     const group = screen.getByRole('group', { name: /first name/i })
     const describedBy = group.getAttribute('aria-describedby')
     expect(describedBy).toBeTruthy()
@@ -82,7 +99,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     const ocrState = withField('addr_line1', {
       value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
     })
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
     expect(screen.getByText(vettedCopy('address_still_current'))).toBeInTheDocument()
   })
 
@@ -90,7 +107,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     // The field carries no value and no provenance — the case the guard must
     // NOT fire for, or the question would be meaningless noise on every blank
     // address field, not just an OCR-derived one.
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={state} {...handlers} />)
     expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
   })
 
@@ -98,7 +115,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     const typedState = withField('addr_line1', {
       value: '123 Main St', status: 'confirmed', provenance: { source: 'user' },
     })
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={typedState} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={typedState} {...handlers} />)
     expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
   })
 
@@ -108,7 +125,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     const ocrName = withField('first_name', {
       value: 'Ada', status: 'derived', provenance: { source: 'ocr' },
     })
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'first_name' }} state={ocrName} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={ocrName} {...handlers} />)
     expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
   })
 
@@ -132,7 +149,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     }
     render(
       <BlockView
-        block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState}
+        seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState}
         onChange={onChange} onClear={vi.fn()} onConfirm={onConfirm} onReadDocument={vi.fn()}
       />,
     )
@@ -147,7 +164,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     const ocrState = withField('addr_line1', {
       value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
     })
-    render(<BlockView block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrState} {...handlers} />)
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(2)
     const [first, second] = buttons
@@ -161,7 +178,7 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
 
 describe('BlockView — rationale', () => {
   it("renders the field's purpose and authority verbatim, without an input control", () => {
-    render(<BlockView block={{ kind: 'rationale', fieldId: 'dl_number' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'rationale', fieldId: 'dl_number' }} state={state} {...handlers} />)
     expect(screen.getByText('Confirms the ID you uploaded belongs to you')).toBeInTheDocument()
     expect(screen.getByText(/required by your state dmv/i)).toBeInTheDocument()
     // Distinguishes this from field_ask: a "why" block never offers to type
@@ -172,14 +189,14 @@ describe('BlockView — rationale', () => {
 
 describe('BlockView — notice', () => {
   it('renders its vetted string', () => {
-    render(<BlockView block={{ kind: 'notice', copyId: 'guard_fallback' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'notice', copyId: 'guard_fallback' }} state={state} {...handlers} />)
     expect(screen.getByText(vettedCopy('guard_fallback'))).toBeInTheDocument()
   })
 })
 
 describe('BlockView — document_request', () => {
   it('renders the upload control for that document', () => {
-    render(<BlockView block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />)
     expect(screen.getByLabelText(/photo of your driver's license/i)).toBeInTheDocument()
   })
 
@@ -187,7 +204,21 @@ describe('BlockView — document_request', () => {
     render(
       <>
         <DocumentUpload docType="drivers_license" onRead={vi.fn()} />
-        <BlockView block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />
+        <BlockView seq={1} block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />
+      </>,
+    )
+    const inputs = screen.getAllByLabelText(/photo of your driver's license/i)
+    expect(inputs).toHaveLength(2)
+    const ids = inputs.map((el) => el.id)
+    expect(ids.every((id) => id !== '')).toBe(true)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it('uses a distinct id across two turns requesting the same document, so a repeat request does not collide with the first', () => {
+    render(
+      <>
+        <BlockView seq={1} block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />
+        <BlockView seq={2} block={{ kind: 'document_request', docType: 'drivers_license' }} state={state} {...handlers} />
       </>,
     )
     const inputs = screen.getAllByLabelText(/photo of your driver's license/i)
@@ -200,7 +231,7 @@ describe('BlockView — document_request', () => {
 
 describe('BlockView — orientation', () => {
   it('renders the done/total counts', () => {
-    render(<BlockView block={{ kind: 'orientation', done: 3, total: 10 }} state={state} {...handlers} />)
+    render(<BlockView seq={1} block={{ kind: 'orientation', done: 3, total: 10 }} state={state} {...handlers} />)
     expect(screen.getByText(/3 of 10 done/i)).toBeInTheDocument()
   })
 })
