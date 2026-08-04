@@ -23,28 +23,38 @@ describe('buildToolSet', () => {
   })
 
   it('gives no tool an execute function — the guard decides, not the SDK', () => {
+    // `in` rather than a cast: the property must be absent, not merely
+    // undefined, and this asserts that without an `as`.
     for (const [name, tool] of Object.entries(buildToolSet())) {
-      expect((tool as { execute?: unknown }).execute, name).toBeUndefined()
+      expect('execute' in tool, name).toBe(false)
     }
   })
 })
 
 describe('activeToolsFor', () => {
+  // Each condition is asserted in BOTH directions. A negative-only test
+  // passes just as happily when the condition is deleted outright, which is
+  // the failure mode this codebase keeps hitting.
+
   it('offers orient only on a resume', () => {
     expect(activeToolsFor(view(), false)).not.toContain('orient')
     expect(activeToolsFor(view(), true)).toContain('orient')
   })
 
-  it('withholds requestDocument when nothing is owed', () => {
+  it('offers requestDocument when a document is owed, and not otherwise', () => {
+    expect(activeToolsFor(view(), false)).toContain('requestDocument')
     expect(activeToolsFor(view({ documentsOutstanding: [] }), false))
       .not.toContain('requestDocument')
   })
 
-  it('withholds askFor when nothing is outstanding', () => {
+  it('offers askFor when something is outstanding, and not otherwise', () => {
+    expect(activeToolsFor(view(), false)).toContain('askFor')
     expect(activeToolsFor(view({ outstanding: [] }), false)).not.toContain('askFor')
   })
 
-  it('always offers explain before submission', () => {
-    expect(activeToolsFor(view({ outstanding: [] }), false)).toContain('explain')
+  it('always offers explain and setProfile before submission', () => {
+    const bare = activeToolsFor(view({ outstanding: [], documentsOutstanding: [] }), false)
+    expect(bare).toContain('explain')
+    expect(bare).toContain('setProfile')
   })
 })
