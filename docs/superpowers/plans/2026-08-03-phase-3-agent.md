@@ -1497,7 +1497,12 @@ export function guardToolCall(
     }
 
     case 'orient': {
-      const total = outstandingFields(state).length + Object.keys(state.fields).length
+      // Counted off what the engine requires, not off recorded keys:
+      // `outstandingFields` filters on status, so a field that is recorded
+      // but not yet satisfied — every OCR-derived one — would be counted in
+      // both terms of a sum. The number is hashed onto the record, so a
+      // wrong one is not merely cosmetic.
+      const total = requiredFields(state.profile).length
       return {
         ok: true,
         blocks: [{
