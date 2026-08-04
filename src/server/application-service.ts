@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { LanguageModel } from 'ai'
 import { applyCarry } from '@/domain/application/carry'
 import {
   ApplicationSubmittedError, submittedRefusal,
@@ -6,6 +7,10 @@ import {
 import {
   applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
+import type { DocType } from '@/domain/field-id'
+import { toOrchestratorView } from '@/domain/orchestrator/view'
+import type { Turn } from '@/domain/orchestrator/transcript'
+import { runTurn, type TurnRequest, type TurnResult } from '@/server/orchestrator/service'
 import { getAuditLog } from '@/server/audit'
 import {
   newOwnerToken, ownsApplication, withoutOwnerToken,
@@ -17,6 +22,9 @@ import type { Action, ApplicationState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; failure: Failure }
+
+/** Rejections at which the agent stops offering its own tools for a turn. */
+const PANEL_ONLY_THRESHOLD = 3
 
 /**
  * What a new application starts as. UPDATE_PROFILE moves it from here; the
@@ -82,6 +90,127 @@ export function applyAction(
     return {
       ok: false,
       failure: failure('rejected', error instanceof Error ? error.message : 'Action rejected'),
+    }
+  }
+}
+
+export type TurnInput = {
+  /** Applicant's own words this turn, if any. */
+  text: string | undefined
+  /**
+   * Resolves the model plus the config that travels with it, lazily — so a
+   * misconfigured provider throws inside the same try/catch as an unreachable
+   * one, and both land on the same degraded turn instead of a 500.
+   */
+  modelForTurn: () => { model: LanguageModel; effort: string; isAnthropic: boolean }
+  isResume: boolean
+  uploadedDocs: readonly DocType[]
+  at: string
+}
+
+/**
+ * Runs one guarded model turn and persists its effects: the applicant's own
+ * message (if any), whatever tool calls survived the guard, the agent's
+ * turn, and one RECORD_REJECTION per refusal. Never lets a model failure
+ * reach the caller as a 500 — it degrades to a turn saying so instead.
+ */
+export async function applyTurn(
+  id: string,
+  ownerToken: string | null,
+  input: TurnInput,
+): Promise<Result<{ state: ApplicationState; turn: Turn }>> {
+  const found = owned(id, ownerToken)
+  if (!found.ok) return found
+  let current = found.value
+
+  const closed = submittedRefusal(current)
+  if (closed !== null) return { ok: false, failure: failure('submitted', closed) }
+
+  // Keyed off truthiness throughout: an empty string is "no text", the same
+  // as it not being sent, both for whether an applicant turn is appended and
+  // for what the model is told the applicant said.
+  const text = input.text ? input.text : null
+
+  try {
+    if (text) {
+      current = commit(current, {
+        type: 'APPEND_TURN',
+        at: input.at,
+        turn: {
+          seq: current.transcript.length + 1,
+          at: input.at,
+          role: 'applicant',
+          voice: null,
+          blocks: [],
+          text,
+        },
+      })
+    }
+
+    const result = await runTurnSafely(input.modelForTurn, {
+      view: toOrchestratorView(current, input.uploadedDocs),
+      state: current,
+      transcript: current.transcript,
+      uploadedDocs: input.uploadedDocs,
+      userText: text,
+      isResume: input.isResume,
+      at: input.at,
+    })
+
+    for (const action of result.actions) current = commit(current, action)
+
+    // Projected ahead of the RECORD_REJECTION loop below, which is what
+    // actually moves the stored count: the notice on this turn must reflect
+    // the count this turn produces, not the count before it.
+    const projected = current.orchestratorRejections + result.rejections.length
+    const droppingToPanelOnly = projected >= PANEL_ONLY_THRESHOLD
+
+    const turn: Turn = {
+      ...result.turn,
+      ...(droppingToPanelOnly && {
+        blocks: [...result.turn.blocks, { kind: 'notice', copyId: 'panel_only_notice' }],
+      }),
+      ...(result.rejections.length > 0 && { rejections: [...result.rejections] }),
+    }
+
+    current = commit(current, { type: 'APPEND_TURN', at: input.at, turn })
+    for (let i = 0; i < result.rejections.length; i += 1) {
+      current = commit(current, { type: 'RECORD_REJECTION', at: input.at })
+    }
+
+    return { ok: true, value: { state: withoutOwnerToken(current), turn } }
+  } catch (error) {
+    if (error instanceof ApplicationSubmittedError) {
+      return { ok: false, failure: failure('submitted', error.message) }
+    }
+    throw error
+  }
+}
+
+/**
+ * Runs the turn, catching both a failure to resolve the model and a failure
+ * of the model call itself — the applicant sees the same graceful notice
+ * either way, and nothing it returns is mistaken for a guard rejection.
+ */
+async function runTurnSafely(
+  modelForTurn: () => { model: LanguageModel; effort: string; isAnthropic: boolean },
+  rest: Omit<TurnRequest, 'model' | 'effort' | 'isAnthropic'>,
+): Promise<TurnResult> {
+  try {
+    const { model, effort, isAnthropic } = modelForTurn()
+    return await runTurn({ ...rest, model, effort, isAnthropic })
+  } catch {
+    const seq = rest.transcript.reduce((max, t) => Math.max(max, t.seq), 0) + 1
+    return {
+      turn: {
+        seq,
+        at: rest.at,
+        role: 'agent',
+        voice: null,
+        blocks: [{ kind: 'notice', copyId: 'degraded_notice' }],
+      },
+      actions: [],
+      rejections: [],
     }
   }
 }
