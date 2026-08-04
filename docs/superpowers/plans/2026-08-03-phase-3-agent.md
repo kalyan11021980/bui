@@ -1554,7 +1554,7 @@ export function activeToolsFor(view: OrchestratorView, isResume: boolean): ToolN
 }
 ```
 
-If `tool()` in this SDK version requires an `execute`, do **not** add a stub that mutates anything — pass the schema-only form the typings allow, and if the typings demand `execute`, supply one that throws with the message `"tool execution must go through guardToolCall"` and add a test asserting it is never called during a turn.
+`execute` is optional in `ai@7` — the `Tool` type has a schema-only form documented as "does not execute the tool". Verified against the installed typings, so pass no `execute` and expect the test above to hold. Do not add a throwing stub "just in case": an `execute` that exists is a second path into the application, and the guard is the only one there should be.
 
 - [ ] **Step 4: Run and confirm pass**
 
