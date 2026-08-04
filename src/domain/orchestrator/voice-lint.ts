@@ -25,10 +25,17 @@ const LEGAL_CLAIM = [
   /\bwe are required to\b/i,
 ]
 
+/**
+ * Most specific first. A statute reference and a percentage both contain
+ * digits, so a numeral-first order could never report either — and the
+ * narrower diagnosis is the useful one when tuning the rules against real
+ * output.
+ */
 export function lintVoice(text: string): VoiceLintResult {
   if (text.length > MAX_LENGTH) return { ok: false, violation: 'length' }
   if (STATUTE.test(text)) return { ok: false, violation: 'statute' }
   if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
+
   if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }
   for (const pattern of LEGAL_CLAIM) {
     if (pattern.test(text)) return { ok: false, violation: 'legal_claim' }
