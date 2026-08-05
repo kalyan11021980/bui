@@ -51,7 +51,7 @@ describe('Composer', () => {
   it('with several outstanding documents, attach opens a chooser', async () => {
     const { onReadDocument } = renderComposer(createApplication('app-1', DEALER_PROFILE, 'o'))
     await userEvent.click(screen.getByRole('button', { name: /attach a document/i }))
-    const input = screen.getByLabelText(/photo of your dealer license/i)
+    const input = screen.getByLabelText(/attach a photo of your dealer license/i)
     await userEvent.upload(input, new File(['x'], 'dealer.png', { type: 'image/png' }))
     expect(onReadDocument).toHaveBeenCalledWith('dealer_license', IMAGE)
   })

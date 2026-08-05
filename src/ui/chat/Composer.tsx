@@ -52,11 +52,15 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
     <div>
       {notice && <p role="status" className="mb-2 mt-0 text-[12px]">{notice}</p>}
       {chooserOpen && outstanding.length > 1 && (
-        <div className="mb-2 flex flex-col gap-1 rounded-xl border border-divider bg-surface p-2 shadow-card">
+        <div
+          id="composer-attach-chooser"
+          className="mb-2 flex flex-col gap-1 rounded-xl border border-divider bg-surface p-2 shadow-card"
+        >
           {outstanding.map((docType) => (
             <span key={docType}>
               <label
                 htmlFor={`composer-attach-${docType}`}
+                aria-label={`Attach a ${DOC_LABEL[docType].toLowerCase()}`}
                 className="block cursor-pointer rounded-lg px-3 py-1.5 text-[13px] hover:bg-page"
               >
                 {DOC_LABEL[docType]}
@@ -100,6 +104,7 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
             type="button"
             aria-label="Attach a document"
             aria-expanded={chooserOpen}
+            aria-controls="composer-attach-chooser"
             className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-secondary hover:bg-page"
             onClick={() => setChooserOpen((open) => !open)}
           >
