@@ -102,8 +102,10 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
       // settle an OCR read, and the field stays outstanding forever.
       const askToConfirm = !askIfStillCurrent && fieldState?.status === 'derived'
       // The other half of "Looks right": once pressed (or once verified) the
-      // button vanishing is not feedback — the card says so instead.
-      const answered = fieldState?.status === 'confirmed' || fieldState?.status === 'verified'
+      // button vanishing is not feedback — the card says so instead. Not
+      // after submission, when "you can still edit it" stops being true.
+      const answered = state.submittedAt === null
+        && (fieldState?.status === 'confirmed' || fieldState?.status === 'verified')
       return (
         // Mirrors FieldRow's own group/aria-describedby pairing, so the
         // rationale's id is not merely passed to Rationale but actually

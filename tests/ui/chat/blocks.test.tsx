@@ -113,6 +113,15 @@ describe('BlockView — field_ask, answered feedback', () => {
     expect(screen.getByRole('status')).toHaveTextContent(vettedCopy('field_confirmed'))
   })
 
+  it('drops the answered line once submitted — "you can still edit it" would be false', () => {
+    const confirmed = withField('first_name', {
+      value: 'Ada', status: 'confirmed', provenance: { source: 'ocr' },
+    })
+    const closed = { ...confirmed, submittedAt: '2026-08-05T00:00:00.000Z' }
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={closed} {...handlers} />)
+    expect(screen.queryByText(vettedCopy('field_confirmed'))).toBeNull()
+  })
+
   it('a verified field reads as answered too', () => {
     const verified = withField('first_name', {
       value: 'Ada', status: 'verified', provenance: { source: 'ocr' },
