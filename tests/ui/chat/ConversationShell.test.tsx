@@ -147,6 +147,9 @@ describe('ConversationShell', () => {
     )
     // §9.1 — the arrival must not steal focus from wherever the applicant is.
     expect(document.activeElement).not.toBe(document.body)
+
+    // Hand the prototype back to the setup.ts stub for the rest of the file.
+    Element.prototype.scrollIntoView = () => undefined
   })
 
   it('keystrokes in a field_ask control reach the panel handler, never the turn endpoint', async () => {

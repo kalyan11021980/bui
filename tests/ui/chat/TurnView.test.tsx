@@ -41,6 +41,20 @@ describe('TurnView — agent turns', () => {
   })
 })
 
+describe('TurnView — entrance animation', () => {
+  it('an agent turn settles in; the applicant bubble never animates', () => {
+    // The applicant's optimistic echo is remounted under its committed seq
+    // when the reply lands — an animated bubble would replay its entrance.
+    const agent: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Hi there', blocks: [] }
+    const { container: agentDom } = render(<TurnView turn={agent} state={state} {...handlers} />)
+    expect(agentDom.firstElementChild?.className).toContain('animate-rise')
+
+    const applicant: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const { container: applicantDom } = render(<TurnView turn={applicant} state={state} {...handlers} />)
+    expect(applicantDom.firstElementChild?.className).not.toContain('animate-rise')
+  })
+})
+
 describe('TurnView — applicant turns', () => {
   it('renders only what the applicant typed, never a block', () => {
     const turn: Turn = {

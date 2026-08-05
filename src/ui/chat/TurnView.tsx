@@ -17,8 +17,11 @@ type Props = BlockHandlers & {
  */
 export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
   if (turn.role === 'applicant') {
+    // No entrance animation: this bubble is the applicant's own act, shown
+    // the instant they send — and the optimistic echo is remounted under its
+    // committed seq when the reply lands, which would replay it.
     return (
-      <p className="animate-rise my-3 ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-md border border-divider bg-surface px-4 py-2 text-[15px] leading-normal">
+      <p className="my-3 ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-md border border-divider bg-surface px-4 py-2 text-[15px] leading-normal">
         {turn.text}
       </p>
     )

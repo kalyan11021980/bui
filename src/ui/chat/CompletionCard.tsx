@@ -20,7 +20,7 @@ export function CompletionCard({ state, onSubmit }: Props) {
   if (outstandingFields(state).length > 0) return null
 
   return (
-    <div className="animate-rise my-3 rounded-xl border border-divider bg-surface p-4 shadow-card">
+    <div role="status" className="animate-rise my-3 rounded-xl border border-divider bg-surface p-4 shadow-card">
       <p className="m-0 mb-3 text-[15px] leading-relaxed">
         {vettedCopy('completion_ready')}
       </p>
