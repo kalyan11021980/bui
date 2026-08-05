@@ -42,6 +42,7 @@ function stubFetch(respond: (call: Call) => { status: number; body: unknown }) {
 const runNow = (run: () => Promise<void>) => { void run() }
 
 const noHandlers: BlockHandlers & {
+  onSubmit: () => void
   onState: (state: ApplicationState) => void
   runSerialized: (run: () => Promise<void>) => void
   panelWrites: number
@@ -50,6 +51,7 @@ const noHandlers: BlockHandlers & {
   onClear: () => undefined,
   onConfirm: () => undefined,
   onReadDocument: () => undefined,
+  onSubmit: () => undefined,
   onState: () => undefined,
   runSerialized: runNow,
   // Never moves in these tests, so the idle nudge stays disarmed and every
@@ -112,6 +114,39 @@ describe('ConversationShell', () => {
     const turnCall = calls.find((c) => c.url.endsWith('/turn'))
     expect(turnCall?.body).toEqual({ text: 'Hi' })
     expect(screen.getByText('Sure — first things first.')).toBeInTheDocument()
+  })
+
+  it('scrolls a newly arrived turn into view — its start, without touching focus', async () => {
+    // jsdom implements no scrolling; the stub is the assertion surface.
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const agentTurn: Turn = {
+      seq: 2, at: AT, role: 'agent', voice: 'Sure — first things first.', blocks: [],
+    }
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+
+    stubFetch((call) =>
+      call.url.endsWith('/turn')
+        ? { status: 200, body: { state: after, turn: agentTurn } }
+        : { status: 200, body: after },
+    )
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+    const input = screen.getByLabelText(/tell the agent something/i)
+    await userEvent.type(input, 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    expect(scrollIntoView).toHaveBeenLastCalledWith(
+      expect.objectContaining({ block: 'start' }),
+    )
+    // §9.1 — the arrival must not steal focus from wherever the applicant is.
+    expect(document.activeElement).not.toBe(document.body)
   })
 
   it('keystrokes in a field_ask control reach the panel handler, never the turn endpoint', async () => {

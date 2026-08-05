@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import { vettedCopy } from '@/domain/orchestrator/copy'
@@ -7,6 +8,7 @@ import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import { useIdleNudge } from '@/ui/client/useIdleNudge'
 import type { BlockHandlers } from './blocks'
+import { CompletionCard } from './CompletionCard'
 import { Composer } from './Composer'
 import { OpeningUploadCard } from './OpeningUploadCard'
 import { Suggestions } from './Suggestions'
@@ -22,6 +24,8 @@ type Props = BlockHandlers & {
   /** Null until the application has started; sending stays disabled. */
   ownerToken: string | null
   state: ApplicationState
+  /** The same submit the panel uses — the CompletionCard is just a second door to it. */
+  onSubmit: () => void
   /** Adopts the state a completed turn returned — a `setProfile` or `askFor`
    *  tool call is already committed server-side by the time it arrives. */
   onState: (state: ApplicationState) => void
@@ -57,11 +61,24 @@ const logStyle: React.CSSProperties = {
  * `useConversation`.
  */
 export function ConversationShell({
-  applicationId, ownerToken, state, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized, panelWrites,
+  applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized, panelWrites,
 }: Props) {
   const { turns, pending, send, nudge } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
+  // Brings a newly arrived turn into view — its start, so a long answer is
+  // read from the top. scrollIntoView never moves focus, so §9.1 holds; the
+  // motion itself honours the reduced-motion preference.
+  const logRef = useRef<HTMLDivElement>(null)
+  const lastSeq = turns.length > 0 ? turns[turns.length - 1]?.seq : undefined
+  useEffect(() => {
+    if (lastSeq === undefined) return
+    const reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    logRef.current?.lastElementChild?.scrollIntoView({
+      behavior: reduced ? 'auto' : 'smooth', block: 'start',
+    })
+  }, [lastSeq])
   const closed = state.submittedAt !== null
   // A field_ask block from an earlier turn stays on screen after submission —
   // history is not pruned — and the reducer refuses every change once
@@ -100,7 +117,7 @@ export function ConversationShell({
 
       {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
           whatever the applicant is doing, and must never steal focus. */}
-      <div role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
+      <div ref={logRef} role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
         {turns.map((turn) => (
           <TurnView
             key={turn.seq}
@@ -123,6 +140,8 @@ export function ConversationShell({
           Thinking…
         </p>
       )}
+
+      <CompletionCard state={state} onSubmit={onSubmit} />
 
       <div className="sticky bottom-0 flex flex-col gap-2 bg-page pb-5">
         <Suggestions

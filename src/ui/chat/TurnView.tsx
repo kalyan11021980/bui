@@ -18,7 +18,7 @@ type Props = BlockHandlers & {
 export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
   if (turn.role === 'applicant') {
     return (
-      <p className="my-3 ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-md border border-divider bg-surface px-4 py-2 text-[15px] leading-normal">
+      <p className="animate-rise my-3 ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-md border border-divider bg-surface px-4 py-2 text-[15px] leading-normal">
         {turn.text}
       </p>
     )
@@ -29,7 +29,7 @@ export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocu
   if (turn.voice === null && turn.blocks.length === 0) return null
 
   return (
-    <div className="my-3 flex gap-3">
+    <div className="animate-rise my-3 flex gap-3">
       {/* The agent's mark. Decorative — the log's structure already says who speaks. */}
       <span
         aria-hidden="true"

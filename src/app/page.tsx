@@ -116,6 +116,7 @@ export default function Page() {
             applicationId={state.id}
             ownerToken={app.ownerToken}
             state={state}
+            onSubmit={submit}
             onChange={app.change}
             onClear={app.clear}
             onConfirm={app.confirm}
