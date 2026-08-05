@@ -1,5 +1,5 @@
 export type VoiceViolation =
-  | 'numeral' | 'percentage' | 'statute' | 'legal_claim' | 'length'
+  | 'numeral' | 'percentage' | 'statute' | 'legal_claim' | 'length' | 'tool_syntax'
 
 export type VoiceLintResult =
   | { ok: true }
@@ -9,6 +9,15 @@ const MAX_LENGTH = 240
 
 /** Any Unicode decimal digit — a numeral in another script is still a numeral. */
 const NUMERAL = /\p{Nd}/u
+
+/**
+ * A model narrating its tools instead of calling them — observed as
+ * `[askFor(field: …)]` emitted as prose. Bracketed call syntax, or a tool's
+ * own name used as a call. `explain`/`orient` are ordinary words, so those
+ * two only match with the paren flush against the name.
+ */
+const TOOL_SYNTAX =
+  /\[\s*\w+\s*\(|\b(?:askFor|setProfile|requestDocument)\s*\(|\b(?:explain|orient)\(/
 const PERCENTAGE = /%|\bpercent\b|\bper cent\b/i
 const STATUTE = /§|\bU\.?S\.?C\.?\b|\bC\.?F\.?R\.?\b|\bIRC\b|\bTitle\s+\p{Nd}/iu
 
@@ -33,6 +42,7 @@ const LEGAL_CLAIM = [
  */
 export function lintVoice(text: string): VoiceLintResult {
   if (text.length > MAX_LENGTH) return { ok: false, violation: 'length' }
+  if (TOOL_SYNTAX.test(text)) return { ok: false, violation: 'tool_syntax' }
   if (STATUTE.test(text)) return { ok: false, violation: 'statute' }
   if (PERCENTAGE.test(text)) return { ok: false, violation: 'percentage' }
   if (NUMERAL.test(text)) return { ok: false, violation: 'numeral' }

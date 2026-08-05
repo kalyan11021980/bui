@@ -96,6 +96,9 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
       // right" lives behind ?debug now — without this the chat has no way to
       // settle an OCR read, and the field stays outstanding forever.
       const askToConfirm = !askIfStillCurrent && fieldState?.status === 'derived'
+      // The other half of "Looks right": once pressed (or once verified) the
+      // button vanishing is not feedback — the card says so instead.
+      const answered = fieldState?.status === 'confirmed' || fieldState?.status === 'verified'
       return (
         // Mirrors FieldRow's own group/aria-describedby pairing, so the
         // rationale's id is not merely passed to Rationale but actually
@@ -152,6 +155,11 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
                 Looks right
               </button>
             </div>
+          )}
+          {answered && (
+            <p role="status" className="m-0 mt-1.5 text-[13px]" style={{ color: COLOR.success }}>
+              {vettedCopy('field_confirmed')}
+            </p>
           )}
           <Rationale field={def} id={rationaleId} />
         </div>

@@ -90,6 +90,38 @@ describe('BlockView — field_ask', () => {
   })
 })
 
+describe('BlockView — field_ask, answered feedback', () => {
+  function withField(fieldId: string, field: FieldState): ApplicationState {
+    return { ...state, fields: { ...state.fields, [fieldId]: field } }
+  }
+
+  it('a derived field offers "Looks right" and no answered line yet', () => {
+    const derived = withField('first_name', {
+      value: 'Ada', status: 'derived', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={derived} {...handlers} />)
+    expect(screen.getByRole('button', { name: /looks right/i })).toBeInTheDocument()
+    expect(screen.queryByText(vettedCopy('field_confirmed'))).toBeNull()
+  })
+
+  it('a confirmed field says it is answered where the button used to be', () => {
+    const confirmed = withField('first_name', {
+      value: 'Ada', status: 'confirmed', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={confirmed} {...handlers} />)
+    expect(screen.queryByRole('button', { name: /looks right/i })).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(vettedCopy('field_confirmed'))
+  })
+
+  it('a verified field reads as answered too', () => {
+    const verified = withField('first_name', {
+      value: 'Ada', status: 'verified', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'first_name' }} state={verified} {...handlers} />)
+    expect(screen.getByRole('status')).toHaveTextContent(vettedCopy('field_confirmed'))
+  })
+})
+
 describe('BlockView — field_ask, OCR-derived address (automation-bias guard)', () => {
   function withField(fieldId: string, field: FieldState): ApplicationState {
     return { ...state, fields: { ...state.fields, [fieldId]: field } }

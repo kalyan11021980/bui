@@ -5,9 +5,14 @@ const PASSING = [
   'Thanks — let me get a couple of details from you.',
   'Sure, here is exactly why we ask:',
   'Nearly there. Just a few more.',
+  'Let me explain (briefly) why we ask.',
 ]
 
 const FAILING: ReadonlyArray<[string, string]> = [
+  ['[askFor(field: "id_images")]', 'tool_syntax'],
+  ['I will askFor (your name) next.', 'tool_syntax'],
+  ['[explain(dob)]', 'tool_syntax'],
+  ['setProfile({ patch }) comes next.', 'tool_syntax'],
   ['You have 3 things left.', 'numeral'],
   ['Almost ninety percent done.', 'percentage'],
   ['This is 90% done.', 'percentage'],
