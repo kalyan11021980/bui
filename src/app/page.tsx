@@ -17,7 +17,7 @@ const OUT_OF_STEP =
 
 /** Every page-level notice shares this shape; only the background says which kind. */
 const noticeClass = (bg: string) =>
-  `mx-auto mt-3 w-full max-w-[720px] rounded-xl border border-divider ${bg} `
+  `mx-auto mt-3 w-full max-w-[680px] rounded-xl border border-divider ${bg} `
   + 'px-4 py-3 text-[13px] text-text-secondary shadow-card'
 
 /**

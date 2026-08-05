@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Composer } from '@/ui/chat/Composer'
+import { outstandingFields } from '@/domain/application/queries'
 import { createApplication, applicationReducer } from '@/domain/application/reducer'
 import type { ApplicationState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
@@ -65,6 +66,24 @@ describe('Composer', () => {
       type: 'RECORD_DOCUMENT', documentId: 'doc-1',
       docType: 'drivers_license', at: '2026-08-05T00:00:00.000Z',
     })
+    renderComposer(state)
+    expect(screen.queryByLabelText(/attach/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /attach/i })).toBeNull()
+  })
+
+  it('hides attach once submitted, even with a document type still un-read', () => {
+    // SUBMIT only checks outstandingFields, not documents — a driver's
+    // license photo can be left un-taken while every typed field is filled
+    // in. The attach control must not survive submission to accept it.
+    const AT = '2026-08-05T00:00:00.000Z'
+    let state = createApplication('app-1', PROFILE, 'o')
+    for (const id of outstandingFields(state)) {
+      state = applicationReducer(state, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    state = applicationReducer(state, { type: 'SUBMIT', at: AT })
+
     renderComposer(state)
     expect(screen.queryByLabelText(/attach/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /attach/i })).toBeNull()

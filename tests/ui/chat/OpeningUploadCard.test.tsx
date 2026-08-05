@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { OpeningUploadCard } from '@/ui/chat/OpeningUploadCard'
 import { createApplication, applicationReducer } from '@/domain/application/reducer'
@@ -28,6 +28,21 @@ describe('OpeningUploadCard', () => {
     await userEvent.upload(input, new File(['x'], 'dl.png', { type: 'image/png' }))
 
     expect(onReadDocument).toHaveBeenCalledWith('drivers_license', IMAGE)
+  })
+
+  it('routes a dropped photo the same way as a picked one', async () => {
+    const onReadDocument = vi.fn()
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    const { container } = render(
+      <OpeningUploadCard state={state} onReadDocument={onReadDocument} prepare={prepare} />,
+    )
+
+    const card = container.firstElementChild as HTMLElement
+    const file = new File(['x'], 'dl.png', { type: 'image/png' })
+    fireEvent.drop(card, { dataTransfer: { files: [file] } })
+
+    await waitFor(() =>
+      expect(onReadDocument).toHaveBeenCalledWith('drivers_license', IMAGE))
   })
 
   it('leaves the applicant a spoken way out', () => {

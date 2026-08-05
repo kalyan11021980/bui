@@ -29,8 +29,14 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
   const [chooserOpen, setChooserOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const outstanding = documentsToUpload(state.profile)
-    .filter((t) => !state.documents.some((d) => d.docType === t))
+  // Every sibling upload surface guards closure the same way — hidden, not
+  // disabled, once the application is submitted (§9.1: refuse, don't grey
+  // out). Without this, a document type left un-read at submission would
+  // still take a photo here and fail only on the server's refusal.
+  const outstanding = state.submittedAt !== null
+    ? []
+    : documentsToUpload(state.profile)
+      .filter((t) => !state.documents.some((d) => d.docType === t))
 
   const handleFile = async (docType: DocType, file: File | undefined) => {
     if (!file) return
@@ -106,7 +112,7 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
             type="button"
             aria-label="Attach a document"
             aria-expanded={chooserOpen}
-            aria-controls="composer-attach-chooser"
+            {...(chooserOpen && { 'aria-controls': 'composer-attach-chooser' })}
             className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-secondary hover:bg-page"
             onClick={() => setChooserOpen((open) => !open)}
           >

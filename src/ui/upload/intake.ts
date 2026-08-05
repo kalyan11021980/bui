@@ -11,9 +11,11 @@ export const DOC_LABEL: Record<DocType, string> = {
   proof_of_residency: vettedCopy('doc_label_proof_of_residency'),
 }
 
-export const TOO_SMALL = vettedCopy('upload_too_small')
-export const TEXT_ONLY = vettedCopy('upload_text_only')
-export const UNOPENABLE = vettedCopy('upload_unopenable')
+// Module-locals: no importer outside intake.ts needs the raw notice text or
+// the standalone judgement — every surface goes through intakeFile.
+const TOO_SMALL = vettedCopy('upload_too_small')
+const TEXT_ONLY = vettedCopy('upload_text_only')
+const UNOPENABLE = vettedCopy('upload_unopenable')
 
 export type IntakeVerdict =
   | { kind: 'unopenable' }
@@ -21,7 +23,7 @@ export type IntakeVerdict =
   | { kind: 'ok'; image: PreparedImage; notice: string | null }
 
 /** One judgement for every surface a photo can enter through. */
-export async function judgeFile(
+async function judgeFile(
   file: File,
   prepare: (f: File) => Promise<PreparedImage> = prepareImage,
 ): Promise<IntakeVerdict> {
