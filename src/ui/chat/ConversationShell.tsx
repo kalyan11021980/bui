@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
+import { useIdleNudge } from '@/ui/client/useIdleNudge'
 import { COLOR } from '@/ui/theme/tokens'
 import type { BlockHandlers } from './blocks'
+import { Suggestions } from './Suggestions'
 import { TurnView } from './TurnView'
 
 /** Stable references, so a no-op swap is not a re-render on every keystroke. */
@@ -28,15 +31,50 @@ type Props = BlockHandlers & {
    * needs the same ordering guarantee `readDocument` already relies on it for.
    */
   runSerialized: (run: () => Promise<void>) => void
+  /** See `useIdleNudge` — what tells the agent an answer landed in the panel. */
+  panelWrites: number
+}
+
+/**
+ * A centred, readable column with the composer pinned under it, rather than
+ * a 560px block flush against the left edge of a 2560px window.
+ */
+const shellStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 680,
+  margin: '0 auto', minHeight: '100vh', padding: '24px 20px 0',
+  boxSizing: 'border-box',
 }
 
 const openingStyle: React.CSSProperties = {
-  margin: '4px 0', fontSize: 15, color: COLOR.textPrimary,
+  margin: '0 0 12px', fontSize: 15, lineHeight: 1.55, color: COLOR.textPrimary,
+}
+
+/** Grows with the conversation; the composer below it never moves off-screen. */
+const logStyle: React.CSSProperties = {
+  flex: 1, display: 'flex', flexDirection: 'column',
+}
+
+/**
+ * Suggestions and composer travel together. Sticky separately, the composer
+ * scrolled over the chips and cut the last one in half.
+ */
+const footerStyle: React.CSSProperties = {
+  position: 'sticky', bottom: 0, display: 'flex', flexDirection: 'column',
+  gap: 8, paddingBottom: 20, background: COLOR.page,
+}
+
+const composerRowStyle: React.CSSProperties = {
+  display: 'flex', gap: 8, margin: 0,
+}
+
+const thinkingStyle: React.CSSProperties = {
+  margin: '8px 0', fontSize: 14, color: COLOR.textSecondary,
 }
 
 const composerStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '8px 10px', fontSize: 15,
-  color: COLOR.textPrimary, background: COLOR.surface, border: `1px solid ${COLOR.border}`,
+  width: '100%', boxSizing: 'border-box', padding: '10px 14px', fontSize: 15,
+  color: COLOR.textPrimary, background: COLOR.surface,
+  border: `1px solid ${COLOR.border}`, borderRadius: 20,
 }
 
 /**
@@ -46,9 +84,9 @@ const composerStyle: React.CSSProperties = {
  * `useConversation`.
  */
 export function ConversationShell({
-  applicationId, ownerToken, state, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
+  applicationId, ownerToken, state, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized, panelWrites,
 }: Props) {
-  const { turns, pending, send } = useConversation(
+  const { turns, pending, send, nudge } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
   const [draft, setDraft] = useState('')
@@ -66,6 +104,19 @@ export function ConversationShell({
   // it (§9.1 — "focus is never stolen by an update"). Sending is refused
   // here instead, so the control stays focusable throughout.
   const sendable = !pending && ownerToken !== null && !closed
+  const suggestible = outstandingFields(state)
+
+  // Nothing outstanding means nothing for the agent to move on to — and a
+  // field already asked this session is an open box on screen, so a nudge
+  // that could only re-ask it would just render a second copy. Only an
+  // outstanding field the agent has not asked yet is worth a turn.
+  const askedOnScreen = new Set(turns.flatMap((turn) =>
+    turn.role === 'agent'
+      ? turn.blocks.flatMap((b) => (b.kind === 'field_ask' ? [b.fieldId] : []))
+      : [],
+  ))
+  const worthNudging = suggestible.some((id) => !askedOnScreen.has(id))
+  useIdleNudge(panelWrites, sendable && worthNudging, nudge)
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -77,14 +128,14 @@ export function ConversationShell({
   }
 
   return (
-    <section aria-label="Registration agent" style={{ maxWidth: 560, marginTop: 16 }}>
+    <section aria-label="Registration agent" style={shellStyle}>
       {vettedCopy('opening_beat').split('\n\n').map((paragraph, index) => (
         <p key={index} style={openingStyle}>{paragraph}</p>
       ))}
 
       {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
           whatever the applicant is doing, and must never steal focus. */}
-      <div role="log" aria-live="polite" aria-relevant="additions">
+      <div role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
         {turns.map((turn) => (
           <TurnView
             key={turn.seq}
@@ -98,7 +149,24 @@ export function ConversationShell({
         ))}
       </div>
 
-      <form onSubmit={submit} style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+      {/* The agent's slot, held while it thinks. Not a spinner for its own
+          sake: a turn is one to ten seconds, and an empty screen after the
+          composer clears reads as an app that dropped what you said. */}
+      {pending && (
+        <p role="status" style={thinkingStyle}>
+          <span aria-hidden="true" style={{ letterSpacing: 2 }}>•••</span>{' '}
+          Thinking…
+        </p>
+      )}
+
+      <div style={footerStyle}>
+        <Suggestions
+          fieldIds={suggestible}
+          disabled={!sendable}
+          onPick={send}
+        />
+
+        <form onSubmit={submit} style={composerRowStyle}>
         <label htmlFor="chat-composer" style={{ position: 'absolute', left: -9999 }}>
           Tell the agent something
         </label>
@@ -113,13 +181,14 @@ export function ConversationShell({
           aria-disabled={!sendable || draft.trim() === ''}
           style={{
             background: COLOR.primary, color: COLOR.surface, border: 'none',
-            padding: '6px 14px', cursor: 'pointer',
+            padding: '6px 18px', borderRadius: 20, cursor: 'pointer',
             opacity: !sendable || draft.trim() === '' ? 0.6 : 1,
           }}
         >
-          Send
-        </button>
-      </form>
+            Send
+          </button>
+        </form>
+      </div>
     </section>
   )
 }

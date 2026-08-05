@@ -10,6 +10,12 @@ export type UseConversation = {
   turns: readonly Turn[]
   pending: boolean
   send: (text: string) => void
+  /**
+   * A turn with nothing said — the applicant answered in the panel instead.
+   * The agent reads the answer from the view it is given, so it has
+   * everything it needs without the applicant narrating it.
+   */
+  nudge: () => void
 }
 
 /**
@@ -54,12 +60,23 @@ export function useConversation(
 
   const send = (text: string) => {
     const trimmed = text.trim()
-    if (trimmed === '' || inFlight.current) return
+    if (trimmed === '') return
+    // Shown before the request is even sent. The server echoes the same turn
+    // back inside `state.transcript`, but that is a whole model call away —
+    // one to ten seconds during which the composer has already emptied, and
+    // without this the screen is byte-identical to before you pressed send.
+    localSeq.current -= 1
+    setTurns((held) => [...held, applicantTurn(localSeq.current, trimmed)])
+    post(trimmed)
+  }
+
+  const post = (text: string | null) => {
+    if (inFlight.current) return
     inFlight.current = true
     setPending(true)
 
     runSerialized(async () => {
-      const result = await sendTurn(applicationId, ownerToken, trimmed)
+      const result = await sendTurn(applicationId, ownerToken, text)
       inFlight.current = false
       setPending(false)
 
@@ -83,12 +100,23 @@ export function useConversation(
       // the last response (or since this session started) is shown.
       const fresh = result.value.state.transcript.filter((turn) => turn.seq > seen.current)
       seen.current = result.value.state.transcript.length
-      setTurns((held) => [...held, ...fresh])
+      // The applicant's own turn comes back committed inside `fresh`, so the
+      // optimistic echo has to go or the same sentence shows twice. Local
+      // turns are the negative-seq ones; a degraded notice is not replaced by
+      // anything and stays.
+      setTurns((held) => [
+        ...held.filter((turn) => !(turn.seq < 0 && turn.role === 'applicant')),
+        ...fresh,
+      ])
       onState(result.value.state)
     })
   }
 
-  return { turns, pending, send }
+  return { turns, pending, send, nudge: () => post(null) }
+}
+
+function applicantTurn(seq: number, text: string): Turn {
+  return { seq, at: new Date().toISOString(), role: 'applicant', voice: null, blocks: [], text }
 }
 
 function degradedTurn(seq: number): Turn {

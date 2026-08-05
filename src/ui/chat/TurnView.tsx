@@ -11,11 +11,23 @@ type Props = BlockHandlers & {
 }
 
 const voiceStyle: React.CSSProperties = {
-  margin: '4px 0 8px', fontSize: 15, color: COLOR.textPrimary,
+  margin: 0, fontSize: 15, lineHeight: 1.5, color: COLOR.textPrimary,
 }
 
-const applicantStyle: React.CSSProperties = {
-  margin: '4px 0 8px', fontSize: 15, color: COLOR.textSecondary, fontStyle: 'italic',
+/**
+ * Right-aligned and filled, against the agent's left-aligned plain text.
+ * Before this both roles rendered as the same grey paragraph at the same
+ * left edge, and what you had just typed read as one more line of the
+ * agent's own speech.
+ */
+const applicantBubble: React.CSSProperties = {
+  margin: '12px 0 12px auto', padding: '8px 12px', maxWidth: '80%', width: 'fit-content',
+  fontSize: 15, lineHeight: 1.4, color: COLOR.surface, background: COLOR.primary,
+  borderRadius: 14, borderBottomRightRadius: 4,
+}
+
+const agentBlock: React.CSSProperties = {
+  margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 8,
 }
 
 /**
@@ -26,11 +38,15 @@ const applicantStyle: React.CSSProperties = {
  */
 export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
   if (turn.role === 'applicant') {
-    return <p style={applicantStyle}>{turn.text}</p>
+    return <p style={applicantBubble}>{turn.text}</p>
   }
 
+  // A nudge turn whose every ask was already on screen — nothing to show,
+  // so no spaced empty div either.
+  if (turn.voice === null && turn.blocks.length === 0) return null
+
   return (
-    <div>
+    <div style={agentBlock}>
       {turn.voice !== null && <p style={voiceStyle}>{turn.voice}</p>}
       {turn.blocks.map((block, index) => (
         <BlockView

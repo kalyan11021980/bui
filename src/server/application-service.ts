@@ -177,9 +177,12 @@ export async function applyTurn(
     // Rejections already on the record (from earlier turns) plus this one:
     // the agent stops offering tools once either crosses the threshold, so a
     // turn that lands after it was already reached must render the same way
-    // as the turn that reached it.
+    // as the turn that reached it. A dropped re-ask stays out of the count —
+    // repeating a legitimate ask is redundancy the server already renders
+    // harmless, not the misbehaviour the threshold exists to bench.
+    const misbehaviour = result.rejections.filter((code) => code !== 'already_asked')
     const alreadyPanelOnly = current.orchestratorRejections >= PANEL_ONLY_THRESHOLD
-    const projected = current.orchestratorRejections + result.rejections.length
+    const projected = current.orchestratorRejections + misbehaviour.length
     const panelOnly = alreadyPanelOnly || projected >= PANEL_ONLY_THRESHOLD
 
     const turn: Turn = {
@@ -187,14 +190,19 @@ export async function applyTurn(
       seq: current.transcript.length + 1,
       ...(panelOnly && {
         // Replaces, not appends: "I'll step back" alongside an ask in the
-        // same breath would contradict the notice it sits next to.
-        blocks: [{ kind: 'notice', copyId: 'panel_only_notice' }],
+        // same breath would contradict the notice it sits next to. And it is
+        // said once, not on every turn after — a run of silent turns keeps
+        // committing for the audit trail, but only an applicant speaking
+        // earns the notice again.
+        blocks: stepBackNoticeStanding(current.transcript)
+          ? []
+          : [{ kind: 'notice', copyId: 'panel_only_notice' as const }],
       }),
       ...(result.rejections.length > 0 && { rejections: [...result.rejections] }),
     }
 
     current = commit(current, { type: 'APPEND_TURN', at: input.at, turn })
-    for (let i = 0; i < result.rejections.length; i += 1) {
+    for (let i = 0; i < misbehaviour.length; i += 1) {
       current = commit(current, { type: 'RECORD_REJECTION', at: input.at })
     }
 
@@ -253,6 +261,22 @@ async function runTurnSafely(
  * exactly what an unknown id answers: 403 here would confirm the id exists,
  * which is the same leak wearing a smaller hat.
  */
+/**
+ * Whether "I'll step back" is already the agent's standing last word: walks
+ * back over agent turns (silent ones included) and stops at the first
+ * applicant turn — a person speaking always earns the notice again.
+ */
+function stepBackNoticeStanding(transcript: readonly Turn[]): boolean {
+  for (let i = transcript.length - 1; i >= 0; i -= 1) {
+    const turn = transcript[i]!
+    if (turn.role === 'applicant') return false
+    if (turn.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice')) {
+      return true
+    }
+  }
+  return false
+}
+
 function owned(id: string, ownerToken: string | null): Result<ApplicationState> {
   const existing = loadApplication(id)
   if (!existing || !ownsApplication(existing, ownerToken)) {

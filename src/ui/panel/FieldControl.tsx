@@ -1,7 +1,7 @@
 'use client'
 
 import { ZodEnum } from 'zod'
-import type { FieldDef } from '@/domain/field-def'
+import type { FieldDef, FieldOption } from '@/domain/field-def'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { COLOR } from '@/ui/theme/tokens'
 
@@ -28,6 +28,10 @@ export function fieldErrorId(fieldId: RequirementKey, scope?: string): string {
   return `${fieldInputId(fieldId, scope)}-error`
 }
 
+export function fieldHintId(fieldId: RequirementKey, scope?: string): string {
+  return `${fieldInputId(fieldId, scope)}-hint`
+}
+
 function inputTypeFor(type: FieldDef['type']): string {
   switch (type) {
     case 'date': return 'date'
@@ -39,8 +43,17 @@ function inputTypeFor(type: FieldDef['type']): string {
   }
 }
 
-function optionsFor(def: FieldDef): readonly string[] | null {
-  return def.validation instanceof ZodEnum ? def.validation.options : null
+/**
+ * The catalog's own option list wins: it carries a display label ("California")
+ * distinct from the stored code ("CA"). The Zod enum is the fallback for a
+ * field whose stored value is already the thing to show.
+ */
+function optionsFor(def: FieldDef): readonly FieldOption[] | null {
+  if (def.options) return def.options
+  if (def.validation instanceof ZodEnum) {
+    return def.validation.options.map((o: string) => ({ value: o, label: o }))
+  }
+  return null
 }
 
 type Props = {
@@ -58,12 +71,13 @@ type Props = {
 /** The element itself. Validation and draft state live in FieldInput. */
 export function FieldControl({ fieldId, def, draft, error, onText, onFiles, scope }: Props) {
   const options = optionsFor(def)
+  const describedBy = error !== null ? fieldErrorId(fieldId, scope) : ''
 
   const shared = {
     id: fieldInputId(fieldId, scope),
     name: fieldId,
     'aria-invalid': error !== null,
-    ...(error !== null && { 'aria-describedby': fieldErrorId(fieldId, scope) }),
+    ...(describedBy !== '' && { 'aria-describedby': describedBy }),
     style: {
       width: '100%', boxSizing: 'border-box' as const, padding: '8px 10px',
       fontSize: 15, color: COLOR.textPrimary, background: COLOR.surface,
@@ -86,9 +100,9 @@ export function FieldControl({ fieldId, def, draft, error, onText, onFiles, scop
   if (options) {
     return (
       <select {...shared} value={draft} onChange={(e) => onText(e.target.value)}>
-        <option value="">Choose one</option>
+        <option value="">{`Select ${def.label.toLowerCase()}…`}</option>
         {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
     )
@@ -99,6 +113,7 @@ export function FieldControl({ fieldId, def, draft, error, onText, onFiles, scop
       {...shared}
       type={inputTypeFor(def.type)}
       value={draft}
+      {...(def.example && { placeholder: def.example })}
       onChange={(e) => onText(e.target.value)}
     />
   )

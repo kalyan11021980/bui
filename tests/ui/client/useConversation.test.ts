@@ -98,8 +98,11 @@ describe('useConversation', () => {
     act(() => result.current.send('Hi'))
     await waitFor(() => expect(result.current.pending).toBe(false))
 
-    expect(result.current.turns).toHaveLength(1)
-    expect(result.current.turns[0]).toMatchObject({
+    // What was typed stays on screen — it was never delivered, so losing it
+    // as well as the reply would be the worst of both.
+    expect(result.current.turns.map((t) => t.role)).toEqual(['applicant', 'agent'])
+    expect(result.current.turns[0]).toMatchObject({ role: 'applicant', text: 'Hi' })
+    expect(result.current.turns[1]).toMatchObject({
       role: 'agent', voice: null, blocks: [{ kind: 'notice', copyId: 'degraded_notice' }],
     })
   })
@@ -114,7 +117,10 @@ describe('useConversation', () => {
     act(() => result.current.send('Hi'))
     await waitFor(() => expect(result.current.pending).toBe(false))
 
-    expect(result.current.turns).toEqual([])
+    // The applicant's own line stays; no agent turn is invented for it,
+    // because no vetted copy describes "closed" or "unknown owner".
+    expect(result.current.turns.filter((t) => t.role === 'agent')).toEqual([])
+    expect(result.current.turns.map((t) => t.text)).toEqual(['Hi'])
   })
 
   it("gives a locally-made turn its own seq space, so a retry after a failure can never collide", async () => {
@@ -142,7 +148,8 @@ describe('useConversation', () => {
 
     act(() => result.current.send('Hi'))
     await waitFor(() => expect(result.current.pending).toBe(false))
-    expect(result.current.turns).toHaveLength(1)
+    // The echo of what was typed, then the degraded notice — both local.
+    expect(result.current.turns).toHaveLength(2)
 
     act(() => result.current.send('Hi again'))
     await waitFor(() => expect(result.current.pending).toBe(false))
@@ -185,5 +192,40 @@ describe('useConversation', () => {
     expect(order.indexOf('panel-write-done')).toBeLessThan(
       order.findIndex((url) => url.endsWith('/turn')),
     )
+  })
+
+  describe('nudge', () => {
+    // Answers go in beside the agent, never through it, so a nudge carries no
+    // text — `applyTurn` appends no applicant turn for one, which is what
+    // keeps an empty bubble off the transcript.
+    it('posts a turn carrying no text', async () => {
+      const agentTurn: Turn = { seq: 1, at: AT, role: 'agent', voice: 'Next then.', blocks: [] }
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const after: ApplicationState = { ...state, transcript: [agentTurn] }
+      stubFetch(() => ({ status: 200, body: { state: after, turn: agentTurn } }))
+
+      const { result } = renderHook(
+        () => useConversation('app-1', OWNER, state, () => undefined, runNow),
+      )
+      act(() => result.current.nudge())
+      await waitFor(() => expect(result.current.pending).toBe(false))
+
+      const turnCall = calls.find((c) => c.url.endsWith('/turn'))
+      expect(turnCall?.body).toEqual({})
+      expect(result.current.turns).toEqual([agentTurn])
+    })
+
+    it('is refused while a turn is already in flight', async () => {
+      const state = createApplication('app-1', PROFILE, OWNER)
+      stubFetch(() => ({ status: 200, body: { state, turn: null } }))
+
+      const { result } = renderHook(
+        () => useConversation('app-1', OWNER, state, () => undefined, runNow),
+      )
+      act(() => { result.current.send('Hi'); result.current.nudge() })
+      await waitFor(() => expect(result.current.pending).toBe(false))
+
+      expect(calls.filter((c) => c.url.endsWith('/turn'))).toHaveLength(1)
+    })
   })
 })

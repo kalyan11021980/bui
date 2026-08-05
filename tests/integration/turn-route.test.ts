@@ -141,6 +141,49 @@ describe('POST /turn', () => {
     expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
   })
 
+  it('does not count a dropped re-ask toward panel-only — repetition is not misbehaviour', async () => {
+    seed()
+    // Every turn asks the same field: legitimate the first time, a dropped
+    // re-ask each turn after. A weak local model does exactly this, and it
+    // must not bench the agent the way inventing fields does.
+    for (let i = 0; i < 4; i += 1) await post('app-1', {})
+    expect(getApplication('app-1')?.orchestratorRejections).toBe(0)
+    const last = getApplication('app-1')?.transcript.at(-1)
+    expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
+  })
+
+  it('still audits a dropped re-ask on its turn', async () => {
+    seed()
+    await post('app-1', {})
+    await post('app-1', {})
+    const event = getAuditLog().entriesFor('app-1')
+      .filter((e) => e.kind === 'agent_turn').at(-1)
+    expect(event?.rejections).toEqual(['already_asked'])
+  })
+
+  it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
+    seed()
+    useModel(rejectedModel())
+    for (let i = 0; i < 5; i += 1) await post('app-1', {})
+    const transcript = getApplication('app-1')?.transcript ?? []
+    const notices = transcript.filter((t) =>
+      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
+    expect(notices).toHaveLength(1)
+    // The turns after it commit (they carry the audit trail) but show nothing.
+    expect(transcript.at(-1)?.blocks).toEqual([])
+  })
+
+  it('repeats the step-back notice when the applicant speaks again — a person is never ignored', async () => {
+    seed()
+    useModel(rejectedModel())
+    for (let i = 0; i < 4; i += 1) await post('app-1', {})
+    await post('app-1', { text: 'Hello? Are you there?' })
+    const transcript = getApplication('app-1')?.transcript ?? []
+    const notices = transcript.filter((t) =>
+      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
+    expect(notices).toHaveLength(2)
+  })
+
   it('returns a degraded notice when the model throws, leaving fields untouched', async () => {
     seed()
     applyAction('app-1', 'tok', {

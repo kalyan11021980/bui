@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
+import { ID_COUNTRIES, US_STATES, idCountrySchema, usStateSchema } from './geography'
 import { isoDate } from './schemas'
 
 export const IDENTITY_FIELDS: readonly FieldDef[] = [
@@ -77,10 +78,11 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     id: 'id_country',
     label: 'Country that issued your ID',
     type: 'select',
+    options: ID_COUNTRIES,
     section: 'identification',
     purpose: 'Sets which checks your ID has to pass',
     authority: 'FEDERAL_KYC',
-    validation: z.string().min(2, 'Select the issuing country'),
+    validation: idCountrySchema,
     // Only the MRZ carries a country code; a licence and a state ID print
     // nothing a strategy reads it from.
     derivableFrom: ['passport'],
@@ -90,10 +92,11 @@ export const IDENTITY_FIELDS: readonly FieldDef[] = [
     id: 'id_state',
     label: 'State that issued your ID',
     type: 'select',
+    options: US_STATES,
     section: 'identification',
     purpose: 'We check your ID against that state’s records',
     authority: 'STATE_DMV',
-    validation: z.string().length(2, 'Select the issuing state'),
+    validation: usStateSchema,
     // No derivableFrom: no strategy emits an issuing state, so claiming one
     // would promise a read that never happens.
     orchestratorVisible: true,

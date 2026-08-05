@@ -22,6 +22,14 @@ describe('TurnView — agent turns', () => {
     expect(container.querySelectorAll('p')).toHaveLength(1)
   })
 
+  it('renders nothing at all for an agent turn with no voice and no blocks', () => {
+    // A nudge turn whose every ask was already on screen ends up empty; it
+    // must leave no gap in the log, not a spaced empty div.
+    const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
+    const { container } = render(<TurnView turn={turn} state={state} {...handlers} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
   it('renders nothing in place of the voice when it is null — no placeholder, no empty bubble', () => {
     const turn: Turn = {
       seq: 1, at: AT, role: 'agent', voice: null, voiceDropped: 'lint',

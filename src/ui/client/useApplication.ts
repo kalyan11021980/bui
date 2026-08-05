@@ -45,6 +45,12 @@ export type UseApplication = {
   carry: CarryNotice | null
   /** Null until the application has started — see `ConversationShell`'s own prop. */
   ownerToken: string | null
+  /**
+   * How many times the panel has written something, only ever going up.
+   * Panel answers never pass through the agent, so this is the only signal
+   * that an answer landed — see `useIdleNudge`, its one consumer.
+   */
+  panelWrites: number
   confirm: (id: RequirementKey) => void
   change: (id: RequirementKey, value: unknown) => void
   clear: (id: RequirementKey) => void
@@ -77,6 +83,8 @@ export function useApplication(): UseApplication {
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
   const [carry, setCarry] = useState<CarryNotice | null>(null)
+  const [panelWrites, setPanelWrites] = useState(0)
+  const noteWrite = () => setPanelWrites((n) => n + 1)
 
   // Requests run one after another, so the server applies them in the order
   // they were made and the upload lands behind every answer that preceded it.
@@ -117,6 +125,9 @@ export function useApplication(): UseApplication {
     const result = applyCarry(applicationReducer(state, action), action.at)
     setState(result.state)
     setCarry(from ? carryNotice(from, result.applied) : null)
+    // Not counted for a SUBMIT: there is nothing left for the agent to move
+    // on to, and the application is closed to turns anyway.
+    if (action.type !== 'SUBMIT') noteWrite()
 
     // Only the action itself goes up: the server runs the same carry rules on
     // the same state, and sending its results too would double them.
@@ -176,11 +187,13 @@ export function useApplication(): UseApplication {
       setState(result.value.state)
       setCarry(null)
       setNotice(readNotice(result.value))
+      // A read that filled eight answers is the largest panel write there is.
+      noteWrite()
     })
   }
 
   return {
-    state, documents: docImages, notice, outOfStep, carry,
+    state, documents: docImages, notice, outOfStep, carry, panelWrites,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),

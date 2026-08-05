@@ -6,10 +6,31 @@ import type { Section } from './section'
 export type FieldType =
   | 'text' | 'date' | 'select' | 'phone' | 'address' | 'file' | 'taxid'
 
+/**
+ * One choice in a `select`. Kept separate from the Zod enum because what is
+ * stored and what is read are not the same string: a state is stored as "CA"
+ * (the DMV's code, and what `validation` accepts) and shown as "California".
+ */
+export type FieldOption = {
+  value: string
+  label: string
+}
+
 type FieldDefBase<T> = {
   id: FieldId
   label: string
   type: FieldType
+  /**
+   * The choices, when there are any. A `select` without this renders as a
+   * plain text box — so the absence of a confirmed option list shows up as
+   * an honest text field rather than a dropdown that looks broken.
+   */
+  options?: readonly FieldOption[]
+  /**
+   * A sample answer, shown as placeholder text. Never a real value, and
+   * never something that could be mistaken for one already entered.
+   */
+  example?: string
   /** What this is FOR, in the user's terms. Required. */
   purpose: string
   /** WHO requires it. Required. */

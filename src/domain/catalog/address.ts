@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
+import { US_STATES, usStateSchema } from './geography'
 import { zipSchema } from './schemas'
 
 export { zipSchema } from './schemas'
@@ -34,10 +35,11 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     id: 'addr_state',
     label: 'State',
     type: 'select',
+    options: US_STATES,
     section: 'address',
     purpose: 'Bidding rules and required documents differ by state',
     authority: 'STATE_DEALER_BOARD',
-    validation: z.string().length(2, 'Select your state'),
+    validation: usStateSchema,
     derivableFrom: ['drivers_license', 'state_id'],
     orchestratorVisible: true,
     neverBulkConfirm: true,

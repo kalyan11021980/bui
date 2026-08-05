@@ -18,6 +18,13 @@ export type OrchestratorConfig =
 
 const PROVIDERS = new Set(['local', 'anthropic'])
 
+/**
+ * The provider name, and so the key its per-call options must be filed under.
+ * Exported because `service.ts` has to name it too, and a mismatch would be
+ * silent — the options would just never reach the model.
+ */
+export const LOCAL_PROVIDER_NAME = 'orchestrator-local'
+
 export function readConfig(env: Record<string, string | undefined>): OrchestratorConfig {
   const provider = env.ORCHESTRATOR_PROVIDER ?? 'local'
   if (!PROVIDERS.has(provider)) {
@@ -48,7 +55,7 @@ export function resolveModel(env: Record<string, string | undefined>): LanguageM
     return createAnthropic({ apiKey: config.apiKey })(config.modelId)
   }
   return createOpenAICompatible({
-    name: 'orchestrator-local',
+    name: LOCAL_PROVIDER_NAME,
     baseURL: `${config.endpoint}/v1`,
   })(config.modelId)
 }

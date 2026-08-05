@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import { documentsToUpload } from '@/domain/requirements/documents'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
@@ -20,9 +20,23 @@ const notice: React.CSSProperties = {
   color: COLOR.textPrimary,
 }
 
+/**
+ * The panel is the whole form on one surface. It is a debug view now, not the
+ * product: the chat is what the applicant registers through, and two live
+ * renderers of the same field put the same question on screen twice.
+ */
+function useDebug(): boolean {
+  const [debug, setDebug] = useState(false)
+  useEffect(() => {
+    setDebug(new URLSearchParams(window.location.search).has('debug'))
+  }, [])
+  return debug
+}
+
 export default function Page() {
   const app = useApplication()
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const debug = useDebug()
   const state = app.state
 
   if (!state) {
@@ -44,23 +58,8 @@ export default function Page() {
     app.submit()
   }
 
-  // Each named by what it is: asking a passport holder to choose "passport"
-  // again is a question we already have the answer to, and a dealer is not
-  // asked for a licence they never said they hold.
-  const docTypes = documentsToUpload(state.profile)
-
   return (
     <main style={{ padding: 24 }}>
-      {docTypes.map((docType) => (
-        <DocumentUpload
-          key={docType}
-          docType={docType}
-          onRead={(image) => app.readDocument(docType, image)}
-          onChoose={app.forgetDocumentNotice}
-          disabled={closed}
-        />
-      ))}
-
       {app.notice && (
         <p role="status" style={{ ...notice, background: COLOR.surface }}>
           {app.notice}
@@ -74,21 +73,39 @@ export default function Page() {
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
-        <ApplicationPanel
-          state={state}
-          onSubmit={submit}
-          {...(!closed && {
-            onConfirm: app.confirm,
-            // "Fix this" moves the caret rather than mutating: the value is
-            // already editable in place.
-            onEdit: revealField,
-            onChange: app.change,
-            onClear: app.clear,
-            onProfileChange: app.updateProfile,
-          })}
-          {...(app.carry && !closed && { carry: app.carry })}
-          documents={app.documents}
-        />
+        {debug && (
+          <div>
+            {/* Was rendered at the top of the page, above the panel heading
+                and outside any container. It belongs with the form it feeds. */}
+            {documentsToUpload(state.profile).map((docType) => (
+              <DocumentUpload
+                key={docType}
+                docType={docType}
+                onRead={(image) => app.readDocument(docType, image)}
+                onChoose={app.forgetDocumentNotice}
+                disabled={closed}
+              />
+            ))}
+          </div>
+        )}
+
+        {debug && (
+          <ApplicationPanel
+            state={state}
+            onSubmit={submit}
+            {...(!closed && {
+              onConfirm: app.confirm,
+              // "Fix this" moves the caret rather than mutating: the value is
+              // already editable in place.
+              onEdit: revealField,
+              onChange: app.change,
+              onClear: app.clear,
+              onProfileChange: app.updateProfile,
+            })}
+            {...(app.carry && !closed && { carry: app.carry })}
+            documents={app.documents}
+          />
+        )}
 
         <ConversationShell
           applicationId={state.id}
@@ -100,6 +117,7 @@ export default function Page() {
           onReadDocument={app.readDocument}
           onState={app.adoptTurnState}
           runSerialized={app.runSerialized}
+          panelWrites={app.panelWrites}
         />
       </div>
 

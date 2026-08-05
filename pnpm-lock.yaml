@@ -14,6 +14,12 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^3
         version: 3.0.20(zod@3.25.76)
+      '@openuidev/lang-core':
+        specifier: 0.2.10
+        version: 0.2.10(zod@3.25.76)
+      '@openuidev/react-lang':
+        specifier: 0.2.10
+        version: 0.2.10(react@19.2.8)(zod@3.25.76)
       ai:
         specifier: ^7
         version: 7.0.48(zod@3.25.76)
@@ -583,6 +589,28 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@openuidev/lang-core@0.2.10':
+    resolution: {integrity: sha512-GeLoP4S+1e7IHAz2a4Fl9+Q+boiyTXpXtdUPI+PN3ml+834q35TCQasm/+s6NW+79FRmyiR8F5xJtoLsH0kGjQ==}
+    peerDependencies:
+      '@modelcontextprotocol/sdk': '>=1.0.0'
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@modelcontextprotocol/sdk':
+        optional: true
+
+  '@openuidev/observability@0.0.2':
+    resolution: {integrity: sha512-uNtO4VGGwcL8Lg1L+9a8JCpee0dOm0djIjItxtGpUPkZNUwzpMQX6mQ4YCtA9Hho4VuqZgHBo1ON8FjsLbNMHg==}
+
+  '@openuidev/react-lang@0.2.10':
+    resolution: {integrity: sha512-CLd5rhJwy9hlMQoeySAwnHu8qb3lolSvW+LdZTGu7pVm7ipnXAwaT34qsDFrsUSBEsu73UGNedlId7mRVUV/uw==}
+    peerDependencies:
+      '@modelcontextprotocol/sdk': '>=1.0.0'
+      react: ^18.3.1 || ^19.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@modelcontextprotocol/sdk':
+        optional: true
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -1837,6 +1865,19 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@15.5.22':
     optional: true
+
+  '@openuidev/lang-core@0.2.10(zod@3.25.76)':
+    dependencies:
+      zod: 3.25.76
+
+  '@openuidev/observability@0.0.2': {}
+
+  '@openuidev/react-lang@0.2.10(react@19.2.8)(zod@3.25.76)':
+    dependencies:
+      '@openuidev/lang-core': 0.2.10(zod@3.25.76)
+      '@openuidev/observability': 0.0.2
+      react: 19.2.8
+      zod: 3.25.76
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 

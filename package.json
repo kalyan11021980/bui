@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "^7",
     "@ai-sdk/anthropic": "^4",
     "@ai-sdk/openai-compatible": "^3",
+    "@openuidev/lang-core": "0.2.10",
+    "@openuidev/react-lang": "0.2.10",
+    "ai": "^7",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

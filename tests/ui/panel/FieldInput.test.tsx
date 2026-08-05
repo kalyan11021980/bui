@@ -62,11 +62,43 @@ describe('FieldInput — the panel accepts data', () => {
     }
   })
 
-  it('falls back to a text input for a select-typed field whose schema is not an enum', () => {
-    // addr_state is type 'select' but validated as a two-letter string; there
-    // is no enumerated list to offer, so inventing one would be a lie.
+  it('gives addr_state a real list, with the name shown and the code stored', () => {
     render(<FieldRow fieldId="addr_state" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
-    expect(control(/^state$/i).tagName).toBe('INPUT')
+    const select = control(/^state$/i)
+    expect(select.tagName).toBe('SELECT')
+    // The DMV's code is what gets stored; the applicant reads the state name.
+    const option = screen.getByRole('option', { name: 'Georgia' }) as HTMLOptionElement
+    expect(option.value).toBe('GA')
+  })
+
+  // The predecessor of this test asserted a hint reading "in your own words —
+  // there is no list to pick from", rendered on five fields including the two
+  // that ask which state and country issued your ID. Both have real lists;
+  // apologising for a missing dropdown on a field that should have one reads
+  // as broken software, so the lists were added and the hint deleted.
+  it('gives id_country a real list keyed by the code a passport MRZ prints', () => {
+    render(<FieldRow fieldId="id_country" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    expect(control(/country that issued/i).tagName).toBe('SELECT')
+    const option = screen.getByRole('option', { name: 'Netherlands' }) as HTMLOptionElement
+    expect(option.value).toBe('NLD')
+  })
+
+  it('leaves a genuinely list-less field as a plain box, with an example, not an apology', () => {
+    render(<FieldRow fieldId="primary_activity" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    const input = control(/primary activity/i)
+    expect(input.tagName).toBe('INPUT')
+    expect(input.getAttribute('placeholder')).toBe('Rebuilding and reselling salvage cars')
+    expect(screen.queryByText(/in your own words/i)).not.toBeInTheDocument()
+  })
+
+  it('offers no such hint where there is a real list to choose from', () => {
+    render(<FieldRow fieldId="license_type" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    expect(screen.queryByText(/in your own words/i)).not.toBeInTheDocument()
+  })
+
+  it('offers no such hint for a plain text field — it is not news that text is text', () => {
+    render(<FieldRow fieldId="first_name" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    expect(screen.queryByText(/in your own words/i)).not.toBeInTheDocument()
   })
 
   it('reports what the user typed to the caller', async () => {

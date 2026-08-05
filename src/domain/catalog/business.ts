@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
+import { US_STATES, usStateSchema } from './geography'
 import { zipSchema } from './address'
 import { phoneSchema } from './contact'
 
@@ -49,10 +50,11 @@ export const BUSINESS_FIELDS: readonly FieldDef[] = [
     id: 'biz_addr_state',
     label: 'Business state',
     type: 'select',
+    options: US_STATES,
     section: 'business',
     purpose: 'Determines which dealer license we need from you',
     authority: 'STATE_DEALER_BOARD',
-    validation: z.string().length(2, 'Select a state'),
+    validation: usStateSchema,
     derivableFrom: ['dealer_license'],
     orchestratorVisible: true,
   }),

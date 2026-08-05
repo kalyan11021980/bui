@@ -134,7 +134,7 @@ function completed(): ApplicationState {
     ['primary_activity', 'dealer'], ['preferred_language', 'English'],
     ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
     ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'], ['id_images', ['front.png']],
-    ['id_country', 'US'], ['id_state', 'GA'],
+    ['id_country', 'USA'], ['id_state', 'GA'],
     ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
     ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
   ]
@@ -146,6 +146,10 @@ function completed(): ApplicationState {
 }
 
 beforeEach(() => {
+  // The panel is a debug view now — the page renders it only behind ?debug.
+  // Everything below asserts on panel rows and the document dropzone, so it
+  // is the debug page under test here, not the applicant's chat.
+  window.history.replaceState({}, '', '/?debug')
   calls = []
   holdActions = null
   decoder.next = PREPARED

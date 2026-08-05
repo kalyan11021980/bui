@@ -176,6 +176,52 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
   })
 })
 
+describe('BlockView — field_ask, OCR-derived non-address field', () => {
+  function withField(fieldId: string, field: FieldState): ApplicationState {
+    return { ...state, fields: { ...state.fields, [fieldId]: field } }
+  }
+  const derivedDl: FieldState = {
+    value: 'A9999999', status: 'derived', provenance: { source: 'ocr' },
+  }
+
+  it('offers "Looks right", wired to CONFIRM — the only way a chat-only applicant can settle an OCR value', async () => {
+    // The screenshot bug: without this, a derived dl_number stays outstanding
+    // forever and the agent re-asks it on every nudge.
+    const onConfirm = vi.fn()
+    render(
+      <BlockView
+        seq={1} block={{ kind: 'field_ask', fieldId: 'dl_number' }}
+        state={withField('dl_number', derivedDl)}
+        onChange={vi.fn()} onClear={vi.fn()} onConfirm={onConfirm} onReadDocument={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Looks right' }))
+    expect(onConfirm).toHaveBeenCalledWith('dl_number')
+  })
+
+  it('offers no confirm button for a field with nothing entered yet', () => {
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'dl_number' }} state={state} {...handlers} />)
+    expect(screen.queryByRole('button', { name: 'Looks right' })).toBeNull()
+  })
+
+  it('offers no confirm button once the value is confirmed', () => {
+    const confirmed = withField('dl_number', {
+      value: 'A9999999', status: 'confirmed', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'dl_number' }} state={confirmed} {...handlers} />)
+    expect(screen.queryByRole('button', { name: 'Looks right' })).toBeNull()
+  })
+
+  it('keeps the still-current question, not "Looks right", for a derived address field', () => {
+    const ocrAddr = withField('addr_line1', {
+      value: '123 Main St', status: 'derived', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={ocrAddr} {...handlers} />)
+    expect(screen.getByRole('button', { name: 'Yes, still current' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Looks right' })).toBeNull()
+  })
+})
+
 describe('BlockView — rationale', () => {
   it("renders the field's purpose and authority verbatim, without an input control", () => {
     render(<BlockView seq={1} block={{ kind: 'rationale', fieldId: 'dl_number' }} state={state} {...handlers} />)

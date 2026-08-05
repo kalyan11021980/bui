@@ -88,7 +88,7 @@ async function submittedApp(): Promise<string> {
     ['primary_activity', 'dealer'], ['preferred_language', 'English'],
     ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
     ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'], ['id_images', ['front.png']],
-    ['id_country', 'US'], ['id_state', 'GA'],
+    ['id_country', 'USA'], ['id_state', 'GA'],
     ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
     ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
   ]

@@ -92,6 +92,10 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
       // §10.4: an OCR-derived address is asked about, never presented as
       // settled fact — regardless of how confident the read was.
       const askIfStillCurrent = def.section === 'address' && fieldState?.provenance?.source === 'ocr'
+      // Any other derived value still needs eyes, and the panel's "Looks
+      // right" lives behind ?debug now — without this the chat has no way to
+      // settle an OCR read, and the field stays outstanding forever.
+      const askToConfirm = !askIfStillCurrent && fieldState?.status === 'derived'
       return (
         // Mirrors FieldRow's own group/aria-describedby pairing, so the
         // rationale's id is not merely passed to Rationale but actually
@@ -134,6 +138,20 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
             onClear={onClear}
             scope={scope}
           />
+          {askToConfirm && (
+            <div style={{ margin: '6px 0' }}>
+              <button
+                type="button"
+                onClick={() => onConfirm(fieldId)}
+                style={{
+                  background: COLOR.primary, color: COLOR.surface,
+                  border: 'none', padding: '6px 12px', cursor: 'pointer',
+                }}
+              >
+                Looks right
+              </button>
+            </div>
+          )}
           <Rationale field={def} id={rationaleId} />
         </div>
       )

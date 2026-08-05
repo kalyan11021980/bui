@@ -25,6 +25,14 @@ describe('systemPrompt', () => {
   it('tells the model it never authors compliance copy', () => {
     expect(systemPrompt()).toMatch(/never/i)
   })
+
+  // Measured against the local model: nought of four turns called a tool
+  // without this, four of four with it. The blocks are what the applicant
+  // actually sees, so a turn that calls nothing is a wasted turn.
+  it('requires a tool call on every reply, and names the fallback tool', () => {
+    expect(systemPrompt()).toMatch(/every reply must include at least one tool call/i)
+    expect(systemPrompt()).toContain('askFor')
+  })
 })
 
 describe('messagesFor', () => {

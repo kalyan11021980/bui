@@ -100,7 +100,7 @@ describe('completing an application through the panel', () => {
       [/last name/i, 'Lovelace'],
       [/driver's license number/i, 'D1234567'],
       [/id expiration date/i, '2030-04-30'],
-      [/country that issued/i, 'US'],
+      [/country that issued/i, 'USA'],
       [/state that issued/i, 'GA'],
       [/date of birth/i, '1982-08-31'],
       [/^address$/i, '2345 Anywhere St'],
@@ -110,7 +110,11 @@ describe('completing an application through the panel', () => {
       [/mobile phone/i, '4045551234'],
     ]
     for (const [label, value] of answers) {
-      await userEvent.type(control(label), value)
+      const element = control(label)
+      // A select takes an option, not keystrokes — id_state, addr_state and
+      // id_country carry real option lists now.
+      if (element.tagName === 'SELECT') await userEvent.selectOptions(element, value)
+      else await userEvent.type(element, value)
     }
     await userEvent.upload(
       control(/photos of your id/i),

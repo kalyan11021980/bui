@@ -49,12 +49,19 @@ export type TurnOutcome = { state: ApplicationState; turn: Turn }
  * never a field value — the composer is for intent, and the route's schema
  * accepts nothing else.
  */
+/**
+ * `text` is omitted, not sent empty, for a nudge: the route's schema is strict
+ * and `applyTurn` appends an applicant turn only when there is text, so an
+ * empty string would be an empty bubble in the transcript.
+ */
 export function sendTurn(
   id: string,
   ownerToken: string | null,
-  text: string,
+  text: string | null,
 ): Promise<ApiResult<TurnOutcome>> {
-  return post<TurnOutcome>(`/api/application/${id}/turn`, ownerToken, { text })
+  return post<TurnOutcome>(
+    `/api/application/${id}/turn`, ownerToken, text === null ? {} : { text },
+  )
 }
 
 /**
