@@ -104,6 +104,7 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
           role="group"
           aria-label={label}
           aria-describedby={rationaleId}
+          className="rounded-xl border border-divider bg-surface p-4 shadow-card"
           style={{ margin: '10px 0' }}
         >
           <label htmlFor={fieldInputId(fieldId, scope)} style={labelStyle}>
@@ -165,21 +166,23 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
     case 'document_request': {
       const { docType } = block
       return (
-        <DocumentUpload
-          docType={docType}
-          onRead={(image) => onReadDocument(docType, image)}
-          scope={scope}
-        />
+        <div className="rounded-xl border border-divider bg-surface p-4 shadow-card">
+          <DocumentUpload
+            docType={docType}
+            onRead={(image) => onReadDocument(docType, image)}
+            scope={scope}
+          />
+        </div>
       )
     }
 
     case 'orientation': {
       const { done, total } = block
-      return <p style={noticeStyle}>{done} of {total} done</p>
+      return <p className="m-0 text-[13px] text-text-secondary">{done} of {total} done</p>
     }
 
     case 'notice': {
-      return <p style={noticeStyle}>{vettedCopy(block.copyId)}</p>
+      return <p className="m-0 text-[13px] text-text-secondary">{vettedCopy(block.copyId)}</p>
     }
 
     default: {

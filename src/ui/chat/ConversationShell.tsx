@@ -45,10 +45,6 @@ const shellStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
-const openingStyle: React.CSSProperties = {
-  margin: '0 0 12px', fontSize: 15, lineHeight: 1.55, color: COLOR.textPrimary,
-}
-
 /** Grows with the conversation; the composer below it never moves off-screen. */
 const logStyle: React.CSSProperties = {
   flex: 1, display: 'flex', flexDirection: 'column',
@@ -65,10 +61,6 @@ const footerStyle: React.CSSProperties = {
 
 const composerRowStyle: React.CSSProperties = {
   display: 'flex', gap: 8, margin: 0,
-}
-
-const thinkingStyle: React.CSSProperties = {
-  margin: '8px 0', fontSize: 14, color: COLOR.textSecondary,
 }
 
 const composerStyle: React.CSSProperties = {
@@ -130,7 +122,7 @@ export function ConversationShell({
   return (
     <section aria-label="Registration agent" style={shellStyle}>
       {vettedCopy('opening_beat').split('\n\n').map((paragraph, index) => (
-        <p key={index} style={openingStyle}>{paragraph}</p>
+        <p key={index} className="mb-3 text-[15px] leading-relaxed">{paragraph}</p>
       ))}
 
       {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
@@ -153,7 +145,7 @@ export function ConversationShell({
           sake: a turn is one to ten seconds, and an empty screen after the
           composer clears reads as an app that dropped what you said. */}
       {pending && (
-        <p role="status" style={thinkingStyle}>
+        <p role="status" className="my-2 text-[13px] text-text-secondary">
           <span aria-hidden="true" style={{ letterSpacing: 2 }}>•••</span>{' '}
           Thinking…
         </p>
