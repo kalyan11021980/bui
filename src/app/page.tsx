@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import { documentsToUpload } from '@/domain/requirements/documents'
+import { AppHeader } from '@/ui/chrome/AppHeader'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
 import { useApplication } from '@/ui/client/useApplication'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
@@ -41,9 +42,12 @@ export default function Page() {
 
   if (!state) {
     return (
-      <main style={{ padding: 24 }}>
-        <p role="status" style={notice}>{app.notice ?? STARTING}</p>
-      </main>
+      <>
+        <AppHeader />
+        <main style={{ padding: 24 }}>
+          <p role="status" style={notice}>{app.notice ?? STARTING}</p>
+        </main>
+      </>
     )
   }
 
@@ -59,84 +63,87 @@ export default function Page() {
   }
 
   return (
-    <main style={{ padding: 24 }}>
-      {app.notice && (
-        <p role="status" style={{ ...notice, background: COLOR.surface }}>
-          {app.notice}
-        </p>
-      )}
-
-      {app.outOfStep && (
-        <p role="alert" style={{ ...notice, background: COLOR.errorSurface }}>
-          {OUT_OF_STEP}
-        </p>
-      )}
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
-        {debug && (
-          <div>
-            {/* Was rendered at the top of the page, above the panel heading
-                and outside any container. It belongs with the form it feeds. */}
-            {documentsToUpload(state.profile).map((docType) => (
-              <DocumentUpload
-                key={docType}
-                docType={docType}
-                onRead={(image) => app.readDocument(docType, image)}
-                onChoose={app.forgetDocumentNotice}
-                disabled={closed}
-              />
-            ))}
-          </div>
+    <>
+      <AppHeader />
+      <main style={{ padding: 24 }}>
+        {app.notice && (
+          <p role="status" style={{ ...notice, background: COLOR.surface }}>
+            {app.notice}
+          </p>
         )}
 
-        {debug && (
-          <ApplicationPanel
+        {app.outOfStep && (
+          <p role="alert" style={{ ...notice, background: COLOR.errorSurface }}>
+            {OUT_OF_STEP}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
+          {debug && (
+            <div>
+              {/* Was rendered at the top of the page, above the panel heading
+                  and outside any container. It belongs with the form it feeds. */}
+              {documentsToUpload(state.profile).map((docType) => (
+                <DocumentUpload
+                  key={docType}
+                  docType={docType}
+                  onRead={(image) => app.readDocument(docType, image)}
+                  onChoose={app.forgetDocumentNotice}
+                  disabled={closed}
+                />
+              ))}
+            </div>
+          )}
+
+          {debug && (
+            <ApplicationPanel
+              state={state}
+              onSubmit={submit}
+              {...(!closed && {
+                onConfirm: app.confirm,
+                // "Fix this" moves the caret rather than mutating: the value is
+                // already editable in place.
+                onEdit: revealField,
+                onChange: app.change,
+                onClear: app.clear,
+                onProfileChange: app.updateProfile,
+              })}
+              {...(app.carry && !closed && { carry: app.carry })}
+              documents={app.documents}
+            />
+          )}
+
+          <ConversationShell
+            applicationId={state.id}
+            ownerToken={app.ownerToken}
             state={state}
-            onSubmit={submit}
-            {...(!closed && {
-              onConfirm: app.confirm,
-              // "Fix this" moves the caret rather than mutating: the value is
-              // already editable in place.
-              onEdit: revealField,
-              onChange: app.change,
-              onClear: app.clear,
-              onProfileChange: app.updateProfile,
-            })}
-            {...(app.carry && !closed && { carry: app.carry })}
-            documents={app.documents}
+            onChange={app.change}
+            onClear={app.clear}
+            onConfirm={app.confirm}
+            onReadDocument={app.readDocument}
+            onState={app.adoptTurnState}
+            runSerialized={app.runSerialized}
+            panelWrites={app.panelWrites}
           />
+        </div>
+
+        {/* The attempt is always allowed; the answer is what is outstanding, or
+            that the application is closed. */}
+        {(attemptedSubmit || closed) && (
+          <p
+            role="status"
+            style={{
+              ...notice,
+              background: closed ? COLOR.successSurface : COLOR.errorSurface,
+            }}
+          >
+            {closed
+              ? 'Sent for review — these answers can no longer be changed. '
+                + 'Buyer Services will be in touch if anything needs correcting.'
+              : `Not sent yet — ${outstanding.length} ${outstanding.length === 1 ? 'answer is' : 'answers are'} still needed above.`}
+          </p>
         )}
-
-        <ConversationShell
-          applicationId={state.id}
-          ownerToken={app.ownerToken}
-          state={state}
-          onChange={app.change}
-          onClear={app.clear}
-          onConfirm={app.confirm}
-          onReadDocument={app.readDocument}
-          onState={app.adoptTurnState}
-          runSerialized={app.runSerialized}
-          panelWrites={app.panelWrites}
-        />
-      </div>
-
-      {/* The attempt is always allowed; the answer is what is outstanding, or
-          that the application is closed. */}
-      {(attemptedSubmit || closed) && (
-        <p
-          role="status"
-          style={{
-            ...notice,
-            background: closed ? COLOR.successSurface : COLOR.errorSurface,
-          }}
-        >
-          {closed
-            ? 'Sent for review — these answers can no longer be changed. '
-              + 'Buyer Services will be in touch if anything needs correcting.'
-            : `Not sent yet — ${outstanding.length} ${outstanding.length === 1 ? 'answer is' : 'answers are'} still needed above.`}
-        </p>
-      )}
-    </main>
+      </main>
+    </>
   )
 }

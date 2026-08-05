@@ -6,7 +6,7 @@
  * Bump COPY_VERSION on any edit: it is an input to the shown-copy hash, which
  * is what lets an attestation be reconstructed after a change.
  */
-export const COPY_VERSION = '1'
+export const COPY_VERSION = '2'
 
 export const ALL_COPY_IDS = [
   'opening_beat',
@@ -14,6 +14,9 @@ export const ALL_COPY_IDS = [
   'degraded_notice',
   'panel_only_notice',
   'address_still_current',
+  'header_reassurance',
+  'opening_upload_alternative',
+  'composer_placeholder',
 ] as const
 
 export type VettedCopyId = (typeof ALL_COPY_IDS)[number]
@@ -36,6 +39,14 @@ export const COPY: Readonly<Record<VettedCopyId, string>> = Object.freeze({
 
   address_still_current:
     'Is this still the address you want on file?',
+
+  header_reassurance:
+    'Checked by a person on Buyer Services — usually within 24 hours.',
+
+  opening_upload_alternative:
+    "Or just answer in chat — I'll ask for the photo when it's needed.",
+
+  composer_placeholder: 'Message your registration agent…',
 })
 
 export function vettedCopy(id: VettedCopyId): string {
