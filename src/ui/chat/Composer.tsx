@@ -69,6 +69,7 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
                 id={`composer-attach-${docType}`}
                 type="file"
                 accept="image/*"
+                aria-label={`Attach a ${DOC_LABEL[docType].toLowerCase()}`}
                 className="sr-only"
                 onChange={(e) => { void handleFile(docType, e.target.files?.[0]) }}
               />
@@ -94,6 +95,7 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
               id="composer-attach"
               type="file"
               accept="image/*"
+              aria-label={`Attach a ${DOC_LABEL[outstanding[0]!].toLowerCase()}`}
               className="sr-only"
               onChange={(e) => { void handleFile(outstanding[0]!, e.target.files?.[0]) }}
             />

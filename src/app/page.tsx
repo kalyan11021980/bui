@@ -9,17 +9,16 @@ import { useApplication } from '@/ui/client/useApplication'
 import { ApplicationPanel } from '@/ui/panel/ApplicationPanel'
 import { DocumentUpload } from '@/ui/panel/DocumentUpload'
 import { revealField } from '@/ui/panel/reveal'
-import { COLOR } from '@/ui/theme/tokens'
 
 const STARTING = 'Setting up your application…'
 const OUT_OF_STEP =
   'One of your answers has not been saved yet. Everything you typed is still on '
   + 'screen — check it before you send.'
 
-const notice: React.CSSProperties = {
-  maxWidth: 560, marginTop: 12, padding: '10px 14px', fontSize: 14,
-  color: COLOR.textPrimary,
-}
+/** Every page-level notice shares this shape; only the background says which kind. */
+const noticeClass = (bg: string) =>
+  `mx-auto mt-3 w-full max-w-[720px] rounded-xl border border-divider ${bg} `
+  + 'px-4 py-3 text-[13px] text-text-secondary shadow-card'
 
 /**
  * The panel is the whole form on one surface. It is a debug view now, not the
@@ -45,7 +44,7 @@ export default function Page() {
       <>
         <AppHeader />
         <main style={{ padding: 24 }}>
-          <p role="status" style={notice}>{app.notice ?? STARTING}</p>
+          <p role="status" className={noticeClass('bg-surface')}>{app.notice ?? STARTING}</p>
         </main>
       </>
     )
@@ -67,13 +66,13 @@ export default function Page() {
       <AppHeader />
       <main style={{ padding: 24 }}>
         {app.notice && (
-          <p role="status" style={{ ...notice, background: COLOR.surface }}>
+          <p role="status" className={noticeClass('bg-surface')}>
             {app.notice}
           </p>
         )}
 
         {app.outOfStep && (
-          <p role="alert" style={{ ...notice, background: COLOR.errorSurface }}>
+          <p role="alert" className={noticeClass('bg-error-surface')}>
             {OUT_OF_STEP}
           </p>
         )}
@@ -132,10 +131,7 @@ export default function Page() {
         {(attemptedSubmit || closed) && (
           <p
             role="status"
-            style={{
-              ...notice,
-              background: closed ? COLOR.successSurface : COLOR.errorSurface,
-            }}
+            className={noticeClass(closed ? 'bg-success-surface' : 'bg-error-surface')}
           >
             {closed
               ? 'Sent for review — these answers can no longer be changed. '

@@ -43,7 +43,10 @@ describe('Composer', () => {
 
   it('with one outstanding document, attach is a direct file input that routes it', async () => {
     const { onReadDocument } = renderComposer(createApplication('app-1', PROFILE, 'o'))
-    const input = screen.getByLabelText(/attach a photo of your driver's license/i)
+    // Both the label and the input now carry this aria-label (Chrome does
+    // not propagate a label's aria-label to its input), so the query is
+    // ambiguous without pinning it to the actual file input.
+    const input = screen.getByLabelText(/attach a photo of your driver's license/i, { selector: 'input' })
     await userEvent.upload(input, new File(['x'], 'dl.png', { type: 'image/png' }))
     expect(onReadDocument).toHaveBeenCalledWith('drivers_license', IMAGE)
   })
@@ -51,7 +54,7 @@ describe('Composer', () => {
   it('with several outstanding documents, attach opens a chooser', async () => {
     const { onReadDocument } = renderComposer(createApplication('app-1', DEALER_PROFILE, 'o'))
     await userEvent.click(screen.getByRole('button', { name: /attach a document/i }))
-    const input = screen.getByLabelText(/attach a photo of your dealer license/i)
+    const input = screen.getByLabelText(/attach a photo of your dealer license/i, { selector: 'input' })
     await userEvent.upload(input, new File(['x'], 'dealer.png', { type: 'image/png' }))
     expect(onReadDocument).toHaveBeenCalledWith('dealer_license', IMAGE)
   })
