@@ -13,6 +13,7 @@ const FAILING: ReadonlyArray<[string, string]> = [
   ['I will askFor (your name) next.', 'tool_syntax'],
   ['[explain(dob)]', 'tool_syntax'],
   ['setProfile({ patch }) comes next.', 'tool_syntax'],
+  ['Askfor(first name) coming up.', 'tool_syntax'],
   ['You have 3 things left.', 'numeral'],
   ['Almost ninety percent done.', 'percentage'],
   ['This is 90% done.', 'percentage'],

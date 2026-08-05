@@ -17,7 +17,7 @@ const NUMERAL = /\p{Nd}/u
  * two only match with the paren flush against the name.
  */
 const TOOL_SYNTAX =
-  /\[\s*\w+\s*\(|\b(?:askFor|setProfile|requestDocument)\s*\(|\b(?:explain|orient)\(/
+  /\[\s*\w+\s*\(|\b(?:askfor|setprofile|requestdocument)\s*\(|\b(?:explain|orient)\(/i
 const PERCENTAGE = /%|\bpercent\b|\bper cent\b/i
 const STATUTE = /§|\bU\.?S\.?C\.?\b|\bC\.?F\.?R\.?\b|\bIRC\b|\bTitle\s+\p{Nd}/iu
 
