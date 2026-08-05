@@ -35,3 +35,17 @@ export async function judgeFile(
   if (band === 're-take') return { kind: 're-take' }
   return { kind: 'ok', image, notice: band === 'text-only' ? TEXT_ONLY : null }
 }
+
+/** The last mile every upload surface repeats: judge, notice, deliver. */
+export async function intakeFile(
+  file: File,
+  setNotice: (notice: string | null) => void,
+  deliver: (image: PreparedImage) => void,
+  prepare?: (f: File) => Promise<PreparedImage>,
+): Promise<void> {
+  const verdict = await judgeFile(file, prepare)
+  if (verdict.kind === 'unopenable') { setNotice(UNOPENABLE); return }
+  if (verdict.kind === 're-take') { setNotice(TOO_SMALL); return }
+  setNotice(verdict.notice)
+  deliver(verdict.image)
+}

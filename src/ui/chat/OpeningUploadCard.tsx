@@ -6,7 +6,7 @@ import type { DocType } from '@/domain/field-id'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import { documentsToUpload } from '@/domain/requirements/documents'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
-import { DOC_LABEL, TOO_SMALL, UNOPENABLE, judgeFile } from '@/ui/upload/intake'
+import { DOC_LABEL, intakeFile } from '@/ui/upload/intake'
 
 type Props = {
   state: ApplicationState
@@ -32,11 +32,7 @@ export function OpeningUploadCard({ state, onReadDocument, prepare }: Props) {
   const handle = async (file: File | undefined) => {
     if (!file) return
     setNotice(null)
-    const verdict = await judgeFile(file, prepare)
-    if (verdict.kind === 'unopenable') { setNotice(UNOPENABLE); return }
-    if (verdict.kind === 're-take') { setNotice(TOO_SMALL); return }
-    setNotice(verdict.notice)
-    onReadDocument(docType, verdict.image)
+    await intakeFile(file, setNotice, (image) => onReadDocument(docType, image), prepare)
   }
 
   return (

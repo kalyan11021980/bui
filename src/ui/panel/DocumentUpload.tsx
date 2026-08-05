@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { DocType } from '@/domain/field-id'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import { COLOR } from '@/ui/theme/tokens'
-import { DOC_LABEL, TOO_SMALL, UNOPENABLE, judgeFile } from '@/ui/upload/intake'
+import { DOC_LABEL, intakeFile } from '@/ui/upload/intake'
 import type { PreparedImage } from './prepare-image'
 
 type Props = {
@@ -35,11 +35,7 @@ export function DocumentUpload({
     if (!file) return
     setNotice(null)
     onChoose?.()
-    const verdict = await judgeFile(file, prepare)
-    if (verdict.kind === 'unopenable') { setNotice(UNOPENABLE); return }
-    if (verdict.kind === 're-take') { setNotice(TOO_SMALL); return }
-    setNotice(verdict.notice)
-    onRead(verdict.image)
+    await intakeFile(file, setNotice, onRead, prepare)
   }
 
   return (
