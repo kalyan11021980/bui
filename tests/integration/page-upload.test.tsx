@@ -185,9 +185,15 @@ beforeEach(() => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
+// The debug panel's own DocumentUpload input — id="upload-<docType>", never
+// scoped. The chat composer's attach control now answers to the same label
+// text when exactly one document is outstanding (§Task 5), so a bare
+// getByLabelText(/photo of your/i) is ambiguous; this is the debug panel's.
+const PANEL_UPLOAD = { selector: 'input[id^="upload-"]' }
+
 const uploadPhoto = async () =>
   userEvent.upload(
-    screen.getByLabelText(/photo of your/i),
+    screen.getByLabelText(/photo of your/i, PANEL_UPLOAD),
     new File(['x'], 'licence.png', { type: 'image/png' }),
   )
 
@@ -226,10 +232,10 @@ describe('the page', () => {
     await screen.findByRole('region', { name: /your application/i })
 
     await userEvent.selectOptions(screen.getByLabelText(/id form/i), 'passport')
-    expect(screen.getByLabelText(/photo of your passport/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/photo of your passport/i, PANEL_UPLOAD)).toBeInTheDocument()
 
     await userEvent.upload(
-      screen.getByLabelText(/photo of your passport/i),
+      screen.getByLabelText(/photo of your passport/i, PANEL_UPLOAD),
       new File(['x'], 'passport.png', { type: 'image/png' }),
     )
     await waitFor(() => expect(uploads()).toHaveLength(1))
@@ -636,7 +642,7 @@ describe('an application that has been sent for review', () => {
     render(<Page />)
     await screen.findByText(/sent for review/i)
 
-    expect(screen.getByLabelText(/photo of your/i)).toBeDisabled()
+    expect(screen.getByLabelText(/photo of your/i, PANEL_UPLOAD)).toBeDisabled()
   })
 })
 

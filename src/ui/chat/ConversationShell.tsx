@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import { useIdleNudge } from '@/ui/client/useIdleNudge'
-import { COLOR } from '@/ui/theme/tokens'
 import type { BlockHandlers } from './blocks'
+import { Composer } from './Composer'
 import { OpeningUploadCard } from './OpeningUploadCard'
 import { Suggestions } from './Suggestions'
 import { TurnView } from './TurnView'
@@ -52,25 +51,6 @@ const logStyle: React.CSSProperties = {
 }
 
 /**
- * Suggestions and composer travel together. Sticky separately, the composer
- * scrolled over the chips and cut the last one in half.
- */
-const footerStyle: React.CSSProperties = {
-  position: 'sticky', bottom: 0, display: 'flex', flexDirection: 'column',
-  gap: 8, paddingBottom: 20, background: COLOR.page,
-}
-
-const composerRowStyle: React.CSSProperties = {
-  display: 'flex', gap: 8, margin: 0,
-}
-
-const composerStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 14px', fontSize: 15,
-  color: COLOR.textPrimary, background: COLOR.surface,
-  border: `1px solid ${COLOR.border}`, borderRadius: 20,
-}
-
-/**
  * The opening beat, the turns, the composer. The opening beat is fixed
  * vetted copy — no turn, no fetch — so a cold or unreachable model never
  * costs the applicant the introduction; everything below it comes from
@@ -82,7 +62,6 @@ export function ConversationShell({
   const { turns, pending, send, nudge } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
-  const [draft, setDraft] = useState('')
   const closed = state.submittedAt !== null
   // A field_ask block from an earlier turn stays on screen after submission —
   // history is not pruned — and the reducer refuses every change once
@@ -110,15 +89,6 @@ export function ConversationShell({
   ))
   const worthNudging = suggestible.some((id) => !askedOnScreen.has(id))
   useIdleNudge(panelWrites, sendable && worthNudging, nudge)
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!sendable) return
-    const text = draft.trim()
-    if (text === '') return
-    setDraft('')
-    send(text)
-  }
 
   return (
     <section aria-label="Registration agent" style={shellStyle}>
@@ -154,35 +124,19 @@ export function ConversationShell({
         </p>
       )}
 
-      <div style={footerStyle}>
+      <div className="sticky bottom-0 flex flex-col gap-2 bg-page pb-5">
         <Suggestions
           fieldIds={suggestible}
           disabled={!sendable}
           onPick={send}
         />
 
-        <form onSubmit={submit} style={composerRowStyle}>
-        <label htmlFor="chat-composer" style={{ position: 'absolute', left: -9999 }}>
-          Tell the agent something
-        </label>
-        <input
-          id="chat-composer"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          style={composerStyle}
+        <Composer
+          sendable={sendable}
+          onSend={send}
+          state={state}
+          onReadDocument={onReadDocument}
         />
-        <button
-          type="submit"
-          aria-disabled={!sendable || draft.trim() === ''}
-          style={{
-            background: COLOR.primary, color: COLOR.surface, border: 'none',
-            padding: '6px 18px', borderRadius: 20, cursor: 'pointer',
-            opacity: !sendable || draft.trim() === '' ? 0.6 : 1,
-          }}
-        >
-            Send
-          </button>
-        </form>
       </div>
     </section>
   )
