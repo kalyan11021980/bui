@@ -246,6 +246,20 @@ describe('runTurn', () => {
     })
   })
 
+  it('never says "keep going with what\'s left" when nothing is left', async () => {
+    // The completion moment: every field answered, the model says so with no
+    // tool calls. The fallback notice under that voice would contradict it.
+    let state = fresh()
+    for (const id of outstandingFields(state)) {
+      state = applicationReducer(state, {
+        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+      })
+    }
+    const { turn } = await run('Everything looks to be in order.', [], state)
+    expect(turn.voice).toBe('Everything looks to be in order.')
+    expect(turn.blocks).toEqual([])
+  })
+
   it('numbers the turn from the highest existing seq, not the transcript length', async () => {
     // Seqs start above the array length — a windowed transcript (fewer
     // entries than the record) must not renumber onto a seq that already exists.

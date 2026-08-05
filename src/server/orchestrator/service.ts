@@ -86,10 +86,14 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   // turn with only actions is still an empty screen without this fallback.
   // A dropped re-ask skips the notice — the model did not whiff, it repeated
   // itself — and the turn moves forward to the next unasked field instead.
-  // If everything outstanding is already on screen, the turn stays empty.
+  // Nothing outstanding skips it too: "keep going with what's left" under a
+  // completion voice is false copy.
   if (blocks.length === 0) {
-    if (!droppedReAsk) blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
-    const next = outstandingFields(request.state).find((id) => !asked.has(id))
+    const outstanding = outstandingFields(request.state)
+    if (!droppedReAsk && outstanding.length > 0) {
+      blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
+    }
+    const next = outstanding.find((id) => !asked.has(id))
     if (next) blocks.push({ kind: 'field_ask', fieldId: next })
   }
 
