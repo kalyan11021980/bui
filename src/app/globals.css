@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Values mirror src/ui/theme/tokens.ts — tests/ui/theme/token-parity.test.ts
+   fails if these drift. */
+@theme {
+  --color-*: initial;
+  --color-primary: #B82018;
+  --color-primary-disabled: #E0B0B0;
+  --color-success: #408030;
+  --color-success-surface: #E0E8D8;
+  --color-error: #E87830;
+  --color-error-surface: #F8E8D8;
+  --color-text-primary: #202020;
+  --color-text-secondary: #404040;
+  --color-text-muted: #A8A8A8;
+  --color-border: #C8C8C8;
+  --color-divider: #E0E0E0;
+  --color-page: #FAF9F7;
+  --color-surface: #FFFFFF;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05), 0 1px 3px rgb(0 0 0 / 0.04);
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}

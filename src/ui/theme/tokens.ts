@@ -17,7 +17,7 @@ export const COLOR = Object.freeze({
   textMuted: '#A8A8A8',
   border: '#C8C8C8',
   divider: '#E0E0E0',
-  page: '#F8F8F8',
+  page: '#FAF9F7',
   surface: '#FFFFFF',
 })
 
