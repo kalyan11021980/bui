@@ -439,30 +439,57 @@ describe('OpeningUploadCard', () => {
 Run: `pnpm test tests/ui/chat/OpeningUploadCard.test.tsx`
 Expected: FAIL — cannot resolve `@/ui/chat/OpeningUploadCard`.
 
-- [ ] **Step 3: Extract the intake module**
+- [ ] **Step 3: Vet the intake copy and extract the intake module**
 
-`src/ui/upload/intake.ts` — moved verbatim from `DocumentUpload.tsx`, plus the verdict function:
+Ruled 2026-08-05 (Kaly): the intake strings join the vetted catalog now, not the
+legal batch. In `src/domain/orchestrator/copy.ts` bump `COPY_VERSION` to `'3'`,
+extend `ALL_COPY_IDS` with `'upload_hint', 'upload_too_small',
+'upload_text_only', 'upload_unopenable', 'doc_label_drivers_license',
+'doc_label_state_id', 'doc_label_passport', 'doc_label_dealer_license',
+'doc_label_proof_of_residency'`, and add to `COPY` (words unchanged from what
+ships today — this is consolidation, not rewriting):
+
+```ts
+  upload_hint:
+    'Lay it flat and fill the frame. We read what we can and ask you about the rest.',
+  upload_too_small:
+    'That photo is too small to read. Take another with the document filling the frame.',
+  upload_text_only:
+    'We read it, but the photo is too small to show you where each answer came from.',
+  upload_unopenable:
+    'We could not open that photo. Try another, or answer the questions below yourself.',
+  doc_label_drivers_license: "Photo of your driver's license",
+  doc_label_state_id: 'Photo of your state ID',
+  doc_label_passport: 'Photo of your passport',
+  doc_label_dealer_license: 'Photo of your dealer license',
+  doc_label_proof_of_residency: 'Photo of your proof of address',
+```
+
+In `src/server/document-service.ts` (line 46 area) replace the literal
+too-small string with `vettedCopy('upload_too_small')` — same refusal, now one
+source. In `DocumentUpload.tsx` the hint paragraph becomes
+`{vettedCopy('upload_hint')}`.
+
+`src/ui/upload/intake.ts` — labels and notices resolved from the catalog, plus
+the verdict function:
 
 ```ts
 import type { DocType } from '@/domain/field-id'
 import { bandForWidth } from '@/domain/ocr/quality'
+import { vettedCopy } from '@/domain/orchestrator/copy'
 import { prepareImage, type PreparedImage } from '@/ui/panel/prepare-image'
 
 export const DOC_LABEL: Record<DocType, string> = {
-  drivers_license: "Photo of your driver's license",
-  state_id: 'Photo of your state ID',
-  passport: 'Photo of your passport',
-  dealer_license: 'Photo of your dealer license',
-  proof_of_residency: 'Photo of your proof of address',
+  drivers_license: vettedCopy('doc_label_drivers_license'),
+  state_id: vettedCopy('doc_label_state_id'),
+  passport: vettedCopy('doc_label_passport'),
+  dealer_license: vettedCopy('doc_label_dealer_license'),
+  proof_of_residency: vettedCopy('doc_label_proof_of_residency'),
 }
 
-/** Same words the route uses, because it is the same refusal. */
-export const TOO_SMALL =
-  'That photo is too small to read. Take another with the document filling the frame.'
-export const TEXT_ONLY =
-  'We read it, but the photo is too small to show you where each answer came from.'
-export const UNOPENABLE =
-  'We could not open that photo. Try another, or answer the questions below yourself.'
+export const TOO_SMALL = vettedCopy('upload_too_small')
+export const TEXT_ONLY = vettedCopy('upload_text_only')
+export const UNOPENABLE = vettedCopy('upload_unopenable')
 
 export type IntakeVerdict =
   | { kind: 'unopenable' }
@@ -486,7 +513,7 @@ export async function judgeFile(
 }
 ```
 
-Rewrite `DocumentUpload.tsx`'s `handle` to use it, deleting its local copies of `DOC_LABEL` and the three notices (import them instead — the rendered words must not change):
+Rewrite `DocumentUpload.tsx`'s `handle` to use it, deleting its local copies of `DOC_LABEL` and the three notices (import them from `@/ui/upload/intake` instead — the rendered words must not change, and panel tests asserting those words prove it):
 
 ```ts
   const handle = async (file: File | undefined) => {
@@ -555,7 +582,7 @@ export function OpeningUploadCard({ state, onReadDocument, prepare }: Props) {
     >
       <p className="m-0 text-[13px] font-semibold">{DOC_LABEL[docType]}</p>
       <p className="mb-3 mt-0.5 text-[12px] text-text-muted">
-        Lay it flat and fill the frame. We read what we can and ask you about the rest.
+        {vettedCopy('upload_hint')}
       </p>
       <label
         htmlFor="opening-upload"
@@ -578,8 +605,6 @@ export function OpeningUploadCard({ state, onReadDocument, prepare }: Props) {
   )
 }
 ```
-
-The hint line under the title is the same sentence `DocumentUpload` shows — it stays duplicated inline for now, matching the panel; it is queued in the legal copy batch with the rest.
 
 In `ConversationShell.tsx`, directly after the opening-beat paragraphs:
 
