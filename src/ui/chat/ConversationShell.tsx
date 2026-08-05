@@ -9,6 +9,7 @@ import { useConversation } from '@/ui/client/useConversation'
 import { useIdleNudge } from '@/ui/client/useIdleNudge'
 import { COLOR } from '@/ui/theme/tokens'
 import type { BlockHandlers } from './blocks'
+import { OpeningUploadCard } from './OpeningUploadCard'
 import { Suggestions } from './Suggestions'
 import { TurnView } from './TurnView'
 
@@ -124,6 +125,8 @@ export function ConversationShell({
       {vettedCopy('opening_beat').split('\n\n').map((paragraph, index) => (
         <p key={index} className="mb-3 text-[15px] leading-relaxed">{paragraph}</p>
       ))}
+
+      <OpeningUploadCard state={state} onReadDocument={onReadDocument} />
 
       {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
           whatever the applicant is doing, and must never steal focus. */}

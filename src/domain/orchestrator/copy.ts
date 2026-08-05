@@ -6,7 +6,7 @@
  * Bump COPY_VERSION on any edit: it is an input to the shown-copy hash, which
  * is what lets an attestation be reconstructed after a change.
  */
-export const COPY_VERSION = '2'
+export const COPY_VERSION = '3'
 
 export const ALL_COPY_IDS = [
   'opening_beat',
@@ -17,6 +17,15 @@ export const ALL_COPY_IDS = [
   'header_reassurance',
   'opening_upload_alternative',
   'composer_placeholder',
+  'upload_hint',
+  'upload_too_small',
+  'upload_text_only',
+  'upload_unopenable',
+  'doc_label_drivers_license',
+  'doc_label_state_id',
+  'doc_label_passport',
+  'doc_label_dealer_license',
+  'doc_label_proof_of_residency',
 ] as const
 
 export type VettedCopyId = (typeof ALL_COPY_IDS)[number]
@@ -47,6 +56,20 @@ export const COPY: Readonly<Record<VettedCopyId, string>> = Object.freeze({
     "Or just answer in chat — I'll ask for the photo when it's needed.",
 
   composer_placeholder: 'Message your registration agent…',
+
+  upload_hint:
+    'Lay it flat and fill the frame. We read what we can and ask you about the rest.',
+  upload_too_small:
+    'That photo is too small to read. Take another with the document filling the frame.',
+  upload_text_only:
+    'We read it, but the photo is too small to show you where each answer came from.',
+  upload_unopenable:
+    'We could not open that photo. Try another, or answer the questions below yourself.',
+  doc_label_drivers_license: "Photo of your driver's license",
+  doc_label_state_id: 'Photo of your state ID',
+  doc_label_passport: 'Photo of your passport',
+  doc_label_dealer_license: 'Photo of your dealer license',
+  doc_label_proof_of_residency: 'Photo of your proof of address',
 })
 
 export function vettedCopy(id: VettedCopyId): string {

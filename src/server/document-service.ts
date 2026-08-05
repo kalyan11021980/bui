@@ -13,6 +13,7 @@ import { extractFor, parseCandidates } from '@/domain/ocr/extract'
 import { respaceAddresses } from '@/domain/ocr/extract/aamva'
 import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
 import { bandForWidth, demoteForCardExtent, type QualityBand } from '@/domain/ocr/quality'
+import { vettedCopy } from '@/domain/orchestrator/copy'
 import { applyAction, getApplication, type Result } from './application-service'
 import { failure } from './http'
 import { imageSizeOf, MAX_IMAGE_BASE64_CHARS } from './image-size'
@@ -42,8 +43,6 @@ export type IngestOutcome = {
   readonly state: ApplicationState
 }
 
-const TOO_SMALL =
-  'That photo is too small to read. Take another with the document filling the frame.'
 const UNREADABLE = 'Upload a PNG or JPEG photo of the document.'
 const TOO_LARGE = 'That image is too large. Send one under 8 MB.'
 const DATA_URL =
@@ -76,7 +75,7 @@ export async function ingestDocument(
 
   const preflight = bandForWidth(imageSize.width)
   if (preflight === 're-take') {
-    return { ok: false, failure: failure('rejected', TOO_SMALL) }
+    return { ok: false, failure: failure('rejected', vettedCopy('upload_too_small')) }
   }
 
   const read = await readDocument(input.imageBase64, input.provider)
