@@ -90,8 +90,13 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
       const label = displayLabel(fieldId)
       const fieldState = state.fields[fieldId]
       // §10.4: an OCR-derived address is asked about, never presented as
-      // settled fact — regardless of how confident the read was.
-      const askIfStillCurrent = def.section === 'address' && fieldState?.provenance?.source === 'ocr'
+      // settled fact — regardless of how confident the read was. Only while
+      // still derived: "Yes, still current" confirms without erasing the OCR
+      // provenance, and a question that outlives its answer contradicts the
+      // answered line below.
+      const askIfStillCurrent = def.section === 'address'
+        && fieldState?.provenance?.source === 'ocr'
+        && fieldState?.status === 'derived'
       // Any other derived value still needs eyes, and the panel's "Looks
       // right" lives behind ?debug now — without this the chat has no way to
       // settle an OCR read, and the field stays outstanding forever.

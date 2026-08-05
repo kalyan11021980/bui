@@ -143,6 +143,18 @@ describe('BlockView — field_ask, OCR-derived address (automation-bias guard)',
     expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
   })
 
+  it('a confirmed OCR address stops asking and reads as answered — never both at once', () => {
+    // "Yes, still current" flips status to confirmed but leaves provenance
+    // 'ocr' by design. The question must collapse at that point: keeping it
+    // on screen beside an "answered" line is two contradicting messages.
+    const confirmedOcr = withField('addr_line1', {
+      value: '123 Main St', status: 'confirmed', provenance: { source: 'ocr' },
+    })
+    render(<BlockView seq={1} block={{ kind: 'field_ask', fieldId: 'addr_line1' }} state={confirmedOcr} {...handlers} />)
+    expect(screen.queryByText(vettedCopy('address_still_current'))).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(vettedCopy('field_confirmed'))
+  })
+
   it('does not ask the question for an address field the applicant typed themselves', () => {
     const typedState = withField('addr_line1', {
       value: '123 Main St', status: 'confirmed', provenance: { source: 'user' },
