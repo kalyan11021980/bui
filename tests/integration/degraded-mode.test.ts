@@ -192,4 +192,19 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
     expect(fieldRes.status).toBe(200)
     expect((await stateOf(id)).fields.first_name?.value).toBe('Ada')
   })
+
+  it('a dead model still presents the titled group', async () => {
+    const id = await newApp()
+    useModel(throwingModel())
+
+    // A fresh application owes 'profile' first; doneWith targets a later
+    // section so the plan returns straight to the group, not a gapped notice
+    // on top of the degraded one.
+    const res = await postTurn(id, { doneWith: 'contact' })
+    expect(res.status).toBe(200)
+    const { turn } = await res.json()
+
+    expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'degraded_notice' })
+    expect(turn.blocks[1]).toMatchObject({ kind: 'section_header', section: 'profile' })
+  })
 })

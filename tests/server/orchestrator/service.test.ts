@@ -17,8 +17,9 @@ const PROFILE = {
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license' as const,
 }
-// tax_id is only required for a business applicant — needed to exercise the
-// sensitive-field suppression, since explain(tax_id) is guard-rejected for PROFILE.
+// tax_id is only required for a business applicant — needed to exercise
+// sensitive-field suppression, since explain(tax_id) is only reachable once
+// tax_id is actually outstanding.
 const BUSINESS_PROFILE = { ...PROFILE, applicantType: 'business' as const }
 
 function fresh(): ApplicationState { return createApplication('app-1', PROFILE, 'tok') }
@@ -113,15 +114,22 @@ describe('runTurn', () => {
   })
 
   it('applies surviving calls even when a sibling was rejected', async () => {
-    const { turn, rejections } = await run('Sure.', [
-      { toolName: 'explain', input: { fieldId: 'first_name' } },
+    // Same setup as "falls back to the vetted line alone" below (blank text,
+    // a section already on screen so the planner adds nothing) — there, zero
+    // surviving calls leaves blocks empty and the fallback fires. Here one
+    // call survives, so its block must stand in and suppress the fallback,
+    // or "correctly withheld" and "never offered" look identical.
+    const state = answeredExcept(['addr_city'])
+    const presented: Turn = {
+      seq: 1, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 1 }],
+    }
+    const { turn, rejections } = await run('', [
+      { toolName: 'explain', input: { fieldId: 'addr_city' } },
       { toolName: 'requestDocument', input: { docType: 'proof_of_residency' } },
-    ])
-    expect(turn.blocks).toContainEqual({ kind: 'rationale', fieldId: 'first_name' })
+    ], state, [presented])
+    expect(turn.blocks).toEqual([{ kind: 'rationale', fieldId: 'addr_city' }])
     expect(rejections).toEqual(['document_not_required'])
-    // The fallback is for when NOTHING survives — a surviving call must
-    // suppress it, or "correctly withheld" and "never offered" look identical.
-    expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
   })
 
   it('never says "keep going with what\'s left" when nothing is left', async () => {
