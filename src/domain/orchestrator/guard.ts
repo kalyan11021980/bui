@@ -11,8 +11,7 @@ import { ALL_TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './tools'
 
 /**
  * The security boundary of phase 3: every code returned for refusing a tool
- * call — by this guard, or by the turn runner dropping a re-ask already on
- * screen. A model that misbehaves produces one of these, never a bad
+ * call. A model that misbehaves produces one of these, never a bad
  * application.
  */
 export type RejectionCode =
