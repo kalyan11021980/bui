@@ -334,3 +334,17 @@ describe('BlockView — orientation', () => {
     expect(screen.getByText(/3 of 10 done/i)).toBeInTheDocument()
   })
 })
+
+describe('BlockView — section_header', () => {
+  it('renders a section header as its label and progress', () => {
+    render(
+      <BlockView
+        block={{ kind: 'section_header', section: 'address', done: 1, total: 4 }}
+        state={state} seq={1}
+        onChange={handlers.onChange} onClear={handlers.onClear} onConfirm={handlers.onConfirm} onReadDocument={handlers.onReadDocument}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: 'Address' })).toBeInTheDocument()
+    expect(screen.getByText('1 of 4 answered')).toBeInTheDocument()
+  })
+})

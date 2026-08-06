@@ -70,4 +70,14 @@ describe('messagesFor', () => {
     expect(text).toContain('tax_id')
     expect(text).toContain('Taxpayer ID')
   })
+
+  it('describes a presented section to the model', () => {
+    const turn: Turn = {
+      seq: 1, at: '2026-08-03T00:00:00.000Z', role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'address', done: 1, total: 4 }],
+    }
+    const messages = messagesFor(view, [turn], null)
+    const assistant = messages.find((m) => m.role === 'assistant')
+    expect(assistant?.content).toContain('presented section: address (1 of 4 answered)')
+  })
 })

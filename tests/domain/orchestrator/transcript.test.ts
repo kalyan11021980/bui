@@ -82,4 +82,12 @@ describe('shownCopyMaterial', () => {
     const b = [{ kind: 'field_ask' as const, fieldId: 'last_name' }]
     expect(shownCopyMaterial(a, labelOf)).not.toBe(shownCopyMaterial(b, labelOf))
   })
+
+  it('folds a section header into the shown-copy material, label included', () => {
+    const material = shownCopyMaterial(
+      [{ kind: 'section_header', section: 'address', done: 1, total: 4 }],
+      () => 'unused',
+    )
+    expect(material).toBe('v6|section:address:Address:1/4')
+  })
 })

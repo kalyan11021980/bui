@@ -6,6 +6,7 @@ import type { DocType } from '@/domain/field-id'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import type { Block } from '@/domain/orchestrator/transcript'
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
+import { SECTION_LABEL } from '@/domain/section'
 import { DocumentUpload } from '@/ui/panel/DocumentUpload'
 import { fieldInputId } from '@/ui/panel/FieldControl'
 import { FieldInput } from '@/ui/panel/FieldInput'
@@ -198,6 +199,18 @@ export function BlockView({ block, state, seq, onChange, onClear, onConfirm, onR
 
     case 'notice': {
       return <p className="m-0 text-[13px] text-text-secondary">{vettedCopy(block.copyId)}</p>
+    }
+
+    case 'section_header': {
+      const { section, done, total } = block
+      return (
+        <div className="mt-4 mb-1">
+          <h3 className="m-0 text-[13px] font-bold uppercase tracking-wide">
+            {SECTION_LABEL[section]}
+          </h3>
+          <p className="m-0 text-[13px] text-text-secondary">{done} of {total} answered</p>
+        </div>
+      )
     }
 
     default: {

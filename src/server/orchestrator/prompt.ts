@@ -56,6 +56,8 @@ function describeBlocks(blocks: readonly Block[]): string {
       case 'document_request': return `requested document: ${b.docType}`
       case 'orientation': return 'showed progress'
       case 'notice': return `showed notice: ${b.copyId}`
+      case 'section_header':
+        return `presented section: ${b.section} (${b.done} of ${b.total} answered)`
     }
   })
   return `[${parts.join('; ')}]`
