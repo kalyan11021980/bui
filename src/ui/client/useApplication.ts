@@ -78,7 +78,10 @@ export function useApplication(): UseApplication {
   const [docImages, setDocImages] = useState<DocumentImages>({})
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
-  const [readingDocument, setReadingDocument] = useState(false)
+  // A count, not a flag: nothing here disables an upload input mid-read, so
+  // a second photo can be chosen while the first is still in flight — a flag
+  // would clear the moment either one settles, even with the other still open.
+  const [readingCount, setReadingCount] = useState(0)
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
   // Requests run one after another, so the server applies them in the order
@@ -153,9 +156,9 @@ export function useApplication(): UseApplication {
   const readDocument = (docType: DocType, image: PreparedImage) => {
     if (!state) return
     setNotice(READING)
-    // Set before the request is even queued, so the flag covers a wait
-    // behind an earlier write too, not just the fetch itself.
-    setReadingDocument(true)
+    // Incremented before the request is even queued, so the count covers a
+    // wait behind an earlier write too, not just the fetch itself.
+    setReadingCount((n) => n + 1)
 
     enqueue(async () => {
       try {
@@ -184,13 +187,13 @@ export function useApplication(): UseApplication {
         setCarry(null)
         setNotice(readNotice(result.value))
       } finally {
-        setReadingDocument(false)
+        setReadingCount((n) => n - 1)
       }
     })
   }
 
   return {
-    state, documents: docImages, notice, outOfStep, readingDocument, carry,
+    state, documents: docImages, notice, outOfStep, readingDocument: readingCount > 0, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),

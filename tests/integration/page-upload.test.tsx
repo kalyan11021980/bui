@@ -97,8 +97,11 @@ let calls: Call[]
 let respond: (call: Call) => { status: number; body: unknown }
 /** Set to hold every action response open until the test lets it go. */
 let holdActions: Promise<void> | null
-/** Set to hold every document-read response open until the test lets it go. */
-let holdDocuments: Promise<void> | null
+/**
+ * One entry per `/documents` call, consumed in call order — so two reads in
+ * flight at once can be released independently, not just held as a pair.
+ */
+let holdDocumentQueue: Array<Promise<void>>
 
 const OWNER = 'owner-token-1'
 
@@ -154,7 +157,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/?debug')
   calls = []
   holdActions = null
-  holdDocuments = null
+  holdDocumentQueue = []
   decoder.next = PREPARED
   respond = asServer
 
@@ -166,7 +169,10 @@ beforeEach(() => {
     }
     calls.push(call)
     if (holdActions && url.endsWith('/actions')) await holdActions
-    if (holdDocuments && url.endsWith('/documents')) await holdDocuments
+    if (url.endsWith('/documents')) {
+      const hold = holdDocumentQueue.shift()
+      if (hold) await hold
+    }
 
     // What the real server does with a caller who cannot produce the token:
     // 404, the same answer an id that does not exist gets. Every test below
@@ -394,7 +400,7 @@ describe('the page', () => {
     // so the in-flight window — including the queue wait, not just the fetch
     // itself — has something to assert on before it is let go.
     let release = () => undefined as void
-    holdDocuments = new Promise<void>((resolve) => { release = () => resolve() })
+    holdDocumentQueue = [new Promise<void>((resolve) => { release = () => resolve() })]
     respond = readNothing
 
     render(<Page />)
@@ -409,9 +415,56 @@ describe('the page', () => {
     await waitFor(() => expect(screen.queryByText(/reading your photo/i)).toBeNull())
   })
 
+  it('keeps the reading-photo line up while a second read overlaps the first', async () => {
+    // Reachable through an ordinary action: two documents are outstanding at
+    // once (licence + proof of address), and nothing here disables either
+    // input mid-read, so a second photo can be chosen before the first read
+    // has come back. A flag that only tracked "is any read open" (rather
+    // than counting them) would clear the moment the first one settles, even
+    // though the second is still running — this is the gap that closes.
+    let releaseA = () => undefined as void
+    const heldA = new Promise<void>((resolve) => { releaseA = () => resolve() })
+    let releaseB = () => undefined as void
+    const heldB = new Promise<void>((resolve) => { releaseB = () => resolve() })
+    holdDocumentQueue = [heldA, heldB]
+
+    let seenDocs = 0
+    respond = (call) => {
+      if (!call.url.endsWith('/documents')) return asServer(call)
+      seenDocs += 1
+      return seenDocs === 1
+        ? {
+            status: 200,
+            body: { band: 'full', documentId: 'doc-1', filled: ['dl_number'], state: withDlNumber(created()) },
+          }
+        : { status: 200, body: { band: 'full', documentId: 'doc-2', filled: [], state: created() } }
+    }
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await userEvent.click(screen.getByLabelText(/address differs from id/i))
+    const licenseInput = screen.getByLabelText(/photo of your driver's license/i, PANEL_UPLOAD)
+    const proofInput = screen.getByLabelText(/photo of your proof of address/i, PANEL_UPLOAD)
+
+    await userEvent.upload(licenseInput, new File(['x'], 'licence.png', { type: 'image/png' }))
+    expect(await screen.findByText(/reading your photo/i)).toBeInTheDocument()
+
+    // The second read starts before the first has resolved.
+    await userEvent.upload(proofInput, new File(['y'], 'bill.png', { type: 'image/png' }))
+
+    releaseA()
+    await screen.findByRole('group', { name: /driver's license number/i })
+    // A settled; B is still open — the line must not have cleared early.
+    expect(screen.getByText(/reading your photo/i)).toBeInTheDocument()
+
+    releaseB()
+    await waitFor(() => expect(screen.queryByText(/reading your photo/i)).toBeNull())
+  })
+
   it('clears the reading-photo status on a failed read too, not only a successful one', async () => {
     let release = () => undefined as void
-    holdDocuments = new Promise<void>((resolve) => { release = () => resolve() })
+    holdDocumentQueue = [new Promise<void>((resolve) => { release = () => resolve() })]
     respond = (call) =>
       call.url.endsWith('/documents')
         ? { status: 500, body: { error: 'boom' } }
