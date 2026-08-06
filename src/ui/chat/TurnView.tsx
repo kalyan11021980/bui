@@ -27,8 +27,8 @@ export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocu
     )
   }
 
-  // A nudge turn whose every ask was already on screen — nothing to show,
-  // so no spaced empty div either.
+  // A turn whose every ask was already on screen ends up empty — nothing to
+  // show, so no spaced empty div either.
   if (turn.voice === null && turn.blocks.length === 0) return null
 
   return (

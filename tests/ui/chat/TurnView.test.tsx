@@ -23,8 +23,8 @@ describe('TurnView — agent turns', () => {
   })
 
   it('renders nothing at all for an agent turn with no voice and no blocks', () => {
-    // A nudge turn whose every ask was already on screen ends up empty; it
-    // must leave no gap in the log, not a spaced empty div.
+    // A turn whose every ask was already on screen ends up empty; it must
+    // leave no gap in the log, not a spaced empty div.
     const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
     const { container } = render(<TurnView turn={turn} state={state} {...handlers} />)
     expect(container).toBeEmptyDOMElement()

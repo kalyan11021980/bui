@@ -123,7 +123,6 @@ export default function Page() {
             onReadDocument={app.readDocument}
             onState={app.adoptTurnState}
             runSerialized={app.runSerialized}
-            panelWrites={app.panelWrites}
           />
         </div>
 

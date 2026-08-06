@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
 import type { BlockHandlers } from '@/ui/chat/blocks'
@@ -44,7 +44,6 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => void
   onState: (state: ApplicationState) => void
   runSerialized: (run: () => Promise<void>) => void
-  panelWrites: number
 } = {
   onChange: () => undefined,
   onClear: () => undefined,
@@ -53,9 +52,6 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => undefined,
   onState: () => undefined,
   runSerialized: runNow,
-  // Never moves in these tests, so the idle nudge stays disarmed and every
-  // fetch asserted below is one the test itself caused.
-  panelWrites: 0,
 }
 
 beforeEach(() => { calls = [] })
@@ -275,9 +271,61 @@ describe('ConversationShell', () => {
     expect(sendButton).toHaveFocus()
   })
 
-  // The idle-nudge gating tests that lived here moved out: `useIdleNudge` is
-  // wired to a no-op pending Task 9, which rewires it to `sendDone` and
-  // deletes the hook's own test file.
+  it('mounts the Done bar under the log once a group is on screen', async () => {
+    const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const agentTurn: Turn = {
+      seq: 2, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'identification', done: 0, total: 3 }],
+    }
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+
+    stubFetch((call) =>
+      call.url.endsWith('/turn')
+        ? { status: 200, body: { state: after, turn: agentTurn } }
+        : { status: 200, body: after },
+    )
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    expect(await screen.findByRole('button', { name: 'Done with this section' })).toBeInTheDocument()
+  })
+
+  it('never fires a turn unprompted', () => {
+    // The old nudge trigger was `panelWrites` going up — which happened on
+    // every panel write, i.e. every time `state` itself changed. `state` is
+    // the only surviving prop that still changes on a panel write, so a
+    // rerender with a freshly answered field is that trigger's stand-in.
+    const state = createApplication('app-1', PROFILE, OWNER)
+    stubFetch(() => ({ status: 200, body: state }))
+
+    const { rerender } = render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+    calls.length = 0
+
+    vi.useFakeTimers()
+    try {
+      const written: ApplicationState = {
+        ...state,
+        fields: { ...state.fields, first_name: { value: 'Ada', status: 'confirmed' } },
+      }
+      rerender(
+        <ConversationShell applicationId="app-1" ownerToken={OWNER} state={written} {...noHandlers} />,
+      )
+
+      act(() => { vi.advanceTimersByTime(5000) })
+
+      expect(calls.some((c) => c.url.endsWith('/turn'))).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 
   it('refuses to send once the application is submitted, without disabling the composer', async () => {
     const state = createApplication('app-1', PROFILE, OWNER)

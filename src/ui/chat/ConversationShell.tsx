@@ -6,11 +6,11 @@ import type { ApplicationState } from '@/domain/application/state'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
-import { useIdleNudge } from '@/ui/client/useIdleNudge'
 import type { BlockHandlers } from './blocks'
 import { CompletionCard } from './CompletionCard'
 import { Composer } from './Composer'
 import { OpeningUploadCard } from './OpeningUploadCard'
+import { SectionDoneBar } from './SectionDoneBar'
 import { Suggestions } from './Suggestions'
 import { TurnView } from './TurnView'
 
@@ -36,8 +36,6 @@ type Props = BlockHandlers & {
    * needs the same ordering guarantee `readDocument` already relies on it for.
    */
   runSerialized: (run: () => Promise<void>) => void
-  /** See `useIdleNudge` — what tells the agent an answer landed in the panel. */
-  panelWrites: number
 }
 
 /**
@@ -62,9 +60,9 @@ const logStyle: React.CSSProperties = {
  * `useConversation`.
  */
 export function ConversationShell({
-  applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized, panelWrites,
+  applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
 }: Props) {
-  const { turns, pending, send } = useConversation(
+  const { turns, pending, send, sendDone } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
   // Brings a newly arrived turn into view — its start, so a long answer is
@@ -95,20 +93,6 @@ export function ConversationShell({
   // here instead, so the control stays focusable throughout.
   const sendable = !pending && ownerToken !== null && !closed
   const suggestible = outstandingFields(state)
-
-  // Nothing outstanding means nothing for the agent to move on to — and a
-  // field already asked this session is an open box on screen, so a nudge
-  // that could only re-ask it would just render a second copy. Only an
-  // outstanding field the agent has not asked yet is worth a turn.
-  const askedOnScreen = new Set(turns.flatMap((turn) =>
-    turn.role === 'agent'
-      ? turn.blocks.flatMap((b) => (b.kind === 'field_ask' ? [b.fieldId] : []))
-      : [],
-  ))
-  const worthNudging = suggestible.some((id) => !askedOnScreen.has(id))
-  // Task 9 rewires this to sendDone/deletes useIdleNudge entirely; for now
-  // it fires nothing.
-  useIdleNudge(panelWrites, sendable && worthNudging, () => undefined)
 
   return (
     <section aria-label="Registration agent" style={shellStyle}>
@@ -143,6 +127,8 @@ export function ConversationShell({
           Thinking…
         </p>
       )}
+
+      <SectionDoneBar state={state} turns={turns} sendable={sendable} onDone={sendDone} />
 
       <CompletionCard state={state} onSubmit={onSubmit} />
 
