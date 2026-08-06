@@ -36,6 +36,14 @@ describe('systemPrompt', () => {
   it('tells the model it cannot ask questions itself', () => {
     expect(systemPrompt()).toMatch(/cannot ask questions/i)
   })
+
+  // A live model narrated markdown ("your **primary activity**") and the
+  // chat renders voice as plain text — asterisks reached the applicant
+  // literally. Pins the rule so a future rewrite can't silently drop it.
+  it('tells the model to write plain sentences with no markdown', () => {
+    expect(systemPrompt()).toMatch(/no markdown/i)
+    expect(systemPrompt()).toMatch(/asterisks/i)
+  })
 })
 
 describe('messagesFor', () => {

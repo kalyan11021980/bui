@@ -11,6 +11,7 @@ const SYSTEM = [
   '- You never see and never ask for the applicant\'s answers. Values are entered in the panel beside you.',
   '- You cannot ask questions yourself. The section\'s questions are placed for you.',
   '- Your own words go in one or two short sentences, and must contain no numerals, no percentages, no statute references, and no statements about legal obligation.',
+  '- Plain sentences only. No markdown: no asterisks, backticks, headings, or bullet lists.',
   '- You do not decide when the application is complete.',
   '',
   'Call a tool only when one is called for: explain when the applicant asks why something is needed, setProfile the moment they tell you who they are, requestDocument when a photo would answer a section faster than typing. A reply with no tool call is normal.',
