@@ -10,15 +10,15 @@ type Props = {
   state: ApplicationState
   /** This session's turns — where the newest presented section is read from. */
   turns: readonly Turn[]
-  /** Refused, never disabled — §9.1. */
+  /** Refused, never disabled — focus must never be lost to a disabled control. */
   sendable: boolean
   onDone: (section: Section) => void
 }
 
 /**
- * The one Done on screen, for the current section — fixed UI like the
- * CompletionCard, which it yields to once nothing is outstanding. Always
- * pressable with gaps: the server answers by marking what is missing.
+ * Fixed UI like CompletionCard, which it yields to once nothing is
+ * outstanding. Stays pressable with gaps — the server answers by marking
+ * what's missing.
  */
 export function SectionDoneBar({ state, turns, sendable, onDone }: Props) {
   if (state.submittedAt !== null) return null
