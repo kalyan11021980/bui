@@ -179,10 +179,8 @@ export async function applyTurn(
     // Rejections already on the record (from earlier turns) plus this one:
     // the agent stops offering tools once either crosses the threshold, so a
     // turn that lands after it was already reached must render the same way
-    // as the turn that reached it. A dropped re-ask stays out of the count —
-    // repeating a legitimate ask is redundancy the server already renders
-    // harmless, not the misbehaviour the threshold exists to bench.
-    const misbehaviour = result.rejections.filter((code) => code !== 'already_asked')
+    // as the turn that reached it.
+    const misbehaviour = result.rejections
     const alreadyPanelOnly = current.orchestratorRejections >= PANEL_ONLY_THRESHOLD
     const projected = current.orchestratorRejections + misbehaviour.length
     const panelOnly = alreadyPanelOnly || projected >= PANEL_ONLY_THRESHOLD

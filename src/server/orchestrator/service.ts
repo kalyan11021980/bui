@@ -92,10 +92,10 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   // A sensitive turn drops its voice, but a wordless form reads as a broken
   // page. The vetted fallback line stands in until legally-reviewed copy for
   // this case exists — chosen over silence on 2026-08-05, not invented here.
-  if (
-    voice.dropped === 'sensitive'
-    && !blocks.some((b) => b.kind === 'notice' && b.copyId === 'guard_fallback')
-  ) {
+  // A sensitive drop always has a non-empty group on screen (the field/doc
+  // that triggered it), so the empty-blocks case above never also applies —
+  // no need to guard against prepending twice.
+  if (voice.dropped === 'sensitive') {
     blocks.unshift({ kind: 'notice', copyId: 'guard_fallback' })
   }
 

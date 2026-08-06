@@ -18,7 +18,7 @@ const PROFILE = {
   idForm: 'drivers_license' as const,
 }
 // tax_id is only required for a business applicant — needed to exercise the
-// sensitive-field suppression, since askFor(tax_id) is guard-rejected for PROFILE.
+// sensitive-field suppression, since explain(tax_id) is guard-rejected for PROFILE.
 const BUSINESS_PROFILE = { ...PROFILE, applicantType: 'business' as const }
 
 function fresh(): ApplicationState { return createApplication('app-1', PROFILE, 'tok') }
@@ -53,17 +53,17 @@ async function run(
   })
 }
 
-const ASK_NAME = [{ toolName: 'askFor', input: { fieldIds: ['first_name'] } }]
+const EXPLAIN_FIRST_NAME = [{ toolName: 'explain', input: { fieldId: 'first_name' } }]
 
 describe('runTurn', () => {
   it('keeps voice that passes the lint', async () => {
-    const { turn } = await run('Right — a couple more.', ASK_NAME)
+    const { turn } = await run('Right — a couple more.', EXPLAIN_FIRST_NAME)
     expect(turn.voice).toBe('Right — a couple more.')
     expect(turn.voiceDropped).toBeUndefined()
   })
 
   it('drops voice that fails the lint and records why', async () => {
-    const { turn } = await run('You have 3 things left.', ASK_NAME)
+    const { turn } = await run('You have 3 things left.', EXPLAIN_FIRST_NAME)
     expect(turn.voice).toBeNull()
     expect(turn.voiceDropped).toBe('lint')
   })
@@ -103,21 +103,21 @@ describe('runTurn', () => {
   })
 
   it('drops a rejected tool call and records its code', async () => {
-    let state = fresh()
-    state = applicationReducer(state, {
-      type: 'SET_VALUE', fieldId: 'first_name', value: 'K', source: 'user', at: AT,
-    })
-    const { turn, rejections } = await run('Sure.', ASK_NAME, state)
-    expect(rejections).toContain('field_not_outstanding')
-    expect(turn.blocks).not.toContainEqual({ kind: 'field_ask', fieldId: 'first_name' })
+    // proof_of_residency is never owed by PROFILE (addressDiffersFromId is
+    // false) — a guaranteed guard-reject, whatever else is on the record.
+    const { turn, rejections } = await run('Sure.', [
+      { toolName: 'requestDocument', input: { docType: 'proof_of_residency' } },
+    ])
+    expect(rejections).toContain('document_not_required')
+    expect(turn.blocks).not.toContainEqual({ kind: 'document_request', docType: 'proof_of_residency' })
   })
 
   it('applies surviving calls even when a sibling was rejected', async () => {
     const { turn, rejections } = await run('Sure.', [
-      { toolName: 'askFor', input: { fieldIds: ['first_name'] } },
+      { toolName: 'explain', input: { fieldId: 'first_name' } },
       { toolName: 'requestDocument', input: { docType: 'proof_of_residency' } },
     ])
-    expect(turn.blocks).toContainEqual({ kind: 'field_ask', fieldId: 'first_name' })
+    expect(turn.blocks).toContainEqual({ kind: 'rationale', fieldId: 'first_name' })
     expect(rejections).toEqual(['document_not_required'])
     // The fallback is for when NOTHING survives — a surviving call must
     // suppress it, or "correctly withheld" and "never offered" look identical.
@@ -140,7 +140,7 @@ describe('runTurn', () => {
       { seq: 5, at: AT, role: 'agent', voice: null, blocks: [] },
       { seq: 6, at: AT, role: 'applicant', voice: null, blocks: [], text: 'hi' },
     ]
-    const { turn } = await run('Sure.', ASK_NAME, fresh(), prior)
+    const { turn } = await run('Sure.', EXPLAIN_FIRST_NAME, fresh(), prior)
     expect(turn.seq).toBe(7)
   })
 

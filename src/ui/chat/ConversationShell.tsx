@@ -26,8 +26,9 @@ type Props = BlockHandlers & {
   state: ApplicationState
   /** The same submit the panel uses — the CompletionCard is just a second door to it. */
   onSubmit: () => void
-  /** Adopts the state a completed turn returned — a `setProfile` or `askFor`
-   *  tool call is already committed server-side by the time it arrives. */
+  /** Adopts the state a completed turn returned — a `setProfile` or
+   *  `requestDocument` tool call is already committed server-side by the
+   *  time it arrives. */
   onState: (state: ApplicationState) => void
   /**
    * `useApplication`'s own write queue. The turn request is routed through

@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { ALL_TOOL_NAMES, TOOL_SCHEMAS, TOOL_DESCRIPTIONS } from '@/domain/orchestrator/tools'
 
 describe('tool schemas', () => {
-  it('declares exactly the five tools the design allows', () => {
+  it('declares exactly the four tools the design allows', () => {
     expect([...ALL_TOOL_NAMES].sort()).toEqual(
-      ['askFor', 'explain', 'orient', 'requestDocument', 'setProfile'],
+      ['explain', 'orient', 'requestDocument', 'setProfile'],
     )
   })
 
@@ -20,12 +20,6 @@ describe('tool schemas', () => {
     for (const name of ALL_TOOL_NAMES) {
       expect(TOOL_DESCRIPTIONS[name], name).toMatch(/\bCall this\b/)
     }
-  })
-
-  it('caps askFor at four fields and requires at least one', () => {
-    expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: [] }).success).toBe(false)
-    expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: ['a', 'b', 'c', 'd', 'e'] }).success).toBe(false)
-    expect(TOOL_SCHEMAS.askFor.safeParse({ fieldIds: ['a'] }).success).toBe(true)
   })
 
   it("routes setProfile through the panel's own profilePatch schema", () => {

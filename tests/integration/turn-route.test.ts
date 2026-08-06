@@ -40,17 +40,17 @@ function useModel(model: ReturnType<typeof stubModel>): void {
   __setModelForTurnTests(() => ({ model, effort: 'low', isAnthropic: false }))
 }
 
-/** Asks for an outstanding field on a fresh individual application — never rejected. */
+/** Explains an outstanding field on a fresh individual application — never rejected. */
 function defaultModel(onGenerate?: () => void): ReturnType<typeof stubModel> {
   return stubModel('Right, one to start.', [
-    { toolName: 'askFor', input: { fieldIds: ['primary_activity'] } },
+    { toolName: 'explain', input: { fieldId: 'primary_activity' } },
   ], onGenerate)
 }
 
-/** tax_id is a real field, but never outstanding for an individual — guaranteed guard-reject. */
+/** proof_of_residency is never owed by PROFILE (addressDiffersFromId is false) — guaranteed guard-reject. */
 function rejectedModel(): ReturnType<typeof stubModel> {
   return stubModel('One moment.', [
-    { toolName: 'askFor', input: { fieldIds: ['tax_id'] } },
+    { toolName: 'requestDocument', input: { docType: 'proof_of_residency' } },
   ])
 }
 
@@ -116,7 +116,7 @@ describe('POST /turn', () => {
     await post('app-1', {})
     expect(getApplication('app-1')?.orchestratorRejections).toBeGreaterThan(0)
     const event = getAuditLog().entriesFor('app-1').find((e) => e.kind === 'agent_turn')
-    expect(event?.rejections).toEqual(['field_not_outstanding'])
+    expect(event?.rejections).toEqual(['document_not_required'])
   })
 
   it('drops to panel-only on the third rejection, replacing the ask rather than joining it', async () => {
@@ -137,17 +137,6 @@ describe('POST /turn', () => {
     seed()
     useModel(rejectedModel())
     await post('app-1', {})
-    const last = getApplication('app-1')?.transcript.at(-1)
-    expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
-  })
-
-  it('does not count a dropped re-ask toward panel-only — repetition is not misbehaviour', async () => {
-    seed()
-    // Every turn asks the same field: legitimate the first time, a dropped
-    // re-ask each turn after. A weak local model does exactly this, and it
-    // must not bench the agent the way inventing fields does.
-    for (let i = 0; i < 4; i += 1) await post('app-1', {})
-    expect(getApplication('app-1')?.orchestratorRejections).toBe(0)
     const last = getApplication('app-1')?.transcript.at(-1)
     expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
   })

@@ -25,49 +25,9 @@ function reject(
 }
 
 describe('guardToolCall rejections', () => {
-  it('rejects an empty askFor', () => {
-    expect(reject({ toolName: 'askFor', input: { fieldIds: [] } })).toBe('ask_cardinality')
-  })
-
-  it('rejects an askFor of more than four fields', () => {
-    expect(reject({ toolName: 'askFor', input: { fieldIds: ['a','b','c','d','e'] } }))
-      .toBe('ask_cardinality')
-  })
-
-  it('rejects a field that is not outstanding', () => {
-    let state = fresh()
-    state = applicationReducer(state, {
-      type: 'SET_VALUE', fieldId: 'first_name', value: 'K', source: 'user', at: AT,
-    })
-    expect(reject({ toolName: 'askFor', input: { fieldIds: ['first_name'] } }, state))
-      .toBe('field_not_outstanding')
-  })
-
-  it('rejects a field with no catalog entry', () => {
-    expect(reject({ toolName: 'askFor', input: { fieldIds: ['not_a_field'] } }))
-      .toBe('unknown_field')
-  })
-
-  it('rejects a malformed requirement key', () => {
-    expect(reject({ toolName: 'askFor', input: { fieldIds: ['first_name#x'] } }))
-      .toBe('unknown_field')
-  })
-
-  it('rejects duplicate ids in one ask', () => {
-    expect(reject({ toolName: 'askFor', input: { fieldIds: ['first_name', 'first_name'] } }))
-      .toBe('duplicate_field')
-  })
-
-  it('rejects the whole ask when one id is bad, with no partial block for the good one', () => {
-    const outcome = guardToolCall(
-      { toolName: 'askFor', input: { fieldIds: ['first_name', 'not_a_field'] } },
-      fresh(), [], AT,
-    )
-    // toEqual over the whole outcome, not just `.code`: an `ok: false` result
-    // that also carried a `blocks` entry for `first_name` would pass a
-    // code-only assertion while still leaking the field that should have
-    // been refused along with the rest of the call.
-    expect(outcome).toEqual({ ok: false, code: 'unknown_field' })
+  it('rejects askFor outright — the planner owns asks now', () => {
+    expect(reject({ toolName: 'askFor', input: { fieldIds: ['first_name'] } }))
+      .toBe('unknown_tool')
   })
 
   it('rejects a patch the panel schema would refuse', () => {
@@ -97,14 +57,14 @@ describe('guardToolCall rejections', () => {
       .toBe('application_closed')
   })
 
-  it('rejects a tool outside the five', () => {
+  it('rejects a tool outside the four', () => {
     expect(reject({ toolName: 'setValue', input: { fieldId: 'tax_id', value: '1' } }))
       .toBe('unknown_tool')
   })
 
   // Table row not covered above: explain on an id the catalog has never
   // heard of. This never reaches the outstanding-or-settled check below —
-  // it is refused earlier, by the same `knownField` gate `askFor` uses.
+  // it is refused earlier, by the same `knownField` gate.
   it('rejects an explain for a field with no catalog entry', () => {
     expect(reject({ toolName: 'explain', input: { fieldId: 'not_a_field' } }))
       .toBe('unknown_field')
@@ -140,16 +100,6 @@ describe('guardToolCall rejections', () => {
 })
 
 describe('guardToolCall acceptance', () => {
-  it('accepts an ask for an outstanding field and produces a block', () => {
-    const outcome = guardToolCall(
-      { toolName: 'askFor', input: { fieldIds: ['first_name'] } }, fresh(), [], AT,
-    )
-    expect(outcome.ok).toBe(true)
-    if (!outcome.ok) return
-    expect(outcome.blocks).toEqual([{ kind: 'field_ask', fieldId: 'first_name' }])
-    expect(outcome.actions).toEqual([])
-  })
-
   it('turns setProfile into an UPDATE_PROFILE action', () => {
     const outcome = guardToolCall(
       { toolName: 'setProfile', input: { patch: { state: 'OH' } } }, fresh(), [], AT,

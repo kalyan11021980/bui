@@ -61,9 +61,9 @@ export type UseApplication = {
   forgetDocumentNotice: () => void
   /**
    * Adopts the state a completed turn returned. Unlike `dispatch`, nothing is
-   * reduced locally first — a `setProfile` or `askFor` tool call is already
-   * committed server-side by the time it arrives, so the whole state is taken
-   * as given.
+   * reduced locally first — a `setProfile` or `requestDocument` tool call is
+   * already committed server-side by the time it arrives, so the whole state
+   * is taken as given.
    */
   adoptTurnState: (state: ApplicationState) => void
   /**

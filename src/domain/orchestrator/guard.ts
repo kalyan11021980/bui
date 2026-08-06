@@ -16,8 +16,7 @@ import { ALL_TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './tools'
  * application.
  */
 export type RejectionCode =
-  | 'ask_cardinality' | 'field_not_outstanding' | 'unknown_field'
-  | 'duplicate_field' | 'already_asked' | 'malformed_patch' | 'empty_patch'
+  | 'unknown_field' | 'malformed_patch' | 'empty_patch'
   | 'document_not_required' | 'document_already_held'
   | 'application_closed' | 'unknown_tool'
 
@@ -52,22 +51,6 @@ export function guardToolCall(
   // collapses the result's `.data` to `{}`, which is what the cast in the
   // brief's sample was working around.
   switch (name) {
-    case 'askFor': {
-      const parsed = TOOL_SCHEMAS.askFor.safeParse(call.input)
-      if (!parsed.success) return reject('ask_cardinality')
-      const { fieldIds } = parsed.data
-      // Validated as a unit: one bad id rejects the whole call rather than
-      // asking for the subset that passed.
-      if (new Set(fieldIds).size !== fieldIds.length) return reject('duplicate_field')
-      const outstanding = new Set(outstandingFields(state))
-      for (const id of fieldIds) {
-        if (!knownField(id)) return reject('unknown_field')
-        if (!outstanding.has(id)) return reject('field_not_outstanding')
-      }
-      const blocks: Block[] = fieldIds.map((fieldId) => ({ kind: 'field_ask', fieldId }))
-      return { ok: true, blocks, actions: [] }
-    }
-
     case 'explain': {
       const parsed = TOOL_SCHEMAS.explain.safeParse(call.input)
       if (!parsed.success) return reject('unknown_field')

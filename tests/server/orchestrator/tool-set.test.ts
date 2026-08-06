@@ -48,11 +48,6 @@ describe('activeToolsFor', () => {
       .not.toContain('requestDocument')
   })
 
-  it('never offers askFor — the planner owns what is asked, not the model', () => {
-    expect(activeToolsFor(view(), false)).not.toContain('askFor')
-    expect(activeToolsFor(view({ outstanding: [] }), false)).not.toContain('askFor')
-  })
-
   it('always offers explain and setProfile before submission', () => {
     const bare = activeToolsFor(view({ outstanding: [], documentsOutstanding: [] }), false)
     expect(bare).toContain('explain')

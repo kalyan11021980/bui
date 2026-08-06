@@ -9,7 +9,6 @@ import type { OrchestratorView } from '@/domain/orchestrator/view'
  */
 export function buildToolSet(): ToolSet {
   return {
-    askFor: tool({ description: TOOL_DESCRIPTIONS.askFor, inputSchema: TOOL_SCHEMAS.askFor }),
     explain: tool({ description: TOOL_DESCRIPTIONS.explain, inputSchema: TOOL_SCHEMAS.explain }),
     setProfile: tool({
       description: TOOL_DESCRIPTIONS.setProfile, inputSchema: TOOL_SCHEMAS.setProfile,

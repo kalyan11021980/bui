@@ -140,7 +140,7 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
     const workingId = await newApp()
     __setModelForTurnTests(() => ({
       model: stubModel('Right, one to start.', [
-        { toolName: 'askFor', input: { fieldIds: ['primary_activity'] } },
+        { toolName: 'explain', input: { fieldId: 'primary_activity' } },
       ]),
       effort: 'low', isAnthropic: false,
     }))

@@ -27,8 +27,8 @@ export type UseConversation = {
  * turn from THIS session starts after — not to backfill history.
  *
  * A turn is server-authored: `send` posts intent text and adopts whatever
- * `ApplicationState` comes back (a `setProfile` or `askFor` tool call is
- * already committed server-side by the time the response arrives) via
+ * `ApplicationState` comes back (a `setProfile` or `requestDocument` tool
+ * call is already committed server-side by the time the response arrives) via
  * `onState`, rather than reducing anything locally the way `useApplication`
  * does for panel edits.
  *
