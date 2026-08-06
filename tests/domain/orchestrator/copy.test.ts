@@ -28,4 +28,12 @@ describe('vetted copy', () => {
   it('exposes COPY as the same data vettedCopy reads', () => {
     for (const id of ALL_COPY_IDS) expect(COPY[id]).toBe(vettedCopy(id))
   })
+
+  it('carries the section-flow copy under version 6', () => {
+    expect(COPY_VERSION).toBe('6')
+    expect(vettedCopy('done_chip')).toBe("Done with this section — what's next?")
+    expect(vettedCopy('section_incomplete')).toBe(
+      "A few answers in this section are still blank — they're marked below.",
+    )
+  })
 })
