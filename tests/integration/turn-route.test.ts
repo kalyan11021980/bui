@@ -232,7 +232,10 @@ describe('POST /turn', () => {
     await post('app-1', { text: 'go on' })
 
     expect(getApplication('app-1')?.orchestratorRejections).toBe(1)
-    const event = getAuditLog().entriesFor('app-1').find((e) => e.kind === 'agent_turn')
+    // Not the first agent_turn: ingestDocument's own presentPlan call already
+    // appended one (the group it presents), ahead of this call's.
+    const event = getAuditLog().entriesFor('app-1')
+      .filter((e) => e.kind === 'agent_turn').at(-1)
     expect(event?.rejections).toEqual(['document_already_held'])
   })
 

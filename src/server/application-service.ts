@@ -53,6 +53,37 @@ export function createApplication(): ApplicationState {
   return created
 }
 
+/**
+ * Presents the current group, deterministically — no model call. An upload
+ * is an applicant act, so its response carries this the same way a turn's
+ * response would; the planner's own dedup rule (`planTurnBlocks`) makes a
+ * second call a no-op once the section is already on screen.
+ */
+export function presentPlan(
+  id: string,
+  ownerToken: string | null,
+  at: string,
+): Result<ApplicationState> {
+  const found = owned(id, ownerToken)
+  if (!found.ok) return found
+  const current = found.value
+
+  const closed = submittedRefusal(current)
+  if (closed !== null) return { ok: false, failure: failure('submitted', closed) }
+
+  const blocks = planTurnBlocks(current, current.transcript, null)
+  if (blocks.length === 0) return { ok: true, value: withoutOwnerToken(current) }
+
+  const next = commit(current, {
+    type: 'APPEND_TURN',
+    at,
+    turn: {
+      seq: current.transcript.length + 1, at, role: 'agent', voice: null, blocks,
+    },
+  })
+  return { ok: true, value: withoutOwnerToken(next) }
+}
+
 export function getApplication(
   id: string,
   ownerToken: string | null,

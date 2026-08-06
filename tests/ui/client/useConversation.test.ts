@@ -246,4 +246,46 @@ describe('useConversation', () => {
       expect(result.current.turns.at(-2)!.seq).toBeGreaterThan(0)
     })
   })
+
+  describe('ingest', () => {
+    it('appends only turns newer than what has been seen', () => {
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+      const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
+      const after: ApplicationState = { ...state, transcript: [turn] }
+      act(() => result.current.ingest(after))
+
+      expect(result.current.turns).toEqual([turn])
+    })
+
+    it('a second ingest of the same state is a no-op', () => {
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+      const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
+      const after: ApplicationState = { ...state, transcript: [turn] }
+      act(() => result.current.ingest(after))
+      act(() => result.current.ingest(after))
+
+      expect(result.current.turns).toEqual([turn])
+    })
+
+    it('never touches an optimistic negative-seq echo already on screen', () => {
+      // Never resolves — nothing here is meant to land a real reply.
+      vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined))
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+      act(() => result.current.sendDone('address'))
+      const echo = result.current.turns[0]
+      expect(echo?.seq).toBeLessThan(0)
+
+      const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
+      const after: ApplicationState = { ...state, transcript: [turn] }
+      act(() => result.current.ingest(after))
+
+      expect(result.current.turns).toEqual([echo, turn])
+    })
+  })
 })

@@ -65,9 +65,17 @@ export function ConversationShell({
   applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
   readingDocument,
 }: Props) {
-  const { turns, pending, send, sendDone } = useConversation(
+  const { turns, pending, send, sendDone, ingest } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
+  // Picks up a turn that arrived outside `send`/`sendDone` — an upload's
+  // response. Keyed on the transcript's own length rather than `state` or
+  // `ingest` itself, since neither is stable across a render that changed
+  // nothing else here.
+  const transcriptLength = state.transcript.length
+  useEffect(() => {
+    ingest(state)
+  }, [transcriptLength]) // eslint-disable-line react-hooks/exhaustive-deps -- keyed on length on purpose
   // Brings a newly arrived turn into view — its start, so a long answer is
   // read from the top. scrollIntoView never moves focus, so §9.1 holds; the
   // motion itself honours the reduced-motion preference.

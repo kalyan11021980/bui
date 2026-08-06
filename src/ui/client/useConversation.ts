@@ -14,6 +14,13 @@ export type UseConversation = {
   pending: boolean
   send: (text: string) => void
   sendDone: (section: Section) => void
+  /**
+   * Appends whatever turns in `state.transcript` are newer than what has
+   * already been shown — for a state that arrived outside `send`/`sendDone`
+   * (an upload's response). Never touches an existing turn, so an
+   * optimistic (negative-seq) echo is left standing.
+   */
+  ingest: (state: ApplicationState) => void
 }
 
 /**
@@ -102,8 +109,7 @@ export function useConversation(
       // Both the applicant's own committed turn and the agent's reply arrive
       // in one response, inside `state.transcript`; only what is new since
       // the last response (or since this session started) is shown.
-      const fresh = result.value.state.transcript.filter((turn) => turn.seq > seen.current)
-      seen.current = result.value.state.transcript.length
+      const fresh = newSince(result.value.state, seen)
       // The applicant's own turn comes back committed inside `fresh`, so the
       // optimistic echo has to go or the same sentence shows twice. Local
       // turns are the negative-seq ones; a degraded notice is not replaced by
@@ -116,7 +122,20 @@ export function useConversation(
     })
   }
 
-  return { turns, pending, send, sendDone }
+  const ingest = (state: ApplicationState) => {
+    const fresh = newSince(state, seen)
+    if (fresh.length === 0) return
+    setTurns((held) => [...held, ...fresh])
+  }
+
+  return { turns, pending, send, sendDone, ingest }
+}
+
+/** What is new in `state.transcript` since `seen`, advancing it as a side effect. */
+function newSince(state: ApplicationState, seen: { current: number }): readonly Turn[] {
+  const fresh = state.transcript.filter((turn) => turn.seq > seen.current)
+  seen.current = state.transcript.length
+  return fresh
 }
 
 function applicantTurn(seq: number, text: string): Turn {

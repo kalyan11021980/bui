@@ -88,6 +88,10 @@ and `useConversation.nudge`. No turn ever arrives unprompted. (`panelWrites` its
 stays in `useApplication` only if something else consumes it; if nothing does, it
 goes too.)
 
+2026-08-06: amended, agreed with Kaly after a live strand — a successful upload's
+response MAY carry a planner-built agent turn presenting the current group. This is
+still prompted, not unprompted: the upload is the applicant acting.
+
 ## 7. New vetted copy
 
 One `COPY_VERSION` bump ('5' → '6'):

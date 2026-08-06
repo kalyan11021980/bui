@@ -304,9 +304,12 @@ describe('ingestDocument', () => {
     // No SET_VALUE fired — nothing was legible — but the document itself was
     // still handed over and accepted, so it must count as held: an applicant
     // who photographed an unreadable licence must not be asked to
-    // photograph it again forever.
-    expect(getAuditLog().sizeFor(app.id)).toBe(1)
+    // photograph it again forever. presentPlan still runs — reading nothing
+    // is not a reason to strand the applicant with no group on screen — so a
+    // second entry (the group it presents) is on the trail too.
+    expect(getAuditLog().sizeFor(app.id)).toBe(2)
     expect(getAuditLog().entriesFor(app.id)[0]?.kind).toBe('document_recorded')
+    expect(getAuditLog().entriesFor(app.id)[1]?.kind).toBe('agent_turn')
     expect(outcome.state.documents).toEqual([
       { documentId: outcome.documentId, docType: 'drivers_license', at: AT },
     ])

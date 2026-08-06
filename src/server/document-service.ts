@@ -14,7 +14,7 @@ import { respaceAddresses } from '@/domain/ocr/extract/aamva'
 import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
 import { bandForWidth, demoteForCardExtent, type QualityBand } from '@/domain/ocr/quality'
 import { vettedCopy } from '@/domain/orchestrator/copy'
-import { applyAction, getApplication, type Result } from './application-service'
+import { applyAction, getApplication, presentPlan, type Result } from './application-service'
 import { failure } from './http'
 import { imageSizeOf, MAX_IMAGE_BASE64_CHARS } from './image-size'
 import { readDocument, type OcrProvider } from './ocr/service'
@@ -121,6 +121,13 @@ export async function ingestDocument(
     state = result.value
     filled.push(candidate.key)
   }
+
+  // The upload is an applicant act, so its response presents the group —
+  // same as a turn would, deterministically. A concurrent submit landing
+  // meanwhile is not this upload's failure to report; the state it has is
+  // what goes back.
+  const presented = presentPlan(input.applicationId, input.ownerToken, input.at)
+  if (presented.ok) state = presented.value
 
   // Reading nothing is a normal outcome, not a failure — the fields get asked
   // for as they are today. The document itself is still on the record, via

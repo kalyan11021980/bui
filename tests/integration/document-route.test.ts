@@ -24,6 +24,7 @@ vi.mock('@/server/ocr/client', async (importOriginal) => {
 import { POST as CREATE } from '@/app/api/application/route'
 import { POST as ACTION } from '@/app/api/application/[id]/actions/route'
 import { POST } from '@/app/api/application/[id]/documents/route'
+import { sectionPlan } from '@/domain/orchestrator/plan'
 import { __resetAuditLogForTests, getAuditLog } from '@/server/audit'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
 import { OWNER_TOKEN_HEADER } from '@/server/ownership'
@@ -160,6 +161,34 @@ describe('POST /api/application/[id]/documents — a successful upload', () => {
     expect(res.status).toBe(200)
     expect(((await res.json()) as ApplicationState).fields.dl_number?.status)
       .toBe('confirmed')
+  })
+
+  it('presents the group after an upload at the opening, before anything is typed', async () => {
+    // The stranded-applicant bug: an upload used to fill fields with nothing
+    // to show for it — no group, no field cards. planTurnBlocks now runs on
+    // the upload response itself, deterministically, no model call.
+    const id = await newApp()
+    const res = await upload(id, { docType: 'drivers_license', imageBase64: WA_PNG })
+    const body = (await res.json()) as { state: ApplicationState }
+
+    expect(body.state.transcript).toHaveLength(1)
+    const turn = body.state.transcript[0]!
+    expect(turn.role).toBe('agent')
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks[0]).toMatchObject({ kind: 'section_header' })
+    const header = turn.blocks[0]!
+    if (header.kind !== 'section_header') throw new Error('expected a section_header')
+    expect(header.section).toBe(sectionPlan(body.state)!.section)
+  })
+
+  it('does not re-present a section a second upload leaves still on screen', async () => {
+    const id = await newApp()
+    await upload(id, { docType: 'drivers_license', imageBase64: WA_PNG })
+    const res = await upload(id, { docType: 'drivers_license', imageBase64: WA_PNG })
+    const body = (await res.json()) as { state: ApplicationState }
+
+    // The planner's dedup rule: still the one turn from the first upload.
+    expect(body.state.transcript).toHaveLength(1)
   })
 
   it('409s an application already sent for review, before reading anything', async () => {

@@ -8,6 +8,7 @@ import { isComplete } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
+import type { Turn } from '@/domain/orchestrator/transcript'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
 import { OWNER_TOKEN_HEADER } from '@/ui/client/application-api'
 
@@ -318,6 +319,43 @@ describe('the page', () => {
     // Read, not accepted: it is still on the applicant to say so.
     expect(within(row).getByRole('button', { name: /looks right/i })).toBeInTheDocument()
     expect(await screen.findByText(/we filled in 1 answer/i)).toBeInTheDocument()
+  })
+
+  it('presents the group in the chat after an upload at the opening — no prior typing', async () => {
+    // Regression test for the reported bug: an upload used to fill fields with
+    // nothing on screen to act on — no group, no field cards, no Done bar.
+    // The chat, not the debug panel, is under test here.
+    window.history.replaceState({}, '', '/')
+
+    const presentingTurn: Turn = {
+      seq: 1, at: '2026-08-06T00:00:00.000Z', role: 'agent', voice: null,
+      blocks: [
+        { kind: 'section_header', section: 'identification', done: 0, total: 1 },
+        { kind: 'field_ask', fieldId: 'dl_number' },
+      ],
+    }
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? {
+            status: 200,
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: { ...withDlNumber(created()), transcript: [presentingTurn] },
+            },
+          }
+        : asServer(call)
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /registration agent/i })
+
+    await userEvent.upload(
+      screen.getByLabelText(/upload photo/i),
+      new File(['x'], 'licence.png', { type: 'image/png' }),
+    )
+
+    const row = await screen.findByRole('group', { name: /driver's license number/i })
+    expect(within(row).getByRole('button', { name: /looks right/i })).toBeInTheDocument()
+    expect(screen.getByText(/identification/i)).toBeInTheDocument()
   })
 
   it('shows the part of the document each value was read from', async () => {
