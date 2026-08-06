@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { uploadedDocTypes } from '@/domain/application/documents'
+import { SECTION_ORDER } from '@/domain/orchestrator/plan'
+import type { Section } from '@/domain/section'
 import { modelForTurn } from '@/server/orchestrator/model-for-turn'
 import { applyTurn, getApplication } from '@/server/application-service'
 import { failure, jsonError } from '@/server/http'
@@ -8,7 +10,19 @@ import { ownerTokenOf } from '@/server/ownership'
 
 type Context = { params: Promise<{ id: string }> }
 
-const bodySchema = z.object({ text: z.string().optional() }).strict()
+// Exactly one of text or doneWith; text must not be blank.
+const bodySchema = z
+  .object({
+    text: z.string().optional(),
+    doneWith: z.enum([...SECTION_ORDER] as [Section, ...Section[]]).optional(),
+  })
+  .strict()
+  .refine((body) => (body.text !== undefined) !== (body.doneWith !== undefined), {
+    message: 'exactly one of text or doneWith',
+  })
+  .refine((body) => body.text === undefined || body.text.trim() !== '', {
+    message: 'text must not be blank',
+  })
 
 export async function POST(request: Request, context: Context) {
   const { id } = await context.params
@@ -36,6 +50,7 @@ export async function POST(request: Request, context: Context) {
 
   const result = await applyTurn(id, ownerToken, {
     text: parsed.data.text,
+    doneWith: parsed.data.doneWith,
     modelForTurn,
     isResume: false,
     uploadedDocs,

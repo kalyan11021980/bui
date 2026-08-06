@@ -8,9 +8,11 @@ import {
   applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
 import type { DocType } from '@/domain/field-id'
+import { vettedCopy } from '@/domain/orchestrator/copy'
 import { planTurnBlocks } from '@/domain/orchestrator/plan'
 import { PANEL_ONLY_THRESHOLD, toOrchestratorView } from '@/domain/orchestrator/view'
 import type { Turn } from '@/domain/orchestrator/transcript'
+import type { Section } from '@/domain/section'
 import { runTurn, type TurnRequest, type TurnResult } from '@/server/orchestrator/service'
 import { getAuditLog } from '@/server/audit'
 import {
@@ -95,6 +97,8 @@ export function applyAction(
 export type TurnInput = {
   /** Applicant's own words this turn, if any. */
   text: string | undefined
+  /** The section a Done chip closed out, if this turn is one. */
+  doneWith: Section | undefined
   /**
    * Resolves the model plus the config that travels with it, lazily — so a
    * misconfigured provider throws inside the same try/catch as an unreachable
@@ -129,9 +133,15 @@ export async function applyTurn(
   // turn is appended and for what the model is told the applicant said.
   const trimmed = input.text?.trim()
   const text = trimmed ? trimmed : null
+  const doneWith = input.doneWith ?? null
+  // The route enforces exactly-one; a second caller must not slip past it.
+  if (text && doneWith) {
+    return { ok: false, failure: failure('malformed', 'exactly one of text or doneWith') }
+  }
+  const applicantText = text ?? (doneWith ? vettedCopy('done_chip') : null)
 
   try {
-    if (text) {
+    if (applicantText) {
       current = commit(current, {
         type: 'APPEND_TURN',
         at: input.at,
@@ -141,7 +151,7 @@ export async function applyTurn(
           role: 'applicant',
           voice: null,
           blocks: [],
-          text,
+          text: applicantText,
         },
       })
     }
@@ -156,10 +166,10 @@ export async function applyTurn(
       state: current,
       transcript: current.transcript,
       uploadedDocs: input.uploadedDocs,
-      userText: text,
+      userText: applicantText,
       isResume: input.isResume,
       at: input.at,
-      doneWith: null, // Task 6 threads the real value.
+      doneWith,
     })
 
     // Re-read from the store rather than reuse `current`: this is the state

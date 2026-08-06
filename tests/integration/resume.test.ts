@@ -75,6 +75,7 @@ describe('resume — §12.1', () => {
 
     const result = await applyTurn('app-1', OWNER, {
       text: undefined,
+      doneWith: undefined,
       modelForTurn: () => ({
         model: stubModel('', [{ toolName: 'orient', input: {} }]),
         effort: 'low', isAnthropic: false,

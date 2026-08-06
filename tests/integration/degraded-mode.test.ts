@@ -114,11 +114,11 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
 
     // Throws at the start, the middle, and right before submission — "every
     // call" means every call, not just the first.
-    expect((await postTurn(degradedId, {})).status).toBe(200)
+    expect((await postTurn(degradedId, { text: 'hi' })).status).toBe(200)
     await fillPanel(degradedId, ANSWERS.slice(0, 7))
     expect((await postTurn(degradedId, { text: 'are you there?' })).status).toBe(200)
     await fillPanel(degradedId, ANSWERS.slice(7))
-    expect((await postTurn(degradedId, {})).status).toBe(200)
+    expect((await postTurn(degradedId, { text: 'go on' })).status).toBe(200)
 
     const submitRes = await postAction(degradedId, { type: 'SUBMIT', at: SUBMIT_AT })
     expect(submitRes.status).toBe(200)
@@ -145,7 +145,7 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
       effort: 'low', isAnthropic: false,
     }))
 
-    const workingTurn = await postTurn(workingId, {})
+    const workingTurn = await postTurn(workingId, { text: 'hi' })
     expect(workingTurn.status).toBe(200)
     const afterWorkingTurn = await stateOf(workingId)
     expect(afterWorkingTurn.transcript.at(-1)?.blocks)
@@ -176,7 +176,7 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
       throw new Error('ORCHESTRATOR_MODEL must be set')
     })
 
-    const res = await postTurn(id, {})
+    const res = await postTurn(id, { text: 'hi' })
     expect(res.status).toBe(200)
 
     const state = await stateOf(id)

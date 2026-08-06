@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { MockLanguageModelV4 } from 'ai/test'
 import { POST as turn } from '@/app/api/application/[id]/turn/route'
-import { __setModelForTurnTests } from '@/server/orchestrator/model-for-turn'
-import { applyAction } from '@/server/application-service'
+import { __setModelForTurnTests, modelForTurn } from '@/server/orchestrator/model-for-turn'
+import { applyAction, applyTurn } from '@/server/application-service'
 import { ingestDocument } from '@/server/document-service'
 import { __resetStoreForTests, getApplication, putApplication } from '@/server/store'
 import { __resetAuditLogForTests, getAuditLog } from '@/server/audit'
@@ -40,6 +40,22 @@ function useModel(model: ReturnType<typeof stubModel>): void {
   __setModelForTurnTests(() => ({ model, effort: 'low', isAnthropic: false }))
 }
 
+/**
+ * A turn with no applicant text and no doneWith — the route's schema rejects
+ * this shape now, but the service still supports it (resume relies on it), so
+ * these go straight to applyTurn to keep covering it.
+ */
+function silentTurn(id: string, token: string | null = 'tok') {
+  return applyTurn(id, token, {
+    text: undefined,
+    doneWith: undefined,
+    modelForTurn,
+    isResume: false,
+    uploadedDocs: [],
+    at: AT,
+  })
+}
+
 /** Explains an outstanding field on a fresh individual application — never rejected. */
 function defaultModel(onGenerate?: () => void): ReturnType<typeof stubModel> {
   return stubModel('Right, one to start.', [
@@ -68,22 +84,22 @@ beforeEach(() => {
 
 describe('POST /turn', () => {
   it('answers 404 for an unknown id', async () => {
-    expect((await post('nope', {})).status).toBe(404)
+    expect((await post('nope', { text: 'hi' })).status).toBe(404)
   })
 
   it('answers 404 for a wrong token, the same as for an unknown id', async () => {
     seed()
-    expect((await post('app-1', {}, 'wrong')).status).toBe(404)
+    expect((await post('app-1', { text: 'hi' }, 'wrong')).status).toBe(404)
   })
 
   it('answers 409 once submitted', async () => {
     putApplication({ ...seed(), submittedAt: '2026-08-03T00:00:00.000Z' })
-    expect((await post('app-1', {})).status).toBe(409)
+    expect((await post('app-1', { text: 'hi' })).status).toBe(409)
   })
 
   it('appends exactly one agent turn to the transcript', async () => {
     seed()
-    await post('app-1', {})
+    await silentTurn('app-1')
     expect(getApplication('app-1')?.transcript).toHaveLength(1)
   })
 
@@ -94,16 +110,9 @@ describe('POST /turn', () => {
     expect(roles).toEqual(['applicant', 'agent'])
   })
 
-  it('treats whitespace-only text as no text at all', async () => {
-    seed()
-    await post('app-1', { text: '   ' })
-    const roles = getApplication('app-1')?.transcript.map((t) => t.role)
-    expect(roles).toEqual(['agent'])
-  })
-
   it('writes one agent_turn audit event carrying a shownCopyHash', async () => {
     seed()
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
     const events = getAuditLog().entriesFor('app-1')
       .filter((e) => e.kind === 'agent_turn')
     expect(events).toHaveLength(1)
@@ -113,7 +122,7 @@ describe('POST /turn', () => {
   it('counts a guard rejection on the record, and audits its reason code', async () => {
     seed()
     useModel(rejectedModel())
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
     expect(getApplication('app-1')?.orchestratorRejections).toBeGreaterThan(0)
     const event = getAuditLog().entriesFor('app-1').find((e) => e.kind === 'agent_turn')
     expect(event?.rejections).toEqual(['document_not_required'])
@@ -122,7 +131,7 @@ describe('POST /turn', () => {
   it('drops to panel-only on the third rejection, replacing the ask rather than joining it', async () => {
     seed()
     useModel(rejectedModel())
-    for (let i = 0; i < 3; i += 1) await post('app-1', {})
+    for (let i = 0; i < 3; i += 1) await post('app-1', { text: 'go on' })
     expect(getApplication('app-1')?.orchestratorRejections).toBe(3)
     const last = getApplication('app-1')?.transcript.at(-1)
     // Exact, not toContainEqual: "I'll step back" must not share the turn
@@ -136,7 +145,7 @@ describe('POST /turn', () => {
     // positive test alone.
     seed()
     useModel(rejectedModel())
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
     const last = getApplication('app-1')?.transcript.at(-1)
     expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
   })
@@ -144,7 +153,7 @@ describe('POST /turn', () => {
   it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
     seed()
     useModel(rejectedModel())
-    for (let i = 0; i < 5; i += 1) await post('app-1', {})
+    for (let i = 0; i < 5; i += 1) await silentTurn('app-1')
     const transcript = getApplication('app-1')?.transcript ?? []
     const notices = transcript.filter((t) =>
       t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
@@ -156,7 +165,7 @@ describe('POST /turn', () => {
   it('repeats the step-back notice when the applicant speaks again — a person is never ignored', async () => {
     seed()
     useModel(rejectedModel())
-    for (let i = 0; i < 4; i += 1) await post('app-1', {})
+    for (let i = 0; i < 4; i += 1) await silentTurn('app-1')
     await post('app-1', { text: 'Hello? Are you there?' })
     const transcript = getApplication('app-1')?.transcript ?? []
     const notices = transcript.filter((t) =>
@@ -172,7 +181,7 @@ describe('POST /turn', () => {
     const before = getApplication('app-1')
 
     useModel(throwingModel())
-    const response = await post('app-1', {})
+    const response = await post('app-1', { text: 'go on' })
     expect(response.status).toBe(200)
 
     const after = getApplication('app-1')
@@ -187,7 +196,7 @@ describe('POST /turn', () => {
     // for a server-side outage rather than their own answers.
     seed()
     useModel(throwingModel())
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
     expect(getApplication('app-1')?.orchestratorRejections).toBe(0)
   })
 
@@ -201,7 +210,7 @@ describe('POST /turn', () => {
       ...state,
       fields: { ...state.fields, not_a_field: { value: 'x', status: 'confirmed' } },
     })
-    const response = await post('app-1', {})
+    const response = await post('app-1', { text: 'go on' })
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ error: expect.stringMatching(/unknown field/i) })
   })
@@ -217,7 +226,7 @@ describe('POST /turn', () => {
         type: 'SET_VALUE', fieldId: 'first_name', value: 'Concurrent', source: 'user', at: AT,
       })
     }))
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
     expect(getApplication('app-1')?.fields.first_name?.value).toBe('Concurrent')
   })
 
@@ -240,7 +249,7 @@ describe('POST /turn', () => {
     useModel(stubModel('One moment.', [
       { toolName: 'requestDocument', input: { docType: 'drivers_license' } },
     ]))
-    await post('app-1', {})
+    await post('app-1', { text: 'go on' })
 
     expect(getApplication('app-1')?.orchestratorRejections).toBe(1)
     const event = getAuditLog().entriesFor('app-1').find((e) => e.kind === 'agent_turn')
@@ -252,10 +261,47 @@ describe('POST /turn', () => {
     useModel(defaultModel(() => {
       putApplication({ ...state, submittedAt: AT })
     }))
-    const response = await post('app-1', {})
-    expect(response.status).toBe(409)
+    const response = await silentTurn('app-1')
+    expect(response.ok).toBe(false)
+    if (response.ok) return
+    expect(response.failure.kind).toBe('submitted')
     // No half-turn: the applicant sent no text this call, so nothing at all
     // should have been committed once the submission won the race.
     expect(getApplication('app-1')?.transcript).toEqual([])
+  })
+
+  it('rejects a body with neither text nor doneWith', async () => {
+    seed()
+    const response = await post('app-1', {})
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects a body with both text and doneWith', async () => {
+    seed()
+    const response = await post('app-1', { text: 'hi', doneWith: 'address' })
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects blank text', async () => {
+    seed()
+    const response = await post('app-1', { text: '   ' })
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects a doneWith outside the Section union', async () => {
+    seed()
+    const response = await post('app-1', { doneWith: 'bogus' })
+    expect(response.status).toBe(400)
+  })
+
+  it('a Done commits an applicant turn in vetted copy and answers with the agent turn', async () => {
+    seed()
+    const response = await post('app-1', { doneWith: 'profile' })
+    expect(response.status).toBe(200)
+    const { state, turn } = await response.json()
+    const applicant = state.transcript.at(-2)
+    expect(applicant.role).toBe('applicant')
+    expect(applicant.text).toBe("Done with this section — what's next?")
+    expect(turn.role).toBe('agent')
   })
 })
