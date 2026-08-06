@@ -18,3 +18,6 @@ coverage/
 .turbo/
 .vercel/
 *.tsbuildinfo
+
+# SDD session scratch — never shipped
+.superpowers/
