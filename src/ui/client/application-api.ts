@@ -3,6 +3,7 @@ import type { DocType } from '@/domain/field-id'
 import type { QualityBand } from '@/domain/ocr/quality'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import type { RequirementKey } from '@/domain/requirements/key'
+import type { Section } from '@/domain/section'
 
 /**
  * Every call the browser makes to the application API, and the only place a
@@ -44,24 +45,19 @@ export function sendAction(
 
 export type TurnOutcome = { state: ApplicationState; turn: Turn }
 
+export type TurnPayload = { text: string } | { doneWith: Section }
+
 /**
  * The conversation's one outbound call. `text` is the applicant's own words,
- * never a field value — the composer is for intent, and the route's schema
- * accepts nothing else.
- */
-/**
- * `text` is omitted, not sent empty, for a nudge: the route's schema is strict
- * and `applyTurn` appends an applicant turn only when there is text, so an
- * empty string would be an empty bubble in the transcript.
+ * never a field value; `doneWith` is the structured Done intent — the route
+ * accepts exactly one of the two.
  */
 export function sendTurn(
   id: string,
   ownerToken: string | null,
-  text: string | null,
+  payload: TurnPayload,
 ): Promise<ApiResult<TurnOutcome>> {
-  return post<TurnOutcome>(
-    `/api/application/${id}/turn`, ownerToken, text === null ? {} : { text },
-  )
+  return post<TurnOutcome>(`/api/application/${id}/turn`, ownerToken, payload)
 }
 
 /**

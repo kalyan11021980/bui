@@ -2,7 +2,10 @@
 
 import { useRef, useState } from 'react'
 import type { ApplicationState } from '@/domain/application/state'
+import { vettedCopy } from '@/domain/orchestrator/copy'
 import type { Turn } from '@/domain/orchestrator/transcript'
+import type { Section } from '@/domain/section'
+import type { TurnPayload } from './application-api'
 import { sendTurn } from './application-api'
 
 export type UseConversation = {
@@ -10,12 +13,7 @@ export type UseConversation = {
   turns: readonly Turn[]
   pending: boolean
   send: (text: string) => void
-  /**
-   * A turn with nothing said — the applicant answered in the panel instead.
-   * The agent reads the answer from the view it is given, so it has
-   * everything it needs without the applicant narrating it.
-   */
-  nudge: () => void
+  sendDone: (section: Section) => void
 }
 
 /**
@@ -67,16 +65,22 @@ export function useConversation(
     // without this the screen is byte-identical to before you pressed send.
     localSeq.current -= 1
     setTurns((held) => [...held, applicantTurn(localSeq.current, trimmed)])
-    post(trimmed)
+    post({ text: trimmed })
   }
 
-  const post = (text: string | null) => {
+  const sendDone = (section: Section) => {
+    localSeq.current -= 1
+    setTurns((held) => [...held, applicantTurn(localSeq.current, vettedCopy('done_chip'))])
+    post({ doneWith: section })
+  }
+
+  const post = (payload: TurnPayload) => {
     if (inFlight.current) return
     inFlight.current = true
     setPending(true)
 
     runSerialized(async () => {
-      const result = await sendTurn(applicationId, ownerToken, text)
+      const result = await sendTurn(applicationId, ownerToken, payload)
       inFlight.current = false
       setPending(false)
 
@@ -112,7 +116,7 @@ export function useConversation(
     })
   }
 
-  return { turns, pending, send, nudge: () => post(null) }
+  return { turns, pending, send, sendDone }
 }
 
 function applicantTurn(seq: number, text: string): Turn {

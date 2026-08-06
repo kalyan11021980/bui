@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
 import type { BlockHandlers } from '@/ui/chat/blocks'
 import { createApplication } from '@/domain/application/reducer'
-import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Turn } from '@/domain/orchestrator/transcript'
@@ -276,58 +275,9 @@ describe('ConversationShell', () => {
     expect(sendButton).toHaveFocus()
   })
 
-  // The screenshot bug's amplifier: a nudge fired after every panel write even
-  // when everything outstanding was already asked on screen, and each nudged
-  // turn appended one more copy of the same form group.
-  describe('idle nudge gating', () => {
-    async function landTurnAsking(fieldIds: readonly string[]) {
-      const state = createApplication('app-1', PROFILE, OWNER)
-      const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
-      const agentTurn: Turn = {
-        seq: 2, at: AT, role: 'agent', voice: null,
-        blocks: fieldIds.map((fieldId) => ({ kind: 'field_ask' as const, fieldId })),
-      }
-      const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
-      stubFetch((call) =>
-        call.url.endsWith('/turn')
-          ? { status: 200, body: { state: after, turn: agentTurn } }
-          : { status: 200, body: after },
-      )
-
-      const shell = (panelWrites: number) => (
-        <ConversationShell
-          applicationId="app-1" ownerToken={OWNER} state={state}
-          {...noHandlers} panelWrites={panelWrites}
-        />
-      )
-      const view = render(shell(0))
-      await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
-      await userEvent.click(screen.getByRole('button', { name: /send/i }))
-      await waitFor(() => expect(calls.some((c) => c.url.endsWith('/turn'))).toBe(true))
-
-      calls.length = 0
-      vi.useFakeTimers()
-      view.rerender(shell(1))
-      await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
-      vi.useRealTimers()
-    }
-
-    it('nudges after a write while something outstanding is not yet on screen', async () => {
-      const [first] = outstandingFields(createApplication('app-1', PROFILE, OWNER))
-      await landTurnAsking([first!])
-
-      const turnCalls = calls.filter((c) => c.url.endsWith('/turn'))
-      expect(turnCalls).toHaveLength(1)
-      // A nudge omits `text` entirely — the route's schema is strict.
-      expect(turnCalls[0]!.body).toEqual({})
-    })
-
-    it('stays quiet when every outstanding field is already asked on screen', async () => {
-      await landTurnAsking(outstandingFields(createApplication('app-1', PROFILE, OWNER)))
-
-      expect(calls.filter((c) => c.url.endsWith('/turn'))).toHaveLength(0)
-    })
-  })
+  // The idle-nudge gating tests that lived here moved out: `useIdleNudge` is
+  // wired to a no-op pending Task 9, which rewires it to `sendDone` and
+  // deletes the hook's own test file.
 
   it('refuses to send once the application is submitted, without disabling the composer', async () => {
     const state = createApplication('app-1', PROFILE, OWNER)

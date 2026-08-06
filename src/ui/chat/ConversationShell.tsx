@@ -64,7 +64,7 @@ const logStyle: React.CSSProperties = {
 export function ConversationShell({
   applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized, panelWrites,
 }: Props) {
-  const { turns, pending, send, nudge } = useConversation(
+  const { turns, pending, send } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
   )
   // Brings a newly arrived turn into view — its start, so a long answer is
@@ -106,7 +106,9 @@ export function ConversationShell({
       : [],
   ))
   const worthNudging = suggestible.some((id) => !askedOnScreen.has(id))
-  useIdleNudge(panelWrites, sendable && worthNudging, nudge)
+  // Task 9 rewires this to sendDone/deletes useIdleNudge entirely; for now
+  // it fires nothing.
+  useIdleNudge(panelWrites, sendable && worthNudging, () => undefined)
 
   return (
     <section aria-label="Registration agent" style={shellStyle}>

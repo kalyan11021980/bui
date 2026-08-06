@@ -194,11 +194,8 @@ describe('useConversation', () => {
     )
   })
 
-  describe('nudge', () => {
-    // Answers go in beside the agent, never through it, so a nudge carries no
-    // text — `applyTurn` appends no applicant turn for one, which is what
-    // keeps an empty bubble off the transcript.
-    it('posts a turn carrying no text', async () => {
+  describe('sendDone', () => {
+    it('sendDone posts the section as structured intent, never text', async () => {
       const agentTurn: Turn = { seq: 1, at: AT, role: 'agent', voice: 'Next then.', blocks: [] }
       const state = createApplication('app-1', PROFILE, OWNER)
       const after: ApplicationState = { ...state, transcript: [agentTurn] }
@@ -207,25 +204,46 @@ describe('useConversation', () => {
       const { result } = renderHook(
         () => useConversation('app-1', OWNER, state, () => undefined, runNow),
       )
-      act(() => result.current.nudge())
+      act(() => result.current.sendDone('address'))
       await waitFor(() => expect(result.current.pending).toBe(false))
 
       const turnCall = calls.find((c) => c.url.endsWith('/turn'))
-      expect(turnCall?.body).toEqual({})
-      expect(result.current.turns).toEqual([agentTurn])
+      expect(turnCall?.body).toEqual({ doneWith: 'address' })
     })
 
-    it('is refused while a turn is already in flight', async () => {
+    it('sendDone echoes the vetted done line immediately', () => {
       const state = createApplication('app-1', PROFILE, OWNER)
-      stubFetch(() => ({ status: 200, body: { state, turn: null } }))
+      // Never resolves — this test asserts before any response lands, so
+      // there is nothing for the mock to answer with.
+      vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined))
+      const { result } = renderHook(
+        () => useConversation('app-1', OWNER, state, () => undefined, runNow),
+      )
+      act(() => result.current.sendDone('address'))
+
+      expect(result.current.turns.at(-1)).toMatchObject({
+        role: 'applicant',
+        text: "Done with this section — what's next?",
+      })
+    })
+
+    it('the echo is replaced by the committed turn when the reply lands', async () => {
+      const doneTurn: Turn = {
+        seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: "Done with this section — what's next?",
+      }
+      const agentTurn: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Next then.', blocks: [] }
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const after: ApplicationState = { ...state, transcript: [doneTurn, agentTurn] }
+      stubFetch(() => ({ status: 200, body: { state: after, turn: agentTurn } }))
 
       const { result } = renderHook(
         () => useConversation('app-1', OWNER, state, () => undefined, runNow),
       )
-      act(() => { result.current.send('Hi'); result.current.nudge() })
+      act(() => result.current.sendDone('address'))
       await waitFor(() => expect(result.current.pending).toBe(false))
 
-      expect(calls.filter((c) => c.url.endsWith('/turn'))).toHaveLength(1)
+      expect(result.current.turns.filter((t) => t.role === 'applicant')).toHaveLength(1)
+      expect(result.current.turns.at(-2)!.seq).toBeGreaterThan(0)
     })
   })
 })
