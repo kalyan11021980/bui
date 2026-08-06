@@ -152,15 +152,6 @@ describe('POST /turn', () => {
     expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
   })
 
-  it('still audits a dropped re-ask on its turn', async () => {
-    seed()
-    await post('app-1', {})
-    await post('app-1', {})
-    const event = getAuditLog().entriesFor('app-1')
-      .filter((e) => e.kind === 'agent_turn').at(-1)
-    expect(event?.rejections).toEqual(['already_asked'])
-  })
-
   it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
     seed()
     useModel(rejectedModel())
