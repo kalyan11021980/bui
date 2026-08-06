@@ -5,6 +5,7 @@ import { SectionDoneBar } from '@/ui/chat/SectionDoneBar'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
+import { PANEL_ONLY_THRESHOLD } from '@/domain/orchestrator/view'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { Section } from '@/domain/section'
 import type { Turn } from '@/domain/orchestrator/transcript'
@@ -36,6 +37,15 @@ const presented = (section: Section): Turn => ({
 })
 
 const noop = () => {}
+
+/** Applies count RECORD_REJECTION actions in a row. */
+function rejectedTimes(base: ApplicationState, count: number): ApplicationState {
+  let s = base
+  for (let i = 0; i < count; i += 1) {
+    s = applicationReducer(s, { type: 'RECORD_REJECTION', at: AT })
+  }
+  return s
+}
 
 const state = answeredExcept(['addr_city'])
 const complete = answeredExcept([])
@@ -80,5 +90,19 @@ describe('SectionDoneBar', () => {
       <SectionDoneBar state={submitted} turns={[presented('address')]} sendable onDone={noop} />,
     )
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders nothing once the guard has dropped the agent to panel-only', () => {
+    const panelOnly = rejectedTimes(state, PANEL_ONLY_THRESHOLD)
+    const { container } = render(
+      <SectionDoneBar state={panelOnly} turns={[presented('address')]} sendable onDone={noop} />,
+    )
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders from the committed transcript when this session has no turns yet — resume', () => {
+    const resumed = applicationReducer(state, { type: 'APPEND_TURN', turn: presented('address'), at: AT })
+    render(<SectionDoneBar state={resumed} turns={[]} sendable onDone={noop} />)
+    expect(screen.getByRole('button', { name: 'Done with this section' })).toBeInTheDocument()
   })
 })

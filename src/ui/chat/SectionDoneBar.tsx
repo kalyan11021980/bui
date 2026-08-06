@@ -4,11 +4,12 @@ import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import { lastPresentedSection } from '@/domain/orchestrator/plan'
 import type { Turn } from '@/domain/orchestrator/transcript'
+import { PANEL_ONLY_THRESHOLD } from '@/domain/orchestrator/view'
 import type { Section } from '@/domain/section'
 
 type Props = {
   state: ApplicationState
-  /** This session's turns — where the newest presented section is read from. */
+  /** This session's turns — joined with state.transcript to read the newest presented section. */
   turns: readonly Turn[]
   /** Refused, never disabled — focus must never be lost to a disabled control. */
   sendable: boolean
@@ -23,7 +24,13 @@ type Props = {
 export function SectionDoneBar({ state, turns, sendable, onDone }: Props) {
   if (state.submittedAt !== null) return null
   if (outstandingFields(state).length === 0) return null
-  const section = lastPresentedSection(turns)
+  // Once panel-only, the server never presents a group again — the button
+  // would just repeat the step-back notice forever.
+  if (state.orchestratorRejections >= PANEL_ONLY_THRESHOLD) return null
+  // Committed history plus this session's turns, so the client agrees with
+  // the server's own re-presentation rule on resume. Section id only — not
+  // replayed into the visible log.
+  const section = lastPresentedSection([...state.transcript, ...turns])
   if (section === null) return null
 
   return (

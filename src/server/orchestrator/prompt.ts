@@ -40,6 +40,8 @@ export function messagesFor(
   }
 
   messages.push({ role: 'user', content: renderView(view) })
+  // Also already in transcript above — repeated deliberately so it sits
+  // after the state dump, closest to the reply, for recency.
   if (userText) messages.push({ role: 'user', content: userText })
   return messages
 }
