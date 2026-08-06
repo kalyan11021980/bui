@@ -44,6 +44,7 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => void
   onState: (state: ApplicationState) => void
   runSerialized: (run: () => Promise<void>) => void
+  readingDocument: boolean
 } = {
   onChange: () => undefined,
   onClear: () => undefined,
@@ -52,6 +53,7 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => undefined,
   onState: () => undefined,
   runSerialized: runNow,
+  readingDocument: false,
 }
 
 beforeEach(() => { calls = [] })
@@ -325,6 +327,34 @@ describe('ConversationShell', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('shows a reading-document status line while a photo is being read', () => {
+    stubFetch(() => ({ status: 200, body: {} }))
+    const state = createApplication('app-1', PROFILE, OWNER)
+
+    render(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={state}
+        {...noHandlers} readingDocument
+      />,
+    )
+
+    expect(screen.getByText(/reading your photo/i)).toBeInTheDocument()
+  })
+
+  it('shows no reading-document line when no photo is in flight', () => {
+    stubFetch(() => ({ status: 200, body: {} }))
+    const state = createApplication('app-1', PROFILE, OWNER)
+
+    render(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={state}
+        {...noHandlers} readingDocument={false}
+      />,
+    )
+
+    expect(screen.queryByText(/reading your photo/i)).toBeNull()
   })
 
   it('refuses to send once the application is submitted, without disabling the composer', async () => {

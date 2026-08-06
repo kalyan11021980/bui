@@ -42,6 +42,8 @@ export type UseApplication = {
   notice: string | null
   /** The server is behind what is on screen, and the applicant should know. */
   outOfStep: boolean
+  /** True for the whole in-flight window of a document read — queued or fetching. */
+  readingDocument: boolean
   carry: CarryNotice | null
   /** Null until the application has started — see `ConversationShell`'s own prop. */
   ownerToken: string | null
@@ -76,6 +78,7 @@ export function useApplication(): UseApplication {
   const [docImages, setDocImages] = useState<DocumentImages>({})
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
+  const [readingDocument, setReadingDocument] = useState(false)
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
   // Requests run one after another, so the server applies them in the order
@@ -150,37 +153,44 @@ export function useApplication(): UseApplication {
   const readDocument = (docType: DocType, image: PreparedImage) => {
     if (!state) return
     setNotice(READING)
+    // Set before the request is even queued, so the flag covers a wait
+    // behind an earlier write too, not just the fetch itself.
+    setReadingDocument(true)
 
     enqueue(async () => {
-      const result = await sendDocument(
-        state.id, ownerToken.current, docType, image.imageBase64,
-      )
-      if (!result.ok) {
-        // A refusal below 500 already carries words written for a person. A
-        // 5xx does not — a transport failure is one by design, so an unset
-        // endpoint cannot pass for an empty read — and neither does a request
-        // that never arrived. Neither is an error page: the applicant fills
-        // the form in themselves, exactly as they would have.
-        const refusal =
-          result.status !== null && result.status < 500 ? result.message : null
-        setNotice(refusal ?? NO_READER)
-        return
+      try {
+        const result = await sendDocument(
+          state.id, ownerToken.current, docType, image.imageBase64,
+        )
+        if (!result.ok) {
+          // A refusal below 500 already carries words written for a person. A
+          // 5xx does not — a transport failure is one by design, so an unset
+          // endpoint cannot pass for an empty read — and neither does a request
+          // that never arrived. Neither is an error page: the applicant fills
+          // the form in themselves, exactly as they would have.
+          const refusal =
+            result.status !== null && result.status < 500 ? result.message : null
+          setNotice(refusal ?? NO_READER)
+          return
+        }
+        // Filed under the server's id, not over the last photo: a value read
+        // from an earlier document must keep showing that document, and the
+        // pixels never leave this browser either way.
+        setDocImages((held) => ({
+          ...held,
+          [result.value.documentId]: { url: image.imageUrl, size: image.imageSize },
+        }))
+        setState(result.value.state)
+        setCarry(null)
+        setNotice(readNotice(result.value))
+      } finally {
+        setReadingDocument(false)
       }
-      // Filed under the server's id, not over the last photo: a value read
-      // from an earlier document must keep showing that document, and the
-      // pixels never leave this browser either way.
-      setDocImages((held) => ({
-        ...held,
-        [result.value.documentId]: { url: image.imageUrl, size: image.imageSize },
-      }))
-      setState(result.value.state)
-      setCarry(null)
-      setNotice(readNotice(result.value))
     })
   }
 
   return {
-    state, documents: docImages, notice, outOfStep, carry,
+    state, documents: docImages, notice, outOfStep, readingDocument, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),

@@ -97,6 +97,8 @@ let calls: Call[]
 let respond: (call: Call) => { status: number; body: unknown }
 /** Set to hold every action response open until the test lets it go. */
 let holdActions: Promise<void> | null
+/** Set to hold every document-read response open until the test lets it go. */
+let holdDocuments: Promise<void> | null
 
 const OWNER = 'owner-token-1'
 
@@ -152,6 +154,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/?debug')
   calls = []
   holdActions = null
+  holdDocuments = null
   decoder.next = PREPARED
   respond = asServer
 
@@ -163,6 +166,7 @@ beforeEach(() => {
     }
     calls.push(call)
     if (holdActions && url.endsWith('/actions')) await holdActions
+    if (holdDocuments && url.endsWith('/documents')) await holdDocuments
 
     // What the real server does with a caller who cannot produce the token:
     // 404, the same answer an id that does not exist gets. Every test below
@@ -383,6 +387,46 @@ describe('the page', () => {
       .querySelector('img')).toHaveAttribute('src', SECOND.imageUrl)
     // Whatever else changed, the second photo is nowhere near the first row.
     expect(carried?.querySelector('img')).not.toHaveAttribute('src', SECOND.imageUrl)
+  })
+
+  it('shows a reading-photo status while the OCR read is in flight, and clears it after', async () => {
+    // The read takes multiple seconds against a real endpoint. Held open here
+    // so the in-flight window — including the queue wait, not just the fetch
+    // itself — has something to assert on before it is let go.
+    let release = () => undefined as void
+    holdDocuments = new Promise<void>((resolve) => { release = () => resolve() })
+    respond = readNothing
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    expect(await screen.findByText(/reading your photo/i)).toBeInTheDocument()
+
+    release()
+
+    await waitFor(() => expect(screen.queryByText(/reading your photo/i)).toBeNull())
+  })
+
+  it('clears the reading-photo status on a failed read too, not only a successful one', async () => {
+    let release = () => undefined as void
+    holdDocuments = new Promise<void>((resolve) => { release = () => resolve() })
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? { status: 500, body: { error: 'boom' } }
+        : asServer(call)
+
+    render(<Page />)
+    await screen.findByRole('region', { name: /your application/i })
+
+    await uploadPhoto()
+
+    expect(await screen.findByText(/reading your photo/i)).toBeInTheDocument()
+
+    release()
+
+    await waitFor(() => expect(screen.queryByText(/reading your photo/i)).toBeNull())
   })
 
   it('says something true and calm when the reader is unreachable, and asks nothing again', async () => {

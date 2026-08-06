@@ -36,6 +36,8 @@ type Props = BlockHandlers & {
    * needs the same ordering guarantee `readDocument` already relies on it for.
    */
   runSerialized: (run: () => Promise<void>) => void
+  /** True for the whole in-flight window of an OCR read — queued or fetching. */
+  readingDocument: boolean
 }
 
 /**
@@ -61,6 +63,7 @@ const logStyle: React.CSSProperties = {
  */
 export function ConversationShell({
   applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
+  readingDocument,
 }: Props) {
   const { turns, pending, send, sendDone } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
@@ -117,6 +120,16 @@ export function ConversationShell({
           />
         ))}
       </div>
+
+      {/* The OCR read is multi-second and otherwise silent — nothing else on
+          screen changes while it runs. Both this and the turn indicator below
+          can show at once; they just stack. */}
+      {readingDocument && (
+        <p role="status" className="my-2 text-[13px] text-text-secondary">
+          <span aria-hidden="true" style={{ letterSpacing: 2 }}>•••</span>{' '}
+          Reading your photo…
+        </p>
+      )}
 
       {/* The agent's slot, held while it thinks. Not a spinner for its own
           sake: a turn is one to ten seconds, and an empty screen after the
