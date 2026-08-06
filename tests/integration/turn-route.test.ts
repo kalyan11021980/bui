@@ -41,9 +41,10 @@ function useModel(model: ReturnType<typeof stubModel>): void {
 }
 
 /**
- * A turn with no applicant text and no doneWith — the route's schema rejects
- * this shape now, but the service still supports it (resume relies on it), so
- * these go straight to applyTurn to keep covering it.
+ * A turn with no applicant text and no doneWith. No route shape produces
+ * this today — every POST /turn body carries text or doneWith — but
+ * applyTurn still accepts it, so these go straight to the service to pin
+ * that defensive handling in case a second caller ever needs it.
  */
 function silentTurn(id: string, token: string | null = 'tok') {
   return applyTurn(id, token, {
@@ -99,8 +100,10 @@ describe('POST /turn', () => {
 
   it('appends exactly one agent turn to the transcript', async () => {
     seed()
-    await silentTurn('app-1')
-    expect(getApplication('app-1')?.transcript).toHaveLength(1)
+    await post('app-1', { text: 'go on' })
+    // One applicant turn (this call's text) plus one agent turn — not two
+    // agent turns from a duplicate append.
+    expect(getApplication('app-1')?.transcript).toHaveLength(2)
   })
 
   it('appends the applicant turn before the agent turn', async () => {
@@ -148,29 +151,6 @@ describe('POST /turn', () => {
     await post('app-1', { text: 'go on' })
     const last = getApplication('app-1')?.transcript.at(-1)
     expect(last?.blocks).not.toContainEqual({ kind: 'notice', copyId: 'panel_only_notice' })
-  })
-
-  it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
-    seed()
-    useModel(rejectedModel())
-    for (let i = 0; i < 5; i += 1) await silentTurn('app-1')
-    const transcript = getApplication('app-1')?.transcript ?? []
-    const notices = transcript.filter((t) =>
-      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
-    expect(notices).toHaveLength(1)
-    // The turns after it commit (they carry the audit trail) but show nothing.
-    expect(transcript.at(-1)?.blocks).toEqual([])
-  })
-
-  it('repeats the step-back notice when the applicant speaks again — a person is never ignored', async () => {
-    seed()
-    useModel(rejectedModel())
-    for (let i = 0; i < 4; i += 1) await silentTurn('app-1')
-    await post('app-1', { text: 'Hello? Are you there?' })
-    const transcript = getApplication('app-1')?.transcript ?? []
-    const notices = transcript.filter((t) =>
-      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
-    expect(notices).toHaveLength(2)
   })
 
   it('returns a degraded notice when the model throws, leaving fields untouched', async () => {
@@ -261,12 +241,11 @@ describe('POST /turn', () => {
     useModel(defaultModel(() => {
       putApplication({ ...state, submittedAt: AT })
     }))
-    const response = await silentTurn('app-1')
-    expect(response.ok).toBe(false)
-    if (response.ok) return
-    expect(response.failure.kind).toBe('submitted')
-    // No half-turn: the applicant sent no text this call, so nothing at all
-    // should have been committed once the submission won the race.
+    const response = await post('app-1', { text: 'go on' })
+    expect(response.status).toBe(409)
+    // The concurrent SUBMIT's write replays a state captured before this
+    // call's applicant turn landed, clobbering it — so even though this
+    // call did send text, nothing from it survives the race.
     expect(getApplication('app-1')?.transcript).toEqual([])
   })
 
@@ -303,5 +282,30 @@ describe('POST /turn', () => {
     expect(applicant.role).toBe('applicant')
     expect(applicant.text).toBe("Done with this section — what's next?")
     expect(turn.role).toBe('agent')
+  })
+})
+
+describe('applyTurn — text-less turns (service-level)', () => {
+  it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
+    seed()
+    useModel(rejectedModel())
+    for (let i = 0; i < 5; i += 1) await silentTurn('app-1')
+    const transcript = getApplication('app-1')?.transcript ?? []
+    const notices = transcript.filter((t) =>
+      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
+    expect(notices).toHaveLength(1)
+    // The turns after it commit (they carry the audit trail) but show nothing.
+    expect(transcript.at(-1)?.blocks).toEqual([])
+  })
+
+  it('repeats the step-back notice when the applicant speaks again — a person is never ignored', async () => {
+    seed()
+    useModel(rejectedModel())
+    for (let i = 0; i < 4; i += 1) await silentTurn('app-1')
+    await post('app-1', { text: 'Hello? Are you there?' })
+    const transcript = getApplication('app-1')?.transcript ?? []
+    const notices = transcript.filter((t) =>
+      t.blocks.some((b) => b.kind === 'notice' && b.copyId === 'panel_only_notice'))
+    expect(notices).toHaveLength(2)
   })
 })
