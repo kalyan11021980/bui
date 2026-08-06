@@ -50,7 +50,7 @@ async function capturedPayload(state: ApplicationState): Promise<string> {
     model,
     view: toOrchestratorView(state, []),
     state, transcript: [], uploadedDocs: [], userText: null,
-    isResume: false, at: AT, effort: 'low', isAnthropic: false,
+    isResume: false, at: AT, effort: 'low', isAnthropic: false, doneWith: null,
   })
   expect(model.doGenerateCalls.length).toBe(1)
   return JSON.stringify(model.doGenerateCalls[0])

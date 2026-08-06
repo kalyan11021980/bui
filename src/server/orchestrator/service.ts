@@ -1,13 +1,17 @@
 import { generateText, type LanguageModel } from 'ai'
+import { applyCarry } from '@/domain/application/carry'
+import { applicationReducer } from '@/domain/application/reducer'
 import { outstandingFields } from '@/domain/application/queries'
 import type { Action, ApplicationState } from '@/domain/application/state'
 import { guardToolCall, type RejectionCode } from '@/domain/orchestrator/guard'
+import { planTurnBlocks } from '@/domain/orchestrator/plan'
 import type { Block, Turn } from '@/domain/orchestrator/transcript'
 import { lintVoice } from '@/domain/orchestrator/voice-lint'
 import type { OrchestratorView } from '@/domain/orchestrator/view'
 import type { DocType } from '@/domain/field-id'
 import { docTypeBacksSensitiveField, fieldDef } from '@/domain/catalog'
 import { parseReqKey } from '@/domain/requirements/key'
+import type { Section } from '@/domain/section'
 import { LOCAL_PROVIDER_NAME } from './model'
 import { messagesFor, systemPrompt } from './prompt'
 import { activeToolsFor, buildToolSet } from './tool-set'
@@ -23,6 +27,7 @@ export type TurnRequest = {
   at: string
   effort: string
   isAnthropic: boolean
+  doneWith: Section | null
 }
 
 export type TurnResult = {
@@ -33,9 +38,10 @@ export type TurnResult = {
 
 /**
  * Runs one turn: a single model call (generateText's default stopWhen is
- * isStepCount(1) — no agentic loop), guards every tool call it returns, then
- * lints or suppresses the voice. Never dead-ends: if nothing survives the
- * guard, a vetted fallback plus the next outstanding ask fill the turn.
+ * isStepCount(1) — no agentic loop), guards every tool call it returns, adds
+ * the section the planner says belongs on screen, then lints or suppresses
+ * the voice. Never dead-ends: a vetted fallback fills a turn with nothing to
+ * show and nothing to say.
  */
 export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   const result = await generateText({
@@ -55,49 +61,33 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   const actions: Action[] = []
   const rejections: RejectionCode[] = []
 
-  // History is never pruned, so a field asked on an earlier turn is still an
-  // open box on screen — asking again just renders a second copy of it.
-  const asked = new Set(request.transcript.flatMap((t) =>
-    t.role === 'agent'
-      ? t.blocks.flatMap((b) => (b.kind === 'field_ask' ? [b.fieldId] : []))
-      : [],
-  ))
-  let droppedReAsk = false
-
   for (const call of result.toolCalls) {
     const outcome = guardToolCall(
       { toolName: call.toolName, input: call.input },
       request.state, request.uploadedDocs, request.at,
     )
     if (!outcome.ok) { rejections.push(outcome.code); continue }
-    for (const block of outcome.blocks) {
-      if (block.kind === 'field_ask' && asked.has(block.fieldId)) {
-        rejections.push('already_asked')
-        droppedReAsk = true
-        continue
-      }
-      if (block.kind === 'field_ask') asked.add(block.fieldId)
-      blocks.push(block)
-    }
+    blocks.push(...outcome.blocks)
     actions.push(...outcome.actions)
   }
 
-  // Gated on blocks alone: an accepted setProfile renders nothing, so a
-  // turn with only actions is still an empty screen without this fallback.
-  // A dropped re-ask skips the notice — the model did not whiff, it repeated
-  // itself — and the turn moves forward to the next unasked field instead.
-  // Nothing outstanding skips it too: "keep going with what's left" under a
-  // completion voice is false copy.
-  if (blocks.length === 0) {
-    const outstanding = outstandingFields(request.state)
-    if (!droppedReAsk && outstanding.length > 0) {
-      blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
-    }
-    const next = outstanding.find((id) => !asked.has(id))
-    if (next) blocks.push({ kind: 'field_ask', fieldId: next })
-  }
+  // The plan reads the state as it will be once this turn's actions commit —
+  // a setProfile this turn reshapes what is asked this same turn.
+  const planState = actions.reduce(
+    (s, a) => applyCarry(applicationReducer(s, a), request.at).state,
+    request.state,
+  )
+  blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith))
 
   const voice = decideVoice(result.text, blocks)
+
+  // A turn with nothing to show and nothing to say reads as a broken page;
+  // the vetted line stands in — unless nothing is outstanding, where it
+  // would be false copy.
+  if (blocks.length === 0 && voice.text === null
+      && outstandingFields(planState).length > 0) {
+    blocks.push({ kind: 'notice', copyId: 'guard_fallback' })
+  }
 
   // A sensitive turn drops its voice, but a wordless form reads as a broken
   // page. The vetted fallback line stands in until legally-reviewed copy for

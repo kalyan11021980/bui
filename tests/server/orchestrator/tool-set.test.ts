@@ -48,8 +48,8 @@ describe('activeToolsFor', () => {
       .not.toContain('requestDocument')
   })
 
-  it('offers askFor when something is outstanding, and not otherwise', () => {
-    expect(activeToolsFor(view(), false)).toContain('askFor')
+  it('never offers askFor — the planner owns what is asked, not the model', () => {
+    expect(activeToolsFor(view(), false)).not.toContain('askFor')
     expect(activeToolsFor(view({ outstanding: [] }), false)).not.toContain('askFor')
   })
 

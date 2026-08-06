@@ -6,6 +6,8 @@ import { toOrchestratorView } from '@/domain/orchestrator/view'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
+import type { RequirementKey } from '@/domain/requirements/key'
+import type { Section } from '@/domain/section'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { stubModel } from './stub-model'
 
@@ -24,17 +26,30 @@ function freshBusiness(): ApplicationState {
   return createApplication('app-1', BUSINESS_PROFILE, 'tok')
 }
 
+/** Answers every outstanding field except `keep`, looping until stable. */
+function answeredExcept(keep: readonly RequirementKey[]): ApplicationState {
+  let state = fresh()
+  for (;;) {
+    const next = outstandingFields(state).find((id) => !keep.includes(id))
+    if (!next) return state
+    state = applicationReducer(state, {
+      type: 'SET_VALUE', fieldId: next, value: 'x', source: 'user', at: AT,
+    })
+  }
+}
+
 async function run(
   text: string,
   calls: Parameters<typeof stubModel>[1],
   state = fresh(),
   transcript: readonly Turn[] = [],
+  doneWith: Section | null = null,
 ) {
   return runTurn({
     model: stubModel(text, calls),
     view: toOrchestratorView(state, []),
     state, transcript, uploadedDocs: [], userText: null,
-    isResume: false, at: AT, effort: 'low', isAnthropic: false,
+    isResume: false, at: AT, effort: 'low', isAnthropic: false, doneWith,
   })
 }
 
@@ -51,43 +66,6 @@ describe('runTurn', () => {
     const { turn } = await run('You have 3 things left.', ASK_NAME)
     expect(turn.voice).toBeNull()
     expect(turn.voiceDropped).toBe('lint')
-  })
-
-  it('suppresses voice entirely when the ask includes a sensitive field', async () => {
-    const { turn } = await run('All good, one more.', [
-      { toolName: 'askFor', input: { fieldIds: ['tax_id'] } },
-    ], freshBusiness())
-    expect(turn.blocks).toContainEqual({ kind: 'field_ask', fieldId: 'tax_id' })
-    expect(turn.voice).toBeNull()
-    expect(turn.voiceDropped).toBe('sensitive')
-  })
-
-  it('stands the vetted fallback line in for a dropped sensitive voice, so the turn is never wordless', async () => {
-    const { turn } = await run('All good, one more.', [
-      { toolName: 'askFor', input: { fieldIds: ['tax_id'] } },
-    ], freshBusiness())
-    expect(turn.voiceDropped).toBe('sensitive')
-    expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'guard_fallback' })
-  })
-
-  it('does not double the notice when the fallback already provided it', async () => {
-    // Everything answered but one sensitive field; the model whiffs, so the
-    // fallback supplies the notice AND the sensitive ask — the voice
-    // stand-in must not add a second copy.
-    let state = fresh()
-    for (const id of outstandingFields(state).filter((f) => f !== 'dl_number')) {
-      state = applicationReducer(state, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
-      })
-    }
-    const { turn } = await run('Sure.', [
-      { toolName: 'askFor', input: { fieldIds: ['not_a_field'] } },
-    ], state)
-    expect(turn.voiceDropped).toBe('sensitive')
-    expect(turn.blocks).toEqual([
-      { kind: 'notice', copyId: 'guard_fallback' },
-      { kind: 'field_ask', fieldId: 'dl_number' },
-    ])
   })
 
   it('suppresses voice when an accepted rationale touches a sensitive field', async () => {
@@ -124,15 +102,6 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBeUndefined()
   })
 
-  it('still falls back when only an action survives, so the screen is never empty', async () => {
-    const { turn, actions } = await run('Got it, one sec.', [
-      { toolName: 'setProfile', input: { patch: { wantsGsa: true } } },
-    ])
-    expect(actions).toHaveLength(1)
-    expect(turn.blocks).toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
-    expect(turn.blocks.some((b) => b.kind === 'field_ask')).toBe(true)
-  })
-
   it('drops a rejected tool call and records its code', async () => {
     let state = fresh()
     state = applicationReducer(state, {
@@ -141,14 +110,6 @@ describe('runTurn', () => {
     const { turn, rejections } = await run('Sure.', ASK_NAME, state)
     expect(rejections).toContain('field_not_outstanding')
     expect(turn.blocks).not.toContainEqual({ kind: 'field_ask', fieldId: 'first_name' })
-  })
-
-  it('falls back to a server-built ask when nothing survives', async () => {
-    const { turn } = await run('Sure.', [
-      { toolName: 'askFor', input: { fieldIds: ['not_a_field'] } },
-    ])
-    expect(turn.blocks).toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
-    expect(turn.blocks.some((b) => b.kind === 'field_ask')).toBe(true)
   })
 
   it('applies surviving calls even when a sibling was rejected', async () => {
@@ -163,98 +124,10 @@ describe('runTurn', () => {
     expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
   })
 
-  // The screenshot bug: every nudge re-asked the same outstanding fields, and
-  // history is never pruned, so the page filled with copies of one form group.
-  describe('re-asks', () => {
-    const askedFirstName: readonly Turn[] = [{
-      seq: 1, at: AT, role: 'agent', voice: null,
-      blocks: [{ kind: 'field_ask', fieldId: 'first_name' }],
-    }]
-
-    it('replaces an ask already on screen with the next field not yet asked', async () => {
-      // Not an empty turn and not the whiff notice: the applicant just
-      // answered something, so the agent moves forward instead of repeating
-      // itself or going quiet.
-      const { turn, rejections } = await run('Sure.', ASK_NAME, fresh(), askedFirstName)
-      expect(rejections).toContain('already_asked')
-      expect(turn.blocks).not.toContainEqual({ kind: 'field_ask', fieldId: 'first_name' })
-      expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
-      const asks = turn.blocks.filter((b) => b.kind === 'field_ask')
-      expect(asks).toHaveLength(1)
-    })
-
-    it('renders an empty turn when a re-ask is dropped and nothing unasked remains', async () => {
-      let state = fresh()
-      for (const id of outstandingFields(state).slice(1)) {
-        state = applicationReducer(state, {
-          type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
-        })
-      }
-      const [remaining] = outstandingFields(state)
-      const onScreen: readonly Turn[] = [{
-        seq: 1, at: AT, role: 'agent', voice: null,
-        blocks: [{ kind: 'field_ask', fieldId: remaining! }],
-      }]
-      const { turn } = await run('Sure.', [
-        { toolName: 'askFor', input: { fieldIds: [remaining!] } },
-      ], state, onScreen)
-      expect(turn.blocks).toEqual([])
-    })
-
-    it('keeps the new ask while dropping the re-asked sibling', async () => {
-      const { turn } = await run('Sure.', [
-        { toolName: 'askFor', input: { fieldIds: ['first_name', 'last_name'] } },
-      ], fresh(), askedFirstName)
-      expect(turn.blocks).toContainEqual({ kind: 'field_ask', fieldId: 'last_name' })
-      expect(turn.blocks).not.toContainEqual({ kind: 'field_ask', fieldId: 'first_name' })
-    })
-
-    it('points the fallback ask at a field not yet on screen', async () => {
-      // The prior turn asked exactly the field the fallback would pick — the
-      // first outstanding one — so an unaware fallback re-asks it.
-      const [first] = outstandingFields(fresh())
-      const askedFirst: readonly Turn[] = [{
-        seq: 1, at: AT, role: 'agent', voice: null,
-        blocks: [{ kind: 'field_ask', fieldId: first! }],
-      }]
-      const { turn } = await run('Sure.', [
-        { toolName: 'askFor', input: { fieldIds: ['not_a_field'] } },
-      ], fresh(), askedFirst)
-      expect(turn.blocks).toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
-      const asks = turn.blocks.filter((b) => b.kind === 'field_ask')
-      expect(asks.length).toBeGreaterThan(0)
-      expect(asks).not.toContainEqual({ kind: 'field_ask', fieldId: first })
-    })
-
-    it('shows only the notice when everything outstanding is already on screen', async () => {
-      // One requirement left, already asked: a whiffed call must not re-ask it.
-      let state = fresh()
-      for (const id of outstandingFields(state).slice(1)) {
-        state = applicationReducer(state, {
-          type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
-        })
-      }
-      const [remaining] = outstandingFields(state)
-      const onScreen: readonly Turn[] = [{
-        seq: 1, at: AT, role: 'agent', voice: null,
-        blocks: [{ kind: 'field_ask', fieldId: remaining! }],
-      }]
-      const { turn } = await run('Sure.', [
-        { toolName: 'askFor', input: { fieldIds: ['not_a_field'] } },
-      ], state, onScreen)
-      expect(turn.blocks).toEqual([{ kind: 'notice', copyId: 'guard_fallback' }])
-    })
-  })
-
   it('never says "keep going with what\'s left" when nothing is left', async () => {
     // The completion moment: every field answered, the model says so with no
     // tool calls. The fallback notice under that voice would contradict it.
-    let state = fresh()
-    for (const id of outstandingFields(state)) {
-      state = applicationReducer(state, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
-      })
-    }
+    const state = answeredExcept([])
     const { turn } = await run('Everything looks to be in order.', [], state)
     expect(turn.voice).toBe('Everything looks to be in order.')
     expect(turn.blocks).toEqual([])
@@ -269,6 +142,88 @@ describe('runTurn', () => {
     ]
     const { turn } = await run('Sure.', ASK_NAME, fresh(), prior)
     expect(turn.seq).toBe(7)
+  })
+
+  // The planner, not the model, decides what group of questions is on
+  // screen this turn.
+  describe('plan-driven turns', () => {
+    it('a turn with no tool calls still presents the planned group', async () => {
+      const state = answeredExcept(['addr_city'])
+      const { turn } = await run('Here is the next part.', [], state)
+      expect(turn.blocks[0]).toMatchObject({ kind: 'section_header', section: 'address' })
+      expect(turn.blocks).toContainEqual({ kind: 'field_ask', fieldId: 'addr_city' })
+      expect(turn.voice).toBe('Here is the next part.')
+    })
+
+    it('does not re-present the section the applicant is already looking at', async () => {
+      const state = answeredExcept(['addr_city'])
+      const presented: Turn = {
+        seq: 1, at: AT, role: 'agent', voice: null,
+        blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 1 }],
+      }
+      const { turn } = await run('It is for your records.', [
+        { toolName: 'explain', input: { fieldId: 'addr_city' } },
+      ], state, [presented])
+      expect(turn.blocks).toEqual([{ kind: 'rationale', fieldId: 'addr_city' }])
+    })
+
+    it('a gapped Done re-presents the missing fields behind the notice', async () => {
+      const state = answeredExcept(['addr_city', 'addr_zip'])
+      const presented: Turn = {
+        seq: 1, at: AT, role: 'agent', voice: null,
+        blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 2 }],
+      }
+      const { turn } = await run('Nearly there.', [], state, [presented], 'address')
+      expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'section_incomplete' })
+      expect(turn.blocks[1]).toMatchObject({ kind: 'section_header', section: 'address' })
+    })
+
+    it('a setProfile this turn reshapes the plan it presents', async () => {
+      const state = answeredExcept([])          // nothing outstanding as individual
+      const { turn, actions } = await run('Noted.', [
+        { toolName: 'setProfile', input: { patch: { applicantType: 'business' } } },
+      ], state)
+      expect(actions).toHaveLength(1)
+      // business profile re-opens business/tax requirements — the group presented
+      // must come from the post-action state, not the stale one.
+      expect(turn.blocks.some((b) => b.kind === 'section_header')).toBe(true)
+    })
+
+    it('sensitive fields in the group suppress voice and stand the fallback line in', async () => {
+      const state = answeredExcept(['dl_number'])
+      const { turn } = await run('One more thing.', [], state)
+      expect(turn.voice).toBeNull()
+      expect(turn.voiceDropped).toBe('sensitive')
+      expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'guard_fallback' })
+    })
+
+    it('a voice-only reply mid-section is a legal turn — no fallback appended', async () => {
+      const state = answeredExcept(['addr_city'])
+      const presented: Turn = {
+        seq: 1, at: AT, role: 'agent', voice: null,
+        blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 1 }],
+      }
+      const { turn } = await run('Take your time.', [], state, [presented])
+      expect(turn.voice).toBe('Take your time.')
+      expect(turn.blocks).toEqual([])
+    })
+
+    it('a whiffed turn mid-section falls back to the vetted line alone', async () => {
+      const state = answeredExcept(['addr_city'])
+      const presented: Turn = {
+        seq: 1, at: AT, role: 'agent', voice: null,
+        blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 1 }],
+      }
+      const { turn } = await run('', [], state, [presented])
+      expect(turn.blocks).toEqual([{ kind: 'notice', copyId: 'guard_fallback' }])
+    })
+
+    it('the final Done is contradiction-free — no blocks, no fallback', async () => {
+      const state = answeredExcept([])
+      const { turn } = await run('All set.', [], state, [], 'contact')
+      expect(turn.blocks).toEqual([])
+      expect(turn.voice).toBe('All set.')
+    })
   })
 })
 
@@ -294,7 +249,7 @@ describe('effort', () => {
     await runTurn({
       model, view: toOrchestratorView(state, []), state,
       transcript: [], uploadedDocs: [], userText: null,
-      isResume: false, at: AT, effort, isAnthropic,
+      isResume: false, at: AT, effort, isAnthropic, doneWith: null,
     })
     return seen as Record<string, Record<string, unknown>> | undefined
   }

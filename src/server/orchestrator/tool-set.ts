@@ -29,7 +29,6 @@ export function activeToolsFor(view: OrchestratorView, isResume: boolean): ToolN
   if (view.panelOnly) return []
 
   const active: ToolName[] = ['explain', 'setProfile']
-  if (view.outstanding.length > 0) active.push('askFor')
   if (view.documentsOutstanding.length > 0) active.push('requestDocument')
   if (isResume) active.push('orient')
   return active

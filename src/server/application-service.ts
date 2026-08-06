@@ -8,6 +8,7 @@ import {
   applicationReducer, createApplication as newApplication,
 } from '@/domain/application/reducer'
 import type { DocType } from '@/domain/field-id'
+import { planTurnBlocks } from '@/domain/orchestrator/plan'
 import { PANEL_ONLY_THRESHOLD, toOrchestratorView } from '@/domain/orchestrator/view'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { runTurn, type TurnRequest, type TurnResult } from '@/server/orchestrator/service'
@@ -158,6 +159,7 @@ export async function applyTurn(
       userText: text,
       isResume: input.isResume,
       at: input.at,
+      doneWith: null, // Task 6 threads the real value.
     })
 
     // Re-read from the store rather than reuse `current`: this is the state
@@ -248,7 +250,10 @@ async function runTurnSafely(
         at: rest.at,
         role: 'agent',
         voice: null,
-        blocks: [{ kind: 'notice', copyId: 'degraded_notice' }],
+        blocks: [
+          { kind: 'notice', copyId: 'degraded_notice' },
+          ...planTurnBlocks(rest.state, rest.transcript, rest.doneWith),
+        ],
       },
       actions: [],
       rejections: [],

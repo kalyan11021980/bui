@@ -26,12 +26,15 @@ describe('systemPrompt', () => {
     expect(systemPrompt()).toMatch(/never/i)
   })
 
-  // Measured against the local model: nought of four turns called a tool
-  // without this, four of four with it. The blocks are what the applicant
-  // actually sees, so a turn that calls nothing is a wasted turn.
-  it('requires a tool call on every reply, and names the fallback tool', () => {
-    expect(systemPrompt()).toMatch(/every reply must include at least one tool call/i)
-    expect(systemPrompt()).toContain('askFor')
+  // The planner places the section's questions; the model narrates. A reply
+  // with no tool call is the designed-for case now, not a wasted turn.
+  it('tells the model a tool-free reply is normal, and never mentions askFor', () => {
+    expect(systemPrompt()).toMatch(/reply with no tool call is normal/i)
+    expect(systemPrompt()).not.toContain('askFor')
+  })
+
+  it('tells the model it cannot ask questions itself', () => {
+    expect(systemPrompt()).toMatch(/cannot ask questions/i)
   })
 })
 
