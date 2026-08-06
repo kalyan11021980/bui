@@ -131,10 +131,16 @@ export function useConversation(
   return { turns, pending, send, sendDone, ingest }
 }
 
-/** What is new in `state.transcript` since `seen`, advancing it as a side effect. */
+/**
+ * What is new in `state.transcript` since `seen`, advancing it as a side
+ * effect. Never backward: `ingest` can be handed a state that is locally
+ * stale (a state update that lands out of order relative to another),
+ * and rewinding `seen` from it would make the next real response re-append
+ * turns already shown — a duplicate `turn.seq` React key, the group twice.
+ */
 function newSince(state: ApplicationState, seen: { current: number }): readonly Turn[] {
   const fresh = state.transcript.filter((turn) => turn.seq > seen.current)
-  seen.current = state.transcript.length
+  seen.current = Math.max(seen.current, state.transcript.length)
   return fresh
 }
 

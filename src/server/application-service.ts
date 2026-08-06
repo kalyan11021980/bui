@@ -74,14 +74,25 @@ export function presentPlan(
   const blocks = planTurnBlocks(current, current.transcript, null)
   if (blocks.length === 0) return { ok: true, value: withoutOwnerToken(current) }
 
-  const next = commit(current, {
-    type: 'APPEND_TURN',
-    at,
-    turn: {
-      seq: current.transcript.length + 1, at, role: 'agent', voice: null, blocks,
-    },
-  })
-  return { ok: true, value: withoutOwnerToken(next) }
+  try {
+    const next = commit(current, {
+      type: 'APPEND_TURN',
+      at,
+      turn: {
+        seq: current.transcript.length + 1, at, role: 'agent', voice: null, blocks,
+      },
+    })
+    return { ok: true, value: withoutOwnerToken(next) }
+  } catch (error) {
+    if (error instanceof ApplicationSubmittedError) {
+      return { ok: false, failure: failure('submitted', error.message) }
+    }
+    // Mirrors applyAction/applyTurn: a rejected reducer throws, not a 500.
+    return {
+      ok: false,
+      failure: failure('rejected', error instanceof Error ? error.message : 'Presentation rejected'),
+    }
+  }
 }
 
 export function getApplication(

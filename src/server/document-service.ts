@@ -123,9 +123,9 @@ export async function ingestDocument(
   }
 
   // The upload is an applicant act, so its response presents the group —
-  // same as a turn would, deterministically. A concurrent submit landing
-  // meanwhile is not this upload's failure to report; the state it has is
-  // what goes back.
+  // same as a turn would, deterministically. On failure (a refusal, or
+  // presentPlan's own reducer call throwing) the upload still succeeds,
+  // carrying the state it already has.
   const presented = presentPlan(input.applicationId, input.ownerToken, input.at)
   if (presented.ok) state = presented.value
 

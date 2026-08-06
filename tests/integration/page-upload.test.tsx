@@ -356,6 +356,45 @@ describe('the page', () => {
     const row = await screen.findByRole('group', { name: /driver's license number/i })
     expect(within(row).getByRole('button', { name: /looks right/i })).toBeInTheDocument()
     expect(screen.getByText(/identification/i)).toBeInTheDocument()
+    // The third symptom in the report: no Done bar either.
+    expect(screen.getByRole('button', { name: /done with this section/i })).toBeInTheDocument()
+  })
+
+  it('presents the group once under StrictMode — the double-invoked ingest effect stays idempotent', async () => {
+    // StrictMode double-invokes effects. ConversationShell's ingest effect
+    // dedupes on the transcript's own seq, but this pins that down against
+    // the presenting turn actually being appended twice into the log.
+    window.history.replaceState({}, '', '/')
+
+    const presentingTurn: Turn = {
+      seq: 1, at: '2026-08-06T00:00:00.000Z', role: 'agent', voice: null,
+      blocks: [
+        { kind: 'section_header', section: 'identification', done: 0, total: 1 },
+        { kind: 'field_ask', fieldId: 'dl_number' },
+      ],
+    }
+    respond = (call) =>
+      call.url.endsWith('/documents')
+        ? {
+            status: 200,
+            body: {
+              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              state: { ...withDlNumber(created()), transcript: [presentingTurn] },
+            },
+          }
+        : asServer(call)
+
+    render(<StrictMode><Page /></StrictMode>)
+    await screen.findByRole('region', { name: /registration agent/i })
+
+    await userEvent.upload(
+      screen.getByLabelText(/upload photo/i),
+      new File(['x'], 'licence.png', { type: 'image/png' }),
+    )
+
+    await screen.findByRole('group', { name: /driver's license number/i })
+    expect(screen.getAllByRole('group', { name: /driver's license number/i })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /done with this section/i })).toHaveLength(1)
   })
 
   it('shows the part of the document each value was read from', async () => {

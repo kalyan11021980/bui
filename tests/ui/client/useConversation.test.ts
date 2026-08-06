@@ -287,5 +287,29 @@ describe('useConversation', () => {
 
       expect(result.current.turns).toEqual([echo, turn])
     })
+
+    it('never rewinds the seen cursor for a stale ingest — a later ingest does not duplicate', () => {
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const { result } = renderHook(() => useConversation('app-1', OWNER, state, () => undefined, runNow))
+
+      const turn1: Turn = { seq: 1, at: AT, role: 'agent', voice: null, blocks: [] }
+      const fresh: ApplicationState = { ...state, transcript: [turn1] }
+      act(() => result.current.ingest(fresh))
+      expect(result.current.turns).toEqual([turn1])
+
+      // A locally-stale state — shorter transcript than what has already been
+      // shown, e.g. one reduced from an earlier snapshot. Must not rewind
+      // the cursor.
+      const stale: ApplicationState = { ...state, transcript: [] }
+      act(() => result.current.ingest(stale))
+      expect(result.current.turns).toEqual([turn1])
+
+      const turn2: Turn = { seq: 2, at: AT, role: 'agent', voice: null, blocks: [] }
+      const newer: ApplicationState = { ...state, transcript: [turn1, turn2] }
+      act(() => result.current.ingest(newer))
+
+      // turn1 must not be appended a second time.
+      expect(result.current.turns).toEqual([turn1, turn2])
+    })
   })
 })
