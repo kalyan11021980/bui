@@ -6,7 +6,7 @@
  * Bump COPY_VERSION on any edit: it is an input to the shown-copy hash, which
  * is what lets an attestation be reconstructed after a change.
  */
-export const COPY_VERSION = '8'
+export const COPY_VERSION = '9'
 
 export const ALL_COPY_IDS = [
   'opening_beat',
@@ -45,11 +45,11 @@ export const COPY: Readonly<Record<VettedCopyId, string>> = Object.freeze({
     'Ready? The fastest start is your driver\'s license. One photo fills in about eight things.',
   ].join('\n\n'),
 
-  start_headline: "Hi — let's get you set up to bid at IAA.",
+  start_headline: "Hi, let's get you set up to bid at IAA.",
 
   start_subline:
     "I'm your registration agent. I'll ask a few things and fill in what I can "
-    + "from your documents — the fastest start is your driver's license.",
+    + "from your documents. The fastest start is your driver's license.",
 
   guard_fallback: "Let's keep going with what's left.",
 
