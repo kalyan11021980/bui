@@ -63,4 +63,30 @@ describe('OpeningUploadCard', () => {
     )
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('shows the reading status in place of the upload control while its photo is read', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    render(
+      <OpeningUploadCard
+        state={state} onReadDocument={vi.fn()} prepare={prepare}
+        readingDocTypes={['drivers_license']}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(/reading your photo/i)
+    expect(screen.queryByLabelText(/upload photo/i)).toBeNull()
+  })
+
+  it('keeps the upload control when a different doc type is being read', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    render(
+      <OpeningUploadCard
+        state={state} onReadDocument={vi.fn()} prepare={prepare}
+        readingDocTypes={['dealer_license']}
+      />,
+    )
+
+    expect(screen.getByLabelText(/upload photo/i)).toBeInTheDocument()
+    expect(screen.queryByText(/reading your photo/i)).toBeNull()
+  })
 })
