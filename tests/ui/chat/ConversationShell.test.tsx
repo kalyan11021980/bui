@@ -3,8 +3,9 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
 import type { BlockHandlers } from '@/ui/chat/blocks'
-import { createApplication } from '@/domain/application/reducer'
+import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import type { ApplicationState } from '@/domain/application/state'
+import type { DocType } from '@/domain/field-id'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { sendAction } from '@/ui/client/application-api'
@@ -45,7 +46,7 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => void
   onState: (state: ApplicationState) => void
   runSerialized: (run: () => Promise<void>) => void
-  readingDocument: boolean
+  readingDocTypes: readonly DocType[]
 } = {
   onChange: () => undefined,
   onClear: () => undefined,
@@ -54,14 +55,14 @@ const noHandlers: BlockHandlers & {
   onSubmit: () => undefined,
   onState: () => undefined,
   runSerialized: runNow,
-  readingDocument: false,
+  readingDocTypes: [],
 }
 
 beforeEach(() => { calls = [] })
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('ConversationShell', () => {
-  it('renders the opening beat before any turn exists, with no fetch at all', () => {
+  it('renders the start greeting before any turn exists, with no fetch at all', () => {
     stubFetch(() => ({ status: 200, body: {} }))
     const state = createApplication('app-1', PROFILE, OWNER)
 
@@ -69,13 +70,11 @@ describe('ConversationShell', () => {
       <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
     )
 
-    expect(screen.getByText(/I'm your registration agent/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /set up to bid at IAA/i })).toBeInTheDocument()
     expect(calls).toHaveLength(0)
   })
 
-  it('cannot render the opening beat via a model call — the copy is local, not fetched', () => {
-    // A provider that never resolves would leave the beat missing forever if
-    // it were gated on a turn. Never letting fetch settle proves it is not.
+  it('cannot render the greeting via a model call — the copy is local, not fetched', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     const state = createApplication('app-1', PROFILE, OWNER)
 
@@ -83,7 +82,7 @@ describe('ConversationShell', () => {
       <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
     )
 
-    expect(screen.getByText(/I'm your registration agent/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /set up to bid at IAA/i })).toBeInTheDocument()
   })
 
   it('sends what the applicant types to the turn endpoint, as intent text', async () => {
@@ -330,32 +329,131 @@ describe('ConversationShell', () => {
     }
   })
 
-  it('shows a reading-document status line while a photo is being read', () => {
+  it('starts centered and docks on the first send', async () => {
+    const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+    const agentTurn: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Hello!', blocks: [] }
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+
+    stubFetch((call) =>
+      call.url.endsWith('/turn')
+        ? { status: 200, body: { state: after, turn: agentTurn } }
+        : { status: 200, body: after },
+    )
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+    expect(screen.getByRole('heading', { name: /set up to bid/i })).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    // The optimistic echo alone docks the layout — before the agent answers.
+    expect(screen.queryByRole('heading', { name: /set up to bid/i })).toBeNull()
+    expect(screen.getByRole('log')).toBeInTheDocument()
+    await screen.findByText('Hello!')
+  })
+
+  it('docks when the first photo starts reading, status shown on the card alone', () => {
     stubFetch(() => ({ status: 200, body: {} }))
     const state = createApplication('app-1', PROFILE, OWNER)
+
+    const { rerender } = render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+    rerender(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={state}
+        {...noHandlers} readingDocTypes={['drivers_license']}
+      />,
+    )
+
+    expect(screen.queryByRole('heading', { name: /set up to bid/i })).toBeNull()
+    // Inline on the card, and nowhere else.
+    expect(screen.getAllByText(/reading your photo/i)).toHaveLength(1)
+    expect(screen.queryByLabelText(/upload photo/i)).toBeNull()
+  })
+
+  it('stays docked after a failed first read leaves nothing behind', () => {
+    stubFetch(() => ({ status: 200, body: {} }))
+    const state = createApplication('app-1', PROFILE, OWNER)
+
+    const { rerender } = render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+    rerender(
+      <ConversationShell
+        applicationId="app-1" ownerToken={OWNER} state={state}
+        {...noHandlers} readingDocTypes={['drivers_license']}
+      />,
+    )
+    rerender(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+
+    expect(screen.queryByRole('heading', { name: /set up to bid/i })).toBeNull()
+  })
+
+  it('floats the reading line for a read no visible card shows', () => {
+    stubFetch(() => ({ status: 200, body: {} }))
+    const base = createApplication('app-1', PROFILE, OWNER)
+    const state = applicationReducer(base, {
+      type: 'RECORD_DOCUMENT', documentId: 'doc-1',
+      docType: 'drivers_license', at: AT,
+    })
 
     render(
       <ConversationShell
         applicationId="app-1" ownerToken={OWNER} state={state}
-        {...noHandlers} readingDocument
+        {...noHandlers} readingDocTypes={['dealer_license']}
       />,
     )
 
     expect(screen.getByText(/reading your photo/i)).toBeInTheDocument()
   })
 
-  it('shows no reading-document line when no photo is in flight', () => {
+  it('a resumed conversation never sees the start screen', () => {
     stubFetch(() => ({ status: 200, body: {} }))
-    const state = createApplication('app-1', PROFILE, OWNER)
+    const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: 'Welcome back.', blocks: [] }
+    const base = createApplication('app-1', PROFILE, OWNER)
+    const state: ApplicationState = { ...base, transcript: [turn] }
 
     render(
-      <ConversationShell
-        applicationId="app-1" ownerToken={OWNER} state={state}
-        {...noHandlers} readingDocument={false}
-      />,
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
     )
 
-    expect(screen.queryByText(/reading your photo/i)).toBeNull()
+    expect(screen.queryByRole('heading', { name: /set up to bid/i })).toBeNull()
+  })
+
+  it('runs the first action through a view transition when the platform has one', async () => {
+    // Same shape as dock-transition.test.ts: the lib's own return type, so
+    // the mock assigns without a cast; `delete` needs `as any` for the same
+    // reason it does there — the property isn't declared optional on `Document`.
+    type VTDocument = Document & { startViewTransition?: (cb: () => void) => ViewTransition }
+    const doc = document as VTDocument
+    const vt = vi.fn((cb: () => void) => { cb(); return {} as ViewTransition })
+    doc.startViewTransition = vt
+    try {
+      const state = createApplication('app-1', PROFILE, OWNER)
+      // A well-shaped /turn response — an unhandled rejection from a bare
+      // `{}` body would otherwise fail the run despite the assertion below.
+      stubFetch((call) =>
+        call.url.endsWith('/turn')
+          ? { status: 200, body: { state, turn: null } }
+          : { status: 200, body: {} },
+      )
+
+      render(
+        <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+      )
+      await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+      await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+      expect(vt).toHaveBeenCalledTimes(1)
+    } finally {
+      delete (doc as any).startViewTransition
+    }
   })
 
   it('refuses to send once the application is submitted, without disabling the composer', async () => {

@@ -3,14 +3,18 @@
 import { useEffect, useRef } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
-import { vettedCopy } from '@/domain/orchestrator/copy'
+import type { DocType } from '@/domain/field-id'
+import { documentsToUpload } from '@/domain/requirements/documents'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import type { BlockHandlers } from './blocks'
 import { CompletionCard } from './CompletionCard'
 import { Composer } from './Composer'
+import { withViewTransition } from './dock-transition'
 import { OpeningUploadCard } from './OpeningUploadCard'
 import { SectionDoneBar } from './SectionDoneBar'
+import { StartScreen } from './StartScreen'
+import { StatusLine, READING_PHOTO } from './StatusLine'
 import { Suggestions } from './Suggestions'
 import { TurnView } from './TurnView'
 
@@ -36,8 +40,8 @@ type Props = BlockHandlers & {
    * needs the same ordering guarantee `readDocument` already relies on it for.
    */
   runSerialized: (run: () => Promise<void>) => void
-  /** True for the whole in-flight window of an OCR read — queued or fetching. */
-  readingDocument: boolean
+  /** Doc types with a read in flight — queued or fetching. */
+  readingDocTypes: readonly DocType[]
 }
 
 /**
@@ -55,15 +59,25 @@ const logStyle: React.CSSProperties = {
   flex: 1, display: 'flex', flexDirection: 'column',
 }
 
+/** The start screen centres the same column instead of growing a log. */
+const startShellStyle: React.CSSProperties = {
+  ...shellStyle, justifyContent: 'center', paddingBottom: 24,
+}
+
+/** Docked only: grows so the sticky composer stays pinned below the log. */
+const contentStyle: React.CSSProperties = {
+  flex: 1, display: 'flex', flexDirection: 'column',
+}
+
 /**
- * The opening beat, the turns, the composer. The opening beat is fixed
- * vetted copy — no turn, no fetch — so a cold or unreachable model never
- * costs the applicant the introduction; everything below it comes from
- * `useConversation`.
+ * Centered start screen before the first action, docked conversation after.
+ * The greeting is fixed vetted copy — no turn, no fetch — so a cold or
+ * unreachable model never costs the applicant the introduction; everything
+ * past the dock comes from `useConversation`.
  */
 export function ConversationShell({
   applicationId, ownerToken, state, onSubmit, onChange, onClear, onConfirm, onReadDocument, onState, runSerialized,
-  readingDocument,
+  readingDocTypes,
 }: Props) {
   const { turns, pending, send, sendDone, ingest } = useConversation(
     applicationId, ownerToken, state, onState, runSerialized,
@@ -105,66 +119,95 @@ export function ConversationShell({
   const sendable = !pending && ownerToken !== null && !closed
   const suggestible = outstandingFields(state)
 
+  const startedNow = turns.length > 0 || state.transcript.length > 0
+    || state.documents.length > 0 || readingDocTypes.length > 0 || pending
+    || state.submittedAt !== null
+  // Latches: a failed first read — nothing committed, nothing pending — must
+  // not un-dock the screen (spec §1).
+  const startedRef = useRef(startedNow)
+  if (startedNow) startedRef.current = true
+  const started = startedRef.current
+
+  // First action docks the layout, animated where the platform allows.
+  // Composer refuses empty drafts before onSend, so a blank send never docks.
+  const dockOn = <A extends unknown[]>(fn: (...args: A) => void) =>
+    (...args: A): void => {
+      if (startedRef.current) { fn(...args); return }
+      startedRef.current = true
+      withViewTransition(() => fn(...args))
+    }
+  const sendDocking = dockOn(send)
+  const readDocking = dockOn(onReadDocument)
+
+  // A read shown on the visible card is not repeated as a floating line.
+  const cardDocType = documentsToUpload(state.profile)[0]!
+  const cardVisible = state.submittedAt === null
+    && !state.documents.some((d) => d.docType === cardDocType)
+  const floatingReads = readingDocTypes.filter((t) => !(cardVisible && t === cardDocType))
+
   return (
-    <section aria-label="Registration agent" style={shellStyle}>
-      {vettedCopy('opening_beat').split('\n\n').map((paragraph, index) => (
-        <p key={index} className="mb-3 text-[15px] leading-relaxed">{paragraph}</p>
-      ))}
+    <section aria-label="Registration agent" style={started ? shellStyle : startShellStyle}>
+      <div style={started ? contentStyle : undefined}>
+        {started ? (
+          <>
+            <OpeningUploadCard
+              state={state} onReadDocument={readDocking} readingDocTypes={readingDocTypes}
+            />
 
-      <OpeningUploadCard state={state} onReadDocument={onReadDocument} />
+            {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
+                whatever the applicant is doing, and must never steal focus. */}
+            <div ref={logRef} role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
+              {turns.map((turn) => (
+                <TurnView
+                  key={turn.seq}
+                  turn={turn}
+                  state={state}
+                  onChange={blockChange}
+                  onClear={blockClear}
+                  onConfirm={blockConfirm}
+                  onReadDocument={readDocking}
+                />
+              ))}
+            </div>
 
-      {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
-          whatever the applicant is doing, and must never steal focus. */}
-      <div ref={logRef} role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
-        {turns.map((turn) => (
-          <TurnView
-            key={turn.seq}
-            turn={turn}
+            {/* The OCR read is multi-second and otherwise silent. Only reads no
+                visible card is already showing land here. */}
+            {floatingReads.length > 0 && <StatusLine text={READING_PHOTO} />}
+
+            {/* The agent's slot, held while it thinks. Not a spinner for its own
+                sake: a turn is one to ten seconds, and an empty screen after the
+                composer clears reads as an app that dropped what you said. */}
+            {pending && <StatusLine text="Thinking…" />}
+
+            <SectionDoneBar state={state} turns={turns} sendable={sendable} onDone={sendDone} />
+
+            <CompletionCard state={state} onSubmit={onSubmit} />
+          </>
+        ) : (
+          <StartScreen
             state={state}
-            onChange={blockChange}
-            onClear={blockClear}
-            onConfirm={blockConfirm}
-            onReadDocument={onReadDocument}
+            fieldIds={suggestible}
+            disabled={!sendable}
+            onPick={sendDocking}
+            onReadDocument={readDocking}
+            readingDocTypes={readingDocTypes}
           />
-        ))}
+        )}
       </div>
 
-      {/* The OCR read is multi-second and otherwise silent — nothing else on
-          screen changes while it runs. Both this and the turn indicator below
-          can show at once; they just stack. */}
-      {readingDocument && (
-        <p role="status" className="my-2 text-[13px] text-text-secondary">
-          <span aria-hidden="true" style={{ letterSpacing: 2 }}>•••</span>{' '}
-          Reading your photo…
-        </p>
-      )}
-
-      {/* The agent's slot, held while it thinks. Not a spinner for its own
-          sake: a turn is one to ten seconds, and an empty screen after the
-          composer clears reads as an app that dropped what you said. */}
-      {pending && (
-        <p role="status" className="my-2 text-[13px] text-text-secondary">
-          <span aria-hidden="true" style={{ letterSpacing: 2 }}>•••</span>{' '}
-          Thinking…
-        </p>
-      )}
-
-      <SectionDoneBar state={state} turns={turns} sendable={sendable} onDone={sendDone} />
-
-      <CompletionCard state={state} onSubmit={onSubmit} />
-
-      <div className="sticky bottom-0 flex flex-col gap-2 bg-page pb-5">
-        <Suggestions
-          fieldIds={suggestible}
-          disabled={!sendable}
-          onPick={send}
-        />
-
+      <div
+        className={started ? 'sticky bottom-0 flex flex-col gap-2 bg-page pb-5' : 'mt-5'}
+        style={{ viewTransitionName: 'composer' }}
+      >
+        {started && (
+          <Suggestions fieldIds={suggestible} disabled={!sendable} onPick={sendDocking} />
+        )}
         <Composer
+          size={started ? 'docked' : 'hero'}
           sendable={sendable}
-          onSend={send}
+          onSend={sendDocking}
           state={state}
-          onReadDocument={onReadDocument}
+          onReadDocument={readDocking}
         />
       </div>
     </section>

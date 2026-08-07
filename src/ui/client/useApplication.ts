@@ -42,8 +42,6 @@ export type UseApplication = {
   notice: string | null
   /** The server is behind what is on screen, and the applicant should know. */
   outOfStep: boolean
-  /** True for the whole in-flight window of a document read — queued or fetching. */
-  readingDocument: boolean
   /** One entry per in-flight read — the doc types queued or fetching. */
   readingDocTypes: readonly DocType[]
   carry: CarryNotice | null
@@ -199,7 +197,7 @@ export function useApplication(): UseApplication {
 
   return {
     state, documents: docImages, notice, outOfStep,
-    readingDocument: readingDocs.length > 0, readingDocTypes: readingDocs, carry,
+    readingDocTypes: readingDocs, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
