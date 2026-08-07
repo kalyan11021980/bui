@@ -44,6 +44,8 @@ export type UseApplication = {
   outOfStep: boolean
   /** True for the whole in-flight window of a document read — queued or fetching. */
   readingDocument: boolean
+  /** One entry per in-flight read — the doc types queued or fetching. */
+  readingDocTypes: readonly DocType[]
   carry: CarryNotice | null
   /** Null until the application has started — see `ConversationShell`'s own prop. */
   ownerToken: string | null
@@ -78,10 +80,10 @@ export function useApplication(): UseApplication {
   const [docImages, setDocImages] = useState<DocumentImages>({})
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
-  // A count, not a flag: nothing here disables an upload input mid-read, so
-  // a second photo can be chosen while the first is still in flight — a flag
-  // would clear the moment either one settles, even with the other still open.
-  const [readingCount, setReadingCount] = useState(0)
+  // An array, not a flag: nothing here disables an upload input mid-read, so
+  // a second photo can be chosen while the first is still in flight — and the
+  // card for one doc type must not read as busy because another one is.
+  const [readingDocs, setReadingDocs] = useState<readonly DocType[]>([])
   const [carry, setCarry] = useState<CarryNotice | null>(null)
 
   // Requests run one after another, so the server applies them in the order
@@ -158,7 +160,7 @@ export function useApplication(): UseApplication {
     setNotice(READING)
     // Incremented before the request is even queued, so the count covers a
     // wait behind an earlier write too, not just the fetch itself.
-    setReadingCount((n) => n + 1)
+    setReadingDocs((held) => [...held, docType])
 
     enqueue(async () => {
       try {
@@ -187,13 +189,16 @@ export function useApplication(): UseApplication {
         setCarry(null)
         setNotice(readNotice(result.value))
       } finally {
-        setReadingCount((n) => n - 1)
+        setReadingDocs((held) => {
+          const at = held.indexOf(docType)
+          return [...held.slice(0, at), ...held.slice(at + 1)]
+        })
       }
     })
   }
 
   return {
-    state, documents: docImages, notice, outOfStep, readingDocument: readingCount > 0, carry,
+    state, documents: docImages, notice, outOfStep, readingDocument: readingDocs.length > 0, readingDocTypes: readingDocs, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
