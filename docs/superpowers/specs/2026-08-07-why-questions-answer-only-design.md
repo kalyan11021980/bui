@@ -30,8 +30,8 @@ A **why-shaped applicant turn never triggers a section presentation** — not
 the first, not an advancing one. The answer arrives alone; the group presents
 on the next non-why turn (or upload, or Done).
 
-Why-shaped: trimmed, lowercased text that starts with `"why "` or contains
-`"why do you"`.
+Why-shaped: trimmed, lowercased text that starts with the word "why"
+(`/^why\b/`) or contains "why do you".
 
 Unchanged behavior:
 

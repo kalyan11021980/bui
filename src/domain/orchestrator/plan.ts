@@ -60,7 +60,7 @@ export function lastPresentedSection(transcript: readonly Turn[]): Section | nul
  *  — the model never chooses grouping, so neither does it choose this. */
 export function isWhyShaped(text: string): boolean {
   const t = text.trim().toLowerCase()
-  return t.startsWith('why ') || t.includes('why do you')
+  return /^why\b/.test(t) || t.includes('why do you')
 }
 
 /**

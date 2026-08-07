@@ -153,12 +153,16 @@ describe('isWhyShaped', () => {
     expect(isWhyShaped('Why do you ask "Which ID will you use?"')).toBe(true)
     expect(isWhyShaped('  WHY is that required')).toBe(true)
     expect(isWhyShaped('tell me why do you need this')).toBe(true)
+    expect(isWhyShaped('Why?')).toBe(true)
+    expect(isWhyShaped("Why's that needed?")).toBe(true)
   })
 
   it('rejects non-why intents', () => {
     expect(isWhyShaped('What else do you need?')).toBe(false)
     expect(isWhyShaped("I'm ready")).toBe(false)
     expect(isWhyShaped('Tell me why later')).toBe(false)
+    // No word boundary between "why" and "ever" — not a why-question.
+    expect(isWhyShaped('Whyever would I mind')).toBe(false)
   })
 })
 

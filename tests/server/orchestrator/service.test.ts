@@ -115,6 +115,28 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBe('sensitive')
   })
 
+  it('leads with guard_fallback when the rationale intro sits behind another block', async () => {
+    // requestDocument survives first, so the rationale intro (framed just
+    // ahead of the rationale) is not at the turn's front — guard_fallback
+    // still belongs there, leading everything. Section already on screen so
+    // the planner adds nothing behind it.
+    const state = answeredExcept(['dl_number'])
+    const presented: Turn = {
+      seq: 1, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'identification', done: 0, total: 1 }],
+    }
+    const { turn } = await run('Photograph it, and here is why.', [
+      { toolName: 'requestDocument', input: { docType: 'drivers_license' } },
+      { toolName: 'explain', input: { fieldId: 'dl_number' } },
+    ], state, [presented])
+    expect(turn.blocks).toEqual([
+      { kind: 'notice', copyId: 'guard_fallback' },
+      { kind: 'document_request', docType: 'drivers_license' },
+      { kind: 'notice', copyId: 'rationale_intro' },
+      { kind: 'rationale', fieldId: 'dl_number' },
+    ])
+  })
+
   it('keeps voice for a document_request that backs no sensitive field', async () => {
     // dealer_license backs only business/license fields, none of which are
     // marked sensitive — the contrast case that proves suppression is keyed

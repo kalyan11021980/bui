@@ -87,6 +87,9 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   // ahead of it.
   const firstRationale = blocks.findIndex((b) => b.kind === 'rationale')
   const framedRationale = voice.text === null && firstRationale !== -1
+  // Only a leading intro pre-empts guard_fallback below — one behind another
+  // block (e.g. a document_request) doesn't put vetted words at the front.
+  const rationaleLeadsTurn = framedRationale && firstRationale === 0
   if (framedRationale) {
     blocks.splice(firstRationale, 0, { kind: 'notice', copyId: 'rationale_intro' })
   }
@@ -104,9 +107,9 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   // this case exists — chosen over silence on 2026-08-05, not invented here.
   // A sensitive drop always has a non-empty group on screen (the field/doc
   // that triggered it), so the empty-blocks case above never also applies —
-  // no need to guard against prepending twice. Skipped when the rationale
-  // intro already framed the turn, or the two notices stack and contradict.
-  if (voice.dropped === 'sensitive' && !framedRationale) {
+  // no need to guard against prepending twice. Skipped only when the
+  // rationale intro leads the turn — otherwise vetted words never open it.
+  if (voice.dropped === 'sensitive' && !rationaleLeadsTurn) {
     blocks.unshift({ kind: 'notice', copyId: 'guard_fallback' })
   }
 
