@@ -649,6 +649,18 @@ describe('profile bridge', () => {
     expect(outstandingFields(s)).toContain('location_state')
   })
 
+  it('does not confirm a bridged field the catalog rejects, even though the profile still takes the patch', () => {
+    // Built directly, bypassing the tightened wire schema — the reducer is
+    // the agent path's last line of defense against a value the field's own
+    // catalog validation would refuse.
+    let s = createApplication('a', START, 'tok')
+    const patch: Partial<ApplicantProfile> = { state: 'XX' }
+    s = applicationReducer(s, { type: 'UPDATE_PROFILE', at: T, patch })
+    expect(s.profile.state).toBe('XX')
+    expect(s.fields['location_state']).toBeUndefined()
+    expect(outstandingFields(s)).toContain('location_state')
+  })
+
   it('CLEAR_VALUE on a bridged determinant returns the field, not the profile', () => {
     // Five of the eight profile keys have no "unknown", and requirements
     // must be driven by something — the engine keeps the last declaration

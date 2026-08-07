@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { Action } from './state'
 import { ALL_COPY_IDS } from '../orchestrator/copy'
 import { ALL_DOC_TYPES } from '../field-id'
+import { ID_COUNTRIES, US_STATES } from '../catalog/geography'
 
 /**
  * The wire shape of an Action, and the only sanctioned way to turn untrusted
@@ -68,6 +69,26 @@ const supersede = z
 
 const licenseType = z.enum(['dealer', 'dismantler', 'exporter', 'salvage'])
 
+/** Wire-side echo of the two catalog lists — never hand-copied, so they cannot drift. */
+const stateCodes = US_STATES.map((s) => s.value) as [string, ...string[]]
+const idCountryCodes = new Set(ID_COUNTRIES.map((c) => c.value))
+const stateCode = z.enum(stateCodes)
+
+/**
+ * An agent volunteering 'US' or 'can' must land as the catalog's ISO-3 code,
+ * not a free string the field's own validation then rejects. Upper-cases,
+ * maps the common two-letter 'US' to 'USA', then requires membership in the
+ * catalog list — the parsed output is always the normalized code.
+ */
+const countryCode = z
+  .string()
+  .min(1)
+  .transform((v) => {
+    const upper = v.toUpperCase()
+    return upper === 'US' ? 'USA' : upper
+  })
+  .pipe(z.string().refine((v) => idCountryCodes.has(v), 'Unknown country'))
+
 /**
  * Strict because the profile is the only input to the requirements engine: an
  * unrecognised key changes nothing today and changes an applicant's legal
@@ -81,13 +102,13 @@ const licenseType = z.enum(['dealer', 'dismantler', 'exporter', 'salvage'])
 export const profilePatch = z
   .object({
     applicantType: z.enum(['business', 'individual']).optional(),
-    country: z.string().min(1).optional(),
-    state: z.string().nullable().optional(),
+    country: countryCode.optional(),
+    state: stateCode.nullable().optional(),
     wantsGsa: z.boolean().optional(),
     licenses: z.array(licenseType).optional(),
     addressDiffersFromId: z.boolean().optional(),
     idForm: z.enum(['drivers_license', 'state_id', 'passport']).optional(),
-    bizCountry: z.string().min(1).nullable().optional(),
+    bizCountry: countryCode.nullable().optional(),
   })
   .strict()
 

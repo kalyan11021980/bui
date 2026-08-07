@@ -208,6 +208,49 @@ describe('toAction', () => {
       type: 'UPDATE_PROFILE', at: '2026-08-07T00:00:00Z', patch: { bizCountry: 'CAN' },
     })
   })
+
+  it('normalizes a two-letter country code to the catalog\'s ISO-3', () => {
+    // An agent volunteering 'US' must not write a location_country the
+    // catalog's ISO-3 countrySchema then rejects.
+    const parsed = actionSchema.parse({
+      type: 'UPDATE_PROFILE', patch: { country: 'US' }, at: AT,
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
+    expect(action.patch).toEqual({ country: 'USA' })
+  })
+
+  it('lower-cases a bizCountry input and normalizes it too', () => {
+    const parsed = actionSchema.parse({
+      type: 'UPDATE_PROFILE', patch: { bizCountry: 'can' }, at: AT,
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
+    expect(action.patch).toEqual({ bizCountry: 'CAN' })
+  })
+
+  it('rejects a country that is not in the ISO-3 catalog list', () => {
+    expect(actionSchema.safeParse({
+      type: 'UPDATE_PROFILE', patch: { country: 'ZZZ' }, at: AT,
+    }).success).toBe(false)
+  })
+
+  it('rejects a state spelled out in full, keeping only the two-letter code', () => {
+    // 'Ohio' would make STATE_RULES['OHIO'] miss silently — the Ohio dealer
+    // would never be asked for the required form.
+    expect(actionSchema.safeParse({
+      type: 'UPDATE_PROFILE', patch: { state: 'Ohio' }, at: AT,
+    }).success).toBe(false)
+  })
+
+  it('accepts a two-letter state code', () => {
+    const parsed = actionSchema.parse({
+      type: 'UPDATE_PROFILE', patch: { state: 'OH' }, at: AT,
+    })
+    const action = toAction(parsed)
+    if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
+    expect(action.patch).toEqual({ state: 'OH' })
+  })
 })
 
 describe('describeZodError', () => {
@@ -232,7 +275,9 @@ describe('every profile key is reachable over the wire', () => {
   /** One valid value per key, so each can be sent on its own and read back. */
   const SAMPLE: { [K in keyof ApplicantProfile]: ApplicantProfile[K] } = {
     applicantType: 'business',
-    country: 'US',
+    // Already normalized: the schema now maps 'US' -> 'USA', which would
+    // otherwise break this sweep's round-trip equality on `country` alone.
+    country: 'USA',
     state: 'OH',
     wantsGsa: true,
     licenses: ['dealer'],
