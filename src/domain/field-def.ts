@@ -1,10 +1,12 @@
 import type { ZodType } from 'zod'
+import type { VettedCopyId } from './orchestrator/copy'
 import type { Authority } from './authority'
 import type { DocType, FieldId } from './field-id'
 import type { Section } from './section'
 
 export type FieldType =
   | 'text' | 'date' | 'select' | 'phone' | 'address' | 'file' | 'taxid'
+  | 'multiselect' | 'attest'
 
 /**
  * One choice in a `select`. Kept separate from the Zod enum because what is
@@ -42,6 +44,8 @@ type FieldDefBase<T> = {
   handling?: string
   /** Where the value lands, e.g. "W-9, line 1". */
   destination?: string
+  /** For `attest` fields: the vetted copy shown above the signature input. */
+  attestation?: VettedCopyId
   validation: ZodType<T>
   derivableFrom?: readonly DocType[]
   /**

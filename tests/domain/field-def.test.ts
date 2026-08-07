@@ -72,4 +72,17 @@ describe('defineField', () => {
       expect(label, key).not.toBe('')
     }
   })
+
+  it('accepts multiselect and attest field types', () => {
+    const def = defineField({
+      id: 'licenses_held',
+      label: 'Which business licenses do you hold?',
+      type: 'multiselect',
+      section: 'profile',
+      purpose: 'test',
+      authority: 'STATE_DEALER_BOARD',
+      validation: z.array(z.string()).min(1),
+    })
+    expect(def.type).toBe('multiselect')
+  })
 })

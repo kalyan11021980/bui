@@ -280,3 +280,4 @@ function enumOf(options: readonly FieldOption[], message: string) {
 
 export const usStateSchema = enumOf(US_STATES, 'Select your state')
 export const idCountrySchema = enumOf(ID_COUNTRIES, 'Select the issuing country')
+export const countrySchema = enumOf(ID_COUNTRIES, 'Select your country')
