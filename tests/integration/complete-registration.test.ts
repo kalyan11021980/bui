@@ -43,7 +43,9 @@ function valueFor(id: string, current: ApplicantProfile, fallback: string): unkn
     case 'address_differs': return current.addressDiffersFromId ? 'yes' : 'no'
     case 'wants_gsa': return current.wantsGsa ? 'yes' : 'no'
     case 'licenses_held': return current.licenses
-    case 'biz_country': return current.bizCountry
+    // A confirmed-null answer is a lie: biz_country is required for a
+    // business applicant, so this walk must record a real value for it.
+    case 'biz_country': return 'USA'
     default: return fallback
   }
 }

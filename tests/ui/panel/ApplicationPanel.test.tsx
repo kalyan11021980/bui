@@ -164,7 +164,7 @@ describe('ApplicationPanel', () => {
     })
     render(<ApplicationPanel state={s} />)
 
-    // CORE_ADDRESS is four fields; one of them is now answered.
+    // addressFields is four fields for a US applicant; one is now answered.
     const address = screen.getByRole('region', { name: /^address$/i })
     expect(within(address).getByText('1 of 4')).toBeInTheDocument()
     // Identification is untouched, so the two counts must differ — a bug that

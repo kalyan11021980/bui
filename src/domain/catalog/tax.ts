@@ -43,6 +43,9 @@ export const TAX_FIELDS: readonly FieldDef[] = [
     ]),
   }),
   defineField({
+    // Deliberately not `sensitive`: the value is a name already held openly
+    // in first_name/last_name, and this field is not orchestratorVisible, so
+    // it never reaches the model anyway.
     id: 'tax_certification',
     label: 'W-9 certification',
     type: 'attest',

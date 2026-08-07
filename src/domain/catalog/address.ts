@@ -5,6 +5,8 @@ import { zipSchema } from './schemas'
 
 export { zipSchema } from './schemas'
 
+// Both ID specimens in the fixture corpus print the address fully, and OCR
+// reads all four parts off them. No line 2: neither prints an apartment line.
 export const ADDRESS_FIELDS: readonly FieldDef[] = [
   defineField({
     id: 'addr_line1',
