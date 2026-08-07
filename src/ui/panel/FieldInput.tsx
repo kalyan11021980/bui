@@ -5,6 +5,7 @@ import type { FieldState } from '@/domain/application/state'
 import type { FieldDef } from '@/domain/field-def'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { COLOR } from '@/ui/theme/tokens'
+import { vettedCopy } from '@/domain/orchestrator/copy'
 import { FieldControl, fieldErrorId } from './FieldControl'
 
 type Props = {
@@ -52,6 +53,33 @@ export function FieldInput({ fieldId, def, state, onChange, onClear, scope }: Pr
     clearedFrom.current = null
   }
 
+  if (def.type === 'multiselect') {
+    const selected = Array.isArray(state?.value) ? (state.value as string[]) : []
+    return (
+      <div role="group" aria-label={def.label} style={{ margin: '6px 0' }}>
+        {(def.options ?? []).map((o) => (
+          <label
+            key={o.value}
+            style={{ display: 'block', fontSize: 15, color: COLOR.textPrimary, padding: '2px 0' }}
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(o.value)}
+              onChange={() => {
+                const next = selected.includes(o.value)
+                  ? selected.filter((v) => v !== o.value)
+                  : [...selected, o.value]
+                if (next.length === 0) onClear(fieldId)
+                else onChange(fieldId, next)
+              }}
+            />{' '}
+            {o.label}
+          </label>
+        ))}
+      </div>
+    )
+  }
+
   const isFile = def.type === 'file'
   const result = def.validation.safeParse(isFile ? state?.value ?? [] : draft)
   // An untouched field is outstanding, not wrong.
@@ -81,6 +109,11 @@ export function FieldInput({ fieldId, def, state, onChange, onClear, scope }: Pr
 
   return (
     <div style={{ margin: '6px 0' }}>
+      {def.type === 'attest' && def.attestation !== undefined && (
+        <p style={{ fontSize: 13, color: COLOR.textPrimary, whiteSpace: 'pre-wrap', margin: '0 0 6px' }}>
+          {vettedCopy(def.attestation)}
+        </p>
+      )}
       <FieldControl
         fieldId={fieldId}
         def={def}

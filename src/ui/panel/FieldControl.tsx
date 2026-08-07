@@ -39,6 +39,7 @@ function inputTypeFor(type: FieldDef['type']): string {
     case 'file': return 'file'
     // `taxid` is deliberately NOT type="password": hiding what you typed from
     // yourself is how a mistyped SSN gets submitted.
+    case 'attest': case 'multiselect':
     case 'text': case 'taxid': case 'address': case 'select': default: return 'text'
   }
 }
