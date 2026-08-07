@@ -20,6 +20,23 @@ const PROFILE = {
 
 function fresh(): ApplicationState { return createApplication('app-1', PROFILE, 'tok') }
 
+/**
+ * A bridged field now feeds SET_VALUE back into the profile, so a blanket
+ * 'x' can corrupt it (e.g. id_form: 'x' has no ID_NUMBER entry). Bridged
+ * fields get a value that keeps the profile as it already is.
+ */
+function valueFor(id: RequirementKey): unknown {
+  switch (id) {
+    case 'applicant_type': return PROFILE.applicantType
+    case 'location_country': return PROFILE.country
+    case 'location_state': return PROFILE.state
+    case 'id_form': return PROFILE.idForm
+    case 'address_differs': return PROFILE.addressDiffersFromId ? 'yes' : 'no'
+    case 'wants_gsa': return PROFILE.wantsGsa ? 'yes' : 'no'
+    default: return 'x'
+  }
+}
+
 /** Answers every outstanding field except `keep`, looping until stable. */
 function answeredExcept(keep: readonly RequirementKey[]): ApplicationState {
   let state = fresh()
@@ -27,7 +44,7 @@ function answeredExcept(keep: readonly RequirementKey[]): ApplicationState {
     const next = outstandingFields(state).find((id) => !keep.includes(id))
     if (!next) return state
     state = applicationReducer(state, {
-      type: 'SET_VALUE', fieldId: next, value: 'x', source: 'user', at: AT,
+      type: 'SET_VALUE', fieldId: next, value: valueFor(next), source: 'user', at: AT,
     })
   }
 }

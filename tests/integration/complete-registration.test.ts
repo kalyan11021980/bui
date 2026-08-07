@@ -29,6 +29,25 @@ const business: ApplicantProfile = {
 }
 const digest = createDigester('integration-test-secret-32-chars-min!')
 
+/**
+ * A bridged field now feeds SET_VALUE back into the profile, so a blanket
+ * 'x' can corrupt it (e.g. licenses_held: 'x' is not an array to iterate).
+ * Bridged fields get a value that keeps the profile as it already is.
+ */
+function valueFor(id: string, current: ApplicantProfile, fallback: string): unknown {
+  switch (id) {
+    case 'applicant_type': return current.applicantType
+    case 'location_country': return current.country
+    case 'location_state': return current.state
+    case 'id_form': return current.idForm
+    case 'address_differs': return current.addressDiffersFromId ? 'yes' : 'no'
+    case 'wants_gsa': return current.wantsGsa ? 'yes' : 'no'
+    case 'licenses_held': return current.licenses
+    case 'biz_country': return current.bizCountry
+    default: return fallback
+  }
+}
+
 beforeEach(() => {
   __resetStoreForTests()
   __resetAuditLogForTests()
@@ -41,7 +60,7 @@ describe('a whole registration, panel only', () => {
 
     for (const id of outstandingFields(s)) {
       const action: Action = {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       }
       s = applicationReducer(s, action)
       log.append(s.id, action)

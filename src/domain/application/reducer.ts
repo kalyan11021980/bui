@@ -1,8 +1,10 @@
 import type { RequirementKey } from '../requirements/key'
+import { parseReqKey, reqKey } from '../requirements/key'
 import { requiredFields } from '../requirements/engine'
 import { RULES_VERSION } from '../requirements/version'
 import { refuseIfSubmitted, requireField } from './guards'
 import { outstandingFields } from './queries'
+import { PROFILE_BRIDGE, bridgeForField } from './profile-bridge'
 import type { Action, ApplicationState, FieldState } from './state'
 import type { ApplicantProfile } from '../requirements/rules'
 
@@ -52,7 +54,11 @@ export function applicationReducer(
           ...(action.fromFieldId !== undefined && { fromFieldId: action.fromFieldId }),
         },
       }
-      return withField(state, action.fieldId, next)
+      const withValue = withField(state, action.fieldId, next)
+      const bare = parseReqKey(action.fieldId)
+      const entry = bare.instance === null ? bridgeForField(bare.fieldId) : undefined
+      if (!entry) return withValue
+      return applyProfilePatch(withValue, entry.toPatch(action.value), { writeFields: false })
     }
 
     case 'CLEAR_VALUE': {
@@ -94,10 +100,8 @@ export function applicationReducer(
       })
     }
 
-    case 'UPDATE_PROFILE': {
-      const profile: ApplicantProfile = { ...state.profile, ...action.patch }
-      return { ...state, profile, fields: resyncFields(state, profile) }
-    }
+    case 'UPDATE_PROFILE':
+      return applyProfilePatch(state, action.patch, { writeFields: true })
 
     case 'SUBMIT': {
       const outstanding = outstandingFields(state)
@@ -138,6 +142,44 @@ export function applicationReducer(
       }
     }
   }
+}
+
+/**
+ * The one place a profile patch lands. `writeFields` records each patched
+ * key's bridged field too (agent path — the applicant said it in chat, which
+ * is as explicit as typing it); the panel path already wrote its own field.
+ * A licence declaration answers each group's type either way.
+ */
+function applyProfilePatch(
+  state: ApplicationState,
+  patch: Partial<ApplicantProfile>,
+  opts: { writeFields: boolean },
+): ApplicationState {
+  const profile: ApplicantProfile = { ...state.profile, ...patch }
+  const fields: ApplicationState['fields'] = { ...state.fields }
+
+  if (opts.writeFields) {
+    for (const entry of PROFILE_BRIDGE) {
+      if (!(entry.key in patch)) continue
+      const value = entry.toFieldValue(profile[entry.key])
+      if (value === null) continue
+      fields[entry.fieldId] = {
+        value, status: 'confirmed', provenance: { source: 'user' },
+      }
+    }
+  }
+
+  for (const [index, type] of (patch.licenses ?? []).entries()) {
+    fields[reqKey('license_type', index)] = {
+      value: type,
+      // Confirmed, not derived: the declaration itself was explicit input.
+      status: 'confirmed',
+      provenance: { source: 'carried', fromFieldId: reqKey('licenses_held') },
+    }
+  }
+
+  const merged = { ...state, profile, fields }
+  return { ...merged, fields: resyncFields(merged, profile) }
 }
 
 /**

@@ -18,6 +18,25 @@ const DEALER_PROFILE: ApplicantProfile = {
   licenses: ['dealer'],
 }
 
+/**
+ * A bridged field now feeds SET_VALUE back into the profile, so a blanket
+ * 'x' can corrupt it (e.g. id_form: 'x' has no ID_NUMBER entry). Bridged
+ * fields get a value that keeps the profile as it already is.
+ */
+function valueFor(id: string, current: ApplicantProfile, fallback: string): unknown {
+  switch (id) {
+    case 'applicant_type': return current.applicantType
+    case 'location_country': return current.country
+    case 'location_state': return current.state
+    case 'id_form': return current.idForm
+    case 'address_differs': return current.addressDiffersFromId ? 'yes' : 'no'
+    case 'wants_gsa': return current.wantsGsa ? 'yes' : 'no'
+    case 'licenses_held': return current.licenses
+    case 'biz_country': return current.bizCountry
+    default: return fallback
+  }
+}
+
 const IMAGE: PreparedImage = {
   imageBase64: 'aGk=', imageUrl: 'data:image/png;base64,aGk=',
   imageSize: { width: 1600, height: 1000 },
@@ -80,7 +99,7 @@ describe('Composer', () => {
     let state = createApplication('app-1', PROFILE, 'o')
     for (const id of outstandingFields(state)) {
       state = applicationReducer(state, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, state.profile, 'x'), source: 'user', at: AT,
       })
     }
     state = applicationReducer(state, { type: 'SUBMIT', at: AT })

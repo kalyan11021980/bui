@@ -18,6 +18,25 @@ const profile: ApplicantProfile = {
   bizCountry: null,
 }
 
+/**
+ * A bridged field now feeds SET_VALUE back into the profile, so a blanket
+ * 'x' can corrupt it (e.g. id_form: 'x' has no ID_NUMBER entry). Bridged
+ * fields get a value that keeps the profile as it already is.
+ */
+function valueFor(id: string, current: ApplicantProfile, fallback: string): unknown {
+  switch (id) {
+    case 'applicant_type': return current.applicantType
+    case 'location_country': return current.country
+    case 'location_state': return current.state
+    case 'id_form': return current.idForm
+    case 'address_differs': return current.addressDiffersFromId ? 'yes' : 'no'
+    case 'wants_gsa': return current.wantsGsa ? 'yes' : 'no'
+    case 'licenses_held': return current.licenses
+    case 'biz_country': return current.bizCountry
+    default: return fallback
+  }
+}
+
 describe('ApplicationPanel', () => {
   it('shows how many fields are left', () => {
     const s = createApplication('app-1', profile, OWNER)
@@ -110,7 +129,8 @@ describe('ApplicationPanel', () => {
     let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'),
+        source: 'user', at: AT,
       })
     }
     render(<ApplicationPanel state={s} onSubmit={onSubmit} />)

@@ -19,7 +19,32 @@ const profile: ApplicantProfile = {
   bizCountry: null,
 }
 
+/** Same shape as `profile`, named for the bridge tests below. */
+const START: ApplicantProfile = profile
+
 const AT = '2026-08-01T12:00:00.000Z'
+const T = AT
+
+/**
+ * "Fill in everything outstanding" loops used to be inert to the profile —
+ * SET_VALUE never fed back into it. Now a bridged field does, so filling one
+ * with an arbitrary string (e.g. location_country: 'x') can change what else
+ * is required. Bridged fields get a value that keeps the profile as it
+ * already is; everything else gets `fallback`.
+ */
+function valueFor(id: string, current: ApplicantProfile, fallback: string): unknown {
+  switch (id) {
+    case 'applicant_type': return current.applicantType
+    case 'location_country': return current.country
+    case 'location_state': return current.state
+    case 'id_form': return current.idForm
+    case 'address_differs': return current.addressDiffersFromId ? 'yes' : 'no'
+    case 'wants_gsa': return current.wantsGsa ? 'yes' : 'no'
+    case 'licenses_held': return current.licenses
+    case 'biz_country': return current.bizCountry
+    default: return fallback
+  }
+}
 
 describe('createApplication', () => {
   it('keeps the owner token it was handed, rather than deriving one', () => {
@@ -135,7 +160,7 @@ describe('applicationReducer', () => {
     let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       })
     }
     expect(isComplete(s)).toBe(true)
@@ -189,7 +214,7 @@ describe('SUBMIT', () => {
     let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       })
     }
     return s
@@ -242,7 +267,7 @@ describe('a submitted application is closed to further change', () => {
     let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       })
     }
     return applicationReducer(s, { type: 'SUBMIT', at: AT })
@@ -418,7 +443,7 @@ describe('UPDATE_PROFILE resyncs fields the profile no longer requires', () => {
     })
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       })
     }
     expect(isComplete(s)).toBe(true)
@@ -473,7 +498,7 @@ describe('CLEAR_VALUE — the record must not outlive what is on screen', () => 
     let s = createApplication('app-1', profile, OWNER)
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x'), source: 'user', at: AT,
       })
     }
     s = applicationReducer(s, { type: 'SUBMIT', at: AT })
@@ -547,11 +572,66 @@ describe('changing the declared ID form swaps which number is required', () => {
     let s = toStateId(withLicenceNumber())
     for (const id of outstandingFields(s)) {
       s = applicationReducer(s, {
-        type: 'SET_VALUE', fieldId: id, value: 'x1234', source: 'user', at: AT,
+        type: 'SET_VALUE', fieldId: id, value: valueFor(id, s.profile, 'x1234'), source: 'user', at: AT,
       })
     }
     expect(isComplete(s)).toBe(true)
     // The orphaned licence number must not block it, nor count towards it.
     expect(s.fields.dl_number?.status).toBe('superseded')
+  })
+})
+
+describe('profile bridge', () => {
+  it('a bridged SET_VALUE patches the profile and expands requirements', () => {
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'applicant_type', value: 'business',
+      source: 'user', at: T,
+    })
+    expect(s.profile.applicantType).toBe('business')
+    expect(outstandingFields(s)).toContain('licenses_held')
+  })
+
+  it('answering licenses_held carries each group type', () => {
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'applicant_type', value: 'business',
+      source: 'user', at: T,
+    })
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'licenses_held', value: ['dealer', 'salvage'],
+      source: 'user', at: T,
+    })
+    expect(s.profile.licenses).toEqual(['dealer', 'salvage'])
+    expect(s.fields['license_type#0']).toMatchObject({
+      value: 'dealer', status: 'confirmed',
+      provenance: { source: 'carried', fromFieldId: 'licenses_held' },
+    })
+    expect(s.fields['license_type#1']?.value).toBe('salvage')
+    expect(outstandingFields(s)).toContain('license_number#1')
+    expect(outstandingFields(s)).not.toContain('license_type#0')
+  })
+
+  it('UPDATE_PROFILE records the bridged fields so nothing is asked twice', () => {
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, {
+      type: 'UPDATE_PROFILE', at: T,
+      patch: { applicantType: 'business', state: 'GA', licenses: ['dealer'], wantsGsa: true },
+    })
+    expect(s.fields['applicant_type']).toMatchObject({ value: 'business', status: 'confirmed' })
+    expect(s.fields['location_state']).toMatchObject({ value: 'GA', status: 'confirmed' })
+    expect(s.fields['wants_gsa']).toMatchObject({ value: 'yes', status: 'confirmed' })
+    expect(s.fields['licenses_held']).toMatchObject({ value: ['dealer'], status: 'confirmed' })
+    expect(s.fields['license_type#0']?.value).toBe('dealer')
+    const out = outstandingFields(s)
+    for (const id of ['applicant_type', 'location_state', 'wants_gsa', 'licenses_held']) {
+      expect(out).not.toContain(id)
+    }
+  })
+
+  it('a null state patch records nothing', () => {
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, { type: 'UPDATE_PROFILE', at: T, patch: { state: null } })
+    expect(s.fields['location_state']).toBeUndefined()
   })
 })
