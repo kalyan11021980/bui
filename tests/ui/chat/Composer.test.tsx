@@ -48,8 +48,8 @@ function renderComposer(state: ApplicationState, over: Partial<Parameters<typeof
     sendable: true, onSend: vi.fn(), onReadDocument: vi.fn(), state, prepare,
     ...over,
   }
-  render(<Composer {...props} />)
-  return props
+  const renderResult = render(<Composer {...props} />)
+  return Object.assign(renderResult, props)
 }
 
 describe('Composer', () => {
@@ -118,9 +118,7 @@ describe('Composer', () => {
 
   it('grows to the hero size on request, docked by default', () => {
     const state = createApplication('app-1', PROFILE, 'owner-1')
-    const { container, rerender } = render(
-      <Composer sendable onSend={vi.fn()} state={state} onReadDocument={vi.fn()} />,
-    )
+    const { container, rerender } = renderComposer(state)
     expect(container.querySelector('form')?.className).toContain('rounded-2xl')
 
     rerender(
