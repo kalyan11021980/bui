@@ -145,6 +145,14 @@ function decideVoice(
   })
   if (touchesSensitive) return { text: null, dropped: 'sensitive' }
 
+  // A rationale-only turn is an answer-only turn: the vetted rationale is the
+  // whole answer, so the model's narration is dropped and the vetted intro
+  // leads (the framing below splices rationale_intro). The voice-lint is a
+  // negative list and cannot see filler like "Let me look that up for you.",
+  // so this rule — not the lint — is what keeps a why-answer vetted-only.
+  const rationaleOnly = blocks.length > 0 && blocks.every((b) => b.kind === 'rationale')
+  if (rationaleOnly) return { text: null }
+
   const trimmed = text.trim()
   if (trimmed === '') return { text: null }
   return lintVoice(trimmed).ok ? { text: trimmed } : { text: null, dropped: 'lint' }

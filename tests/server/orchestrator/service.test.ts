@@ -63,11 +63,12 @@ async function run(
   state = fresh(),
   transcript: readonly Turn[] = [],
   doneWith: Section | null = null,
+  userText: string | null = null,
 ) {
   return runTurn({
     model: stubModel(text, calls),
     view: toOrchestratorView(state, []),
-    state, transcript, uploadedDocs: [], userText: null,
+    state, transcript, uploadedDocs: [], userText,
     isResume: false, at: AT, effort: 'low', isAnthropic: false, doneWith,
   })
 }
@@ -85,6 +86,22 @@ describe('runTurn', () => {
     const { turn } = await run('You have 3 things left.', EXPLAIN_FIRST_NAME)
     expect(turn.voice).toBeNull()
     expect(turn.voiceDropped).toBe('lint')
+  })
+
+  it('drops model narration on a rationale-only turn and leads with the vetted intro', async () => {
+    // The applicant asks "why do you ask what best describes you?". The plan
+    // adds nothing (a why-question gets its answer alone), so the turn's only
+    // block is the rationale the model emits. The model narrates "Let me look
+    // that up for you." before its explain call — filler the voice-lint's
+    // negative list cannot see. A why-answer is vetted-only: the narration is
+    // dropped and rationale_intro leads, instead of the model's words standing
+    // in for the vetted lead-in.
+    const { turn } = await run('Let me look that up for you.', [
+      { toolName: 'explain', input: { fieldId: 'applicant_type' } },
+    ], fresh(), [], null, 'why do you ask what best describes me?')
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'rationale_intro' })
+    expect(turn.blocks).toContainEqual({ kind: 'rationale', fieldId: 'applicant_type' })
   })
 
   it('suppresses voice when an accepted rationale touches a sensitive field, framing it with the vetted intro alone (group still on screen)', async () => {
@@ -221,10 +238,18 @@ describe('runTurn', () => {
         seq: 1, at: AT, role: 'agent', voice: null,
         blocks: [{ kind: 'section_header', section: 'address', done: 0, total: 1 }],
       }
+      // The section is already on screen, so the planner adds nothing and the
+      // turn is rationale-only. "It is for your records." is the model
+      // authoring why-prose, which a rationale-only turn drops in favour of
+      // the vetted intro — no section_header re-presented either way.
       const { turn } = await run('It is for your records.', [
         { toolName: 'explain', input: { fieldId: 'addr_city' } },
       ], state, [presented])
-      expect(turn.blocks).toEqual([{ kind: 'rationale', fieldId: 'addr_city' }])
+      expect(turn.voice).toBeNull()
+      expect(turn.blocks).toEqual([
+        { kind: 'notice', copyId: 'rationale_intro' },
+        { kind: 'rationale', fieldId: 'addr_city' },
+      ])
     })
 
     it('a gapped Done re-presents the missing fields behind the notice', async () => {

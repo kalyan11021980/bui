@@ -301,7 +301,11 @@ describe('why-shaped turns', () => {
     expect(response.status).toBe(200)
     const { turn } = await response.json()
 
-    expect(turn.voice).toBe('Because it shapes what we ask next.')
+    // A why-answer is vetted-only: the model's "Because it shapes what we ask
+    // next." is dropped (it authors why-prose the catalog owns), the vetted
+    // rationale_intro leads, and the section is still not presented.
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks[0]).toMatchObject({ kind: 'notice', copyId: 'rationale_intro' })
     expect(turn.blocks.some((b: { kind: string }) => b.kind === 'rationale')).toBe(true)
     expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(false)
   })
