@@ -83,6 +83,14 @@ describe('FieldInput — the panel accepts data', () => {
     expect(option.value).toBe('NLD')
   })
 
+  it('gives a question-shaped label a neutral placeholder, not "Select which id will you use?"', () => {
+    render(<FieldRow fieldId="id_form" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
+    const select = control(/which id will you use/i)
+    expect(select.tagName).toBe('SELECT')
+    expect(screen.getByRole('option', { name: 'Choose an answer…' })).toBeInTheDocument()
+    expect(screen.queryByText(/select which id/i)).not.toBeInTheDocument()
+  })
+
   it('leaves a genuinely list-less field as a plain box, with an example, not an apology', () => {
     render(<FieldRow fieldId="primary_activity" state={undefined} onChange={vi.fn()} onClear={vi.fn()} />)
     const input = control(/primary activity/i)

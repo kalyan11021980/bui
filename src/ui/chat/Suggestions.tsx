@@ -25,7 +25,13 @@ const chipClass =
 export function Suggestions({ fieldIds, disabled, onPick }: Props) {
   if (disabled || fieldIds.length === 0) return null
 
-  const asks = fieldIds.slice(0, 2).map((id) => `Why do you need my ${displayLabel(id).toLowerCase()}?`)
+  // A question-shaped label ("Which ID will you use?") already carries its
+  // own question mark and reads as nonsense lowercased into "need my…" — it
+  // is quoted back instead, so nothing is folded or doubled.
+  const asks = fieldIds.slice(0, 2).map((id) => {
+    const label = displayLabel(id)
+    return label.endsWith('?') ? `Why do you ask “${label}”` : `Why do you need my ${label.toLowerCase()}?`
+  })
   const offers = ['What else do you need?']
 
   return (

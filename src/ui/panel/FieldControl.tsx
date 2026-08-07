@@ -99,9 +99,14 @@ export function FieldControl({ fieldId, def, draft, error, onText, onFiles, scop
   }
 
   if (options) {
+    // A question-shaped label ("Which ID will you use?") reads as nonsense
+    // lowercased into the "Select …" template — swap in a neutral prompt.
+    const placeholder = def.label.endsWith('?')
+      ? 'Choose an answer…'
+      : `Select ${def.label.toLowerCase()}…`
     return (
       <select {...shared} value={draft} onChange={(e) => onText(e.target.value)}>
-        <option value="">{`Select ${def.label.toLowerCase()}…`}</option>
+        <option value="">{placeholder}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
