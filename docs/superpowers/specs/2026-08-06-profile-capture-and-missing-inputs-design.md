@@ -44,9 +44,9 @@ New `src/domain/catalog/profile.ts` (`preferences.ts` keeps activity and languag
 | `location_country` | `select` | `country` | always |
 | `location_state` | `select` (US states) | `state` | `country === 'US'` |
 | `id_form` | `select` (driver's license / state ID / passport) | `idForm` | always |
-| `address_differs` | `boolean` | `addressDiffersFromId` | always |
+| `address_differs` | `select` (yes / no) | `addressDiffersFromId` | always |
 | `licenses_held` | `multiselect` (dealer / dismantler / exporter / salvage), min 1 | `licenses` | `applicantType === 'business'` |
-| `wants_gsa` | `boolean` | `wantsGsa` | always |
+| `wants_gsa` | `select` (yes / no) | `wantsGsa` | always |
 | `biz_country` | `select` | `bizCountry` (new key) | business section, see §4 |
 
 `applicant_type`, `licenses_held` are `neverBulkConfirm`. `ApplicantProfile` gains
@@ -121,9 +121,11 @@ records that the two exist and await sign-off.
 - `setProfile`'s description and the system prompt name the full determinant set
   (including GSA and address-differs) so volunteered facts are recorded. The agent
   still never authors questions; the planner now asks them.
-- Three new render types in the panel `FieldRow` and chat blocks — `multiselect`
-  (chip toggles), `boolean` (two radio chips), `attest` (copy + name input) —
-  extensions of the existing type-render map. No new OpenUI components.
+- Two new render types in the panel `FieldRow` and chat blocks — `multiselect`
+  (checkbox group) and `attest` (vetted certification copy above a name input) —
+  extensions of the existing type-render map. Yes/no questions are ordinary
+  selects; the string-draft input pipeline stays untouched. No new OpenUI
+  components.
 
 ## 9. Testing
 
