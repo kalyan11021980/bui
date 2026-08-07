@@ -289,6 +289,69 @@ describe('POST /turn', () => {
   })
 })
 
+describe('why-shaped turns', () => {
+  it('answers a first-turn why-question without presenting the section', async () => {
+    seed()
+    useModel(stubModel('Because it shapes what we ask next.', [
+      { toolName: 'explain', input: { fieldId: 'primary_activity' } },
+    ]))
+
+    const response = await post('app-1', { text: 'Why do you ask “What best describes you?”' })
+    expect(response.status).toBe(200)
+    const { turn } = await response.json()
+
+    expect(turn.voice).toBe('Because it shapes what we ask next.')
+    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'rationale')).toBe(true)
+    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(false)
+  })
+
+  it('still presents the section for a first-turn "what else" question', async () => {
+    seed()
+    useModel(stubModel('Plenty — here it is.', []))
+
+    const response = await post('app-1', { text: 'What else do you need?' })
+    const { turn } = await response.json()
+
+    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(true)
+  })
+
+  it('the degraded fallback still presents even for a why-question', async () => {
+    seed()
+    __setModelForTurnTests(() => ({ model: throwingModel(), effort: 'low', isAnthropic: false }))
+
+    const response = await post('app-1', { text: 'Why do you need my address?' })
+    const { turn } = await response.json()
+
+    expect(turn.blocks[0]).toMatchObject({ kind: 'notice', copyId: 'degraded_notice' })
+    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(true)
+  })
+
+  it('a narrated tool marker never renders: voice dropped, guard fallback stands in', async () => {
+    seed()
+    useModel(stubModel('[explained: location_country]', []))
+
+    const response = await post('app-1', { text: 'Why do you ask “Where are you located?”' })
+    const { turn } = await response.json()
+
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks).toEqual([{ kind: 'notice', copyId: 'guard_fallback' }])
+  })
+
+  it('frames a rationale-only turn with the vetted intro when the voice dies', async () => {
+    seed()
+    useModel(stubModel('[explained: primary_activity]', [
+      { toolName: 'explain', input: { fieldId: 'primary_activity' } },
+    ]))
+
+    const response = await post('app-1', { text: 'Why do you ask “Where are you located?”' })
+    const { turn } = await response.json()
+
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks[0]).toMatchObject({ kind: 'notice', copyId: 'rationale_intro' })
+    expect(turn.blocks[1]).toMatchObject({ kind: 'rationale', fieldId: 'primary_activity' })
+  })
+})
+
 describe('applyTurn — text-less turns (service-level)', () => {
   it('shows the step-back notice once across consecutive silent turns, not on every one', async () => {
     seed()

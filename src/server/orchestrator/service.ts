@@ -77,9 +77,16 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
     (s, a) => applyCarry(applicationReducer(s, a), request.at).state,
     request.state,
   )
-  blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith, null))
+  blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith, request.userText))
 
   const voice = decideVoice(result.text, blocks)
+
+  // A rationale with no surviving voice reads as bare catalog copy; the
+  // vetted intro makes it an answer.
+  const framedRationale = voice.text === null && blocks.some((b) => b.kind === 'rationale')
+  if (framedRationale) {
+    blocks.unshift({ kind: 'notice', copyId: 'rationale_intro' })
+  }
 
   // A turn with nothing to show and nothing to say reads as a broken page;
   // the vetted line stands in — unless nothing is outstanding, where it
@@ -94,8 +101,9 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   // this case exists — chosen over silence on 2026-08-05, not invented here.
   // A sensitive drop always has a non-empty group on screen (the field/doc
   // that triggered it), so the empty-blocks case above never also applies —
-  // no need to guard against prepending twice.
-  if (voice.dropped === 'sensitive') {
+  // no need to guard against prepending twice. Skipped when the rationale
+  // intro already framed the turn, or the two notices stack and contradict.
+  if (voice.dropped === 'sensitive' && !framedRationale) {
     blocks.unshift({ kind: 'notice', copyId: 'guard_fallback' })
   }
 

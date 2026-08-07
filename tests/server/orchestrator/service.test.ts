@@ -96,6 +96,18 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBe('sensitive')
   })
 
+  it('frames a sensitive rationale with the vetted intro alone, not stacked with guard_fallback', async () => {
+    // A sensitive rationale always drops voice, so it would also satisfy the
+    // sensitive-drop fallback below — without a guard there, the applicant
+    // sees two contradictory notices ("keep going with what's left" then
+    // "here's why we ask") above one rationale block.
+    const { turn } = await run('Here is why we ask.', [
+      { toolName: 'explain', input: { fieldId: 'tax_id' } },
+    ], freshBusiness())
+    expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'rationale_intro' })
+    expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
+  })
+
   it('suppresses voice when the accepted document_request backs a sensitive field', async () => {
     // drivers_license is PROFILE's idForm, so it is in documentsToUpload
     // already, and it backs dl_number/dob — both sensitive.
@@ -136,7 +148,8 @@ describe('runTurn', () => {
     // a section already on screen so the planner adds nothing) — there, zero
     // surviving calls leaves blocks empty and the fallback fires. Here one
     // call survives, so its block must stand in and suppress the fallback,
-    // or "correctly withheld" and "never offered" look identical.
+    // or "correctly withheld" and "never offered" look identical. Blank text
+    // means no voice, so the surviving rationale gets the vetted intro too.
     const state = answeredExcept(['addr_city'])
     const presented: Turn = {
       seq: 1, at: AT, role: 'agent', voice: null,
@@ -146,7 +159,10 @@ describe('runTurn', () => {
       { toolName: 'explain', input: { fieldId: 'addr_city' } },
       { toolName: 'requestDocument', input: { docType: 'proof_of_residency' } },
     ], state, [presented])
-    expect(turn.blocks).toEqual([{ kind: 'rationale', fieldId: 'addr_city' }])
+    expect(turn.blocks).toEqual([
+      { kind: 'notice', copyId: 'rationale_intro' },
+      { kind: 'rationale', fieldId: 'addr_city' },
+    ])
     expect(rejections).toEqual(['document_not_required'])
   })
 
