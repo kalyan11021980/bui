@@ -47,4 +47,25 @@ describe('StartScreen', () => {
     expect(screen.queryByRole('button', { name: /what else do you need/i })).toBeNull()
     expect(screen.getByLabelText(/upload photo/i)).toBeInTheDocument()
   })
+
+  it('positions the upload card before suggestion cards in DOM order', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    const { container } = render(<StartScreen state={state} {...props} />)
+
+    const uploadLabel = screen.getByLabelText(/upload photo/i)
+    const uploadCard = uploadLabel.closest('div[class*="rounded-xl"]')!
+
+    const suggestionButton = screen.getByRole('button', { name: /what else do you need/i })
+
+    const position = uploadCard.compareDocumentPosition(suggestionButton)
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('applies start-hero view-transition name to wrapper', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    const { container } = render(<StartScreen state={state} {...props} />)
+
+    const wrapper = container.firstElementChild as HTMLElement
+    expect(wrapper.style.viewTransitionName).toBe('start-hero')
+  })
 })
