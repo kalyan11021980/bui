@@ -56,16 +56,25 @@ export function lastPresentedSection(transcript: readonly Turn[]): Section | nul
   return null
 }
 
+/** A question about a field, not a demand to fill the form. Closed heuristic
+ *  — the model never chooses grouping, so neither does it choose this. */
+export function isWhyShaped(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  return t.startsWith('why ') || t.includes('why do you')
+}
+
 /**
  * The planned half of a turn. A Done always presents (same section's gaps
  * behind the vetted notice, or the next group); otherwise a section is
  * presented only when it is not already the newest one on screen — a typed
- * question mid-section gets its answer and stays put.
+ * question mid-section gets its answer and stays put. A why-question gets
+ * its answer alone; the group presents on the next non-why turn.
  */
 export function planTurnBlocks(
   state: ApplicationState,
   transcript: readonly Turn[],
   doneWith: Section | null,
+  applicantText: string | null,
 ): Block[] {
   const plan = sectionPlan(state)
   if (plan === null) return []
@@ -76,6 +85,10 @@ export function planTurnBlocks(
       ? [{ kind: 'notice', copyId: 'section_incomplete' }, ...group]
       : group
   }
+
+  // A why-question gets its answer alone; the group presents on the next
+  // non-why turn (or upload, or Done).
+  if (applicantText !== null && isWhyShaped(applicantText)) return []
 
   if (lastPresentedSection(transcript) === plan.section) return []
   return groupBlocks(state, plan)

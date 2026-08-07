@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SECTION_ORDER, sectionPlan, sectionProgress, lastPresentedSection, planTurnBlocks,
+  SECTION_ORDER, sectionPlan, sectionProgress, lastPresentedSection, planTurnBlocks, isWhyShaped,
 } from '@/domain/orchestrator/plan'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import { outstandingFields } from '@/domain/application/queries'
@@ -108,25 +108,25 @@ describe('lastPresentedSection', () => {
 describe('planTurnBlocks', () => {
   it('presents the planned group when nothing has been presented yet', () => {
     const state = answeredExcept(['addr_city'])
-    const blocks = planTurnBlocks(state, [], null)
+    const blocks = planTurnBlocks(state, [], null, null)
     expect(blocks[0]).toMatchObject({ kind: 'section_header', section: 'address' })
     expect(blocks.slice(1)).toEqual([{ kind: 'field_ask', fieldId: 'addr_city' }])
   })
 
   it('presents nothing when the current section is already the newest header', () => {
     const state = answeredExcept(['addr_city'])
-    expect(planTurnBlocks(state, [header('address')], null)).toEqual([])
+    expect(planTurnBlocks(state, [header('address')], null, null)).toEqual([])
   })
 
   it('re-presents after the plan moves back to an earlier section', () => {
     const state = answeredExcept(['addr_city', 'phone_mobile'])
-    const blocks = planTurnBlocks(state, [header('contact')], null)
+    const blocks = planTurnBlocks(state, [header('contact')], null, null)
     expect(blocks[0]).toMatchObject({ kind: 'section_header', section: 'address' })
   })
 
   it('a gapped Done re-presents only the missing fields, behind the vetted notice', () => {
     const state = answeredExcept(['addr_city', 'addr_zip'])
-    const blocks = planTurnBlocks(state, [header('address')], 'address')
+    const blocks = planTurnBlocks(state, [header('address')], 'address', null)
     expect(blocks[0]).toEqual({ kind: 'notice', copyId: 'section_incomplete' })
     expect(blocks[1]).toMatchObject({ kind: 'section_header', section: 'address' })
     expect(blocks.slice(2)).toEqual([
@@ -137,12 +137,63 @@ describe('planTurnBlocks', () => {
 
   it('a complete Done advances to the next section, without the notice', () => {
     const state = answeredExcept(['phone_mobile'])          // address done, contact open
-    const blocks = planTurnBlocks(state, [header('address')], 'address')
+    const blocks = planTurnBlocks(state, [header('address')], 'address', null)
     expect(blocks[0]).toMatchObject({ kind: 'section_header', section: 'contact' })
     expect(blocks.some((b) => b.kind === 'notice')).toBe(false)
   })
 
   it('the final Done yields no blocks at all', () => {
-    expect(planTurnBlocks(answeredExcept([]), [header('contact')], 'contact')).toEqual([])
+    expect(planTurnBlocks(answeredExcept([]), [header('contact')], 'contact', null)).toEqual([])
+  })
+})
+
+describe('isWhyShaped', () => {
+  it('accepts the pill templates and typed variants', () => {
+    expect(isWhyShaped('Why do you need my last name?')).toBe(true)
+    expect(isWhyShaped('Why do you ask "Which ID will you use?"')).toBe(true)
+    expect(isWhyShaped('  WHY is that required')).toBe(true)
+    expect(isWhyShaped('tell me why do you need this')).toBe(true)
+  })
+
+  it('rejects non-why intents', () => {
+    expect(isWhyShaped('What else do you need?')).toBe(false)
+    expect(isWhyShaped("I'm ready")).toBe(false)
+    expect(isWhyShaped('Tell me why later')).toBe(false)
+  })
+})
+
+describe('planTurnBlocks and why-shaped turns', () => {
+  it('presents nothing for a why-question on an empty transcript', () => {
+    const state = fresh()
+    expect(planTurnBlocks(state, [], null, 'Why do you ask "What best describes you?"'))
+      .toEqual([])
+  })
+
+  it('still presents for a non-why first turn', () => {
+    const state = fresh()
+    const blocks = planTurnBlocks(state, [], null, 'What else do you need?')
+    expect(blocks[0]).toMatchObject({ kind: 'section_header' })
+  })
+
+  it('presents nothing for a why-question even when the plan has advanced', () => {
+    // The newest header on screen is an older section; a non-why turn would
+    // present the current plan section — a why turn must not.
+    const state = fresh()
+    const plan = sectionPlan(state)!
+    const stale: Turn = {
+      seq: 1, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'tax', done: 0, total: 1 }],
+    }
+    expect(plan.section).not.toBe('tax')
+    expect(planTurnBlocks(state, [stale], null, 'why do you need all this')).toEqual([])
+    expect(planTurnBlocks(state, [stale], null, 'ok, keep going')[0])
+      .toMatchObject({ kind: 'section_header', section: plan.section })
+  })
+
+  it('a Done turn keeps presenting regardless of its chip text', () => {
+    const state = fresh()
+    const plan = sectionPlan(state)!
+    const blocks = planTurnBlocks(state, [], plan.section, null)
+    expect(blocks[0]).toMatchObject({ kind: 'notice', copyId: 'section_incomplete' })
   })
 })

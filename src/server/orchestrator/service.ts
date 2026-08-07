@@ -77,7 +77,7 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
     (s, a) => applyCarry(applicationReducer(s, a), request.at).state,
     request.state,
   )
-  blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith))
+  blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith, null))
 
   const voice = decideVoice(result.text, blocks)
 

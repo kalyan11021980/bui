@@ -72,7 +72,7 @@ export function presentPlan(
   const closed = submittedRefusal(current)
   if (closed !== null) return { ok: false, failure: failure('submitted', closed) }
 
-  const blocks = planTurnBlocks(current, current.transcript, null)
+  const blocks = planTurnBlocks(current, current.transcript, null, null)
   if (blocks.length === 0) return { ok: true, value: withoutOwnerToken(current) }
 
   try {
@@ -303,7 +303,7 @@ async function runTurnSafely(
         voice: null,
         blocks: [
           { kind: 'notice', copyId: 'degraded_notice' },
-          ...planTurnBlocks(rest.state, rest.transcript, rest.doneWith),
+          ...planTurnBlocks(rest.state, rest.transcript, rest.doneWith, null),
         ],
       },
       actions: [],
