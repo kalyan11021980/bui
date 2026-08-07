@@ -158,8 +158,8 @@ export function useApplication(): UseApplication {
   const readDocument = (docType: DocType, image: PreparedImage) => {
     if (!state) return
     setNotice(READING)
-    // Incremented before the request is even queued, so the count covers a
-    // wait behind an earlier write too, not just the fetch itself.
+    // Listed before the request is even queued, so the entry covers a wait
+    // behind an earlier write too, not just the fetch itself.
     setReadingDocs((held) => [...held, docType])
 
     enqueue(async () => {
@@ -198,7 +198,8 @@ export function useApplication(): UseApplication {
   }
 
   return {
-    state, documents: docImages, notice, outOfStep, readingDocument: readingDocs.length > 0, readingDocTypes: readingDocs, carry,
+    state, documents: docImages, notice, outOfStep,
+    readingDocument: readingDocs.length > 0, readingDocTypes: readingDocs, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
     forgetDocumentNotice: () => setNotice(null),
