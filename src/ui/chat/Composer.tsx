@@ -8,6 +8,8 @@ import { documentsToUpload } from '@/domain/requirements/documents'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
 import { DOC_LABEL, intakeFile } from '@/ui/upload/intake'
 
+type Size = 'docked' | 'hero'
+
 type Props = {
   sendable: boolean
   onSend: (text: string) => void
@@ -15,6 +17,12 @@ type Props = {
   onReadDocument: (docType: DocType, image: PreparedImage) => void
   /** Injectable: jsdom decodes no images and has no canvas. */
   prepare?: (file: File) => Promise<PreparedImage>
+  size?: Size
+}
+
+const FORM_CLASS: Record<Size, string> = {
+  docked: 'flex items-center gap-2 rounded-2xl border border-border bg-surface px-2 py-1.5 shadow-card',
+  hero: 'flex items-center gap-2 rounded-3xl border border-border bg-surface px-3 py-4 shadow-card',
 }
 
 const PAPERCLIP = (
@@ -24,7 +32,7 @@ const PAPERCLIP = (
   </svg>
 )
 
-export function Composer({ sendable, onSend, state, onReadDocument, prepare }: Props) {
+export function Composer({ sendable, onSend, state, onReadDocument, prepare, size = 'docked' }: Props) {
   const [draft, setDraft] = useState('')
   const [chooserOpen, setChooserOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -86,7 +94,7 @@ export function Composer({ sendable, onSend, state, onReadDocument, prepare }: P
 
       <form
         onSubmit={submit}
-        className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-2 py-1.5 shadow-card"
+        className={FORM_CLASS[size]}
       >
         {outstanding.length === 1 && (
           <>

@@ -115,4 +115,17 @@ describe('Composer', () => {
     expect(send).not.toBeDisabled()
     expect(send).toHaveAttribute('aria-disabled', 'true')
   })
+
+  it('grows to the hero size on request, docked by default', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    const { container, rerender } = render(
+      <Composer sendable onSend={vi.fn()} state={state} onReadDocument={vi.fn()} />,
+    )
+    expect(container.querySelector('form')?.className).toContain('rounded-2xl')
+
+    rerender(
+      <Composer sendable onSend={vi.fn()} state={state} onReadDocument={vi.fn()} size="hero" />,
+    )
+    expect(container.querySelector('form')?.className).toContain('rounded-3xl')
+  })
 })
