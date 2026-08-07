@@ -19,9 +19,29 @@ describe('withViewTransition', () => {
 
   it('routes the update through startViewTransition when it exists', () => {
     const calls: string[] = []
-    doc.startViewTransition = vi.fn((cb: () => void) => { calls.push('vt'); cb(); return {} as ViewTransition })
+    doc.startViewTransition = vi.fn((cb: () => void) => {
+      calls.push('vt')
+      cb()
+      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+    })
     withViewTransition(() => calls.push('update'))
     expect(calls).toEqual(['vt', 'update'])
+  })
+
+  it('swallows a rejected ready/finished from a skipped or aborted transition', async () => {
+    const update = vi.fn()
+    doc.startViewTransition = vi.fn((cb: () => void) => {
+      cb()
+      return {
+        ready: Promise.reject(new DOMException('aborted', 'InvalidStateError')),
+        finished: Promise.reject(new DOMException('aborted', 'InvalidStateError')),
+      } as unknown as ViewTransition
+    })
+    withViewTransition(update)
+    expect(update).toHaveBeenCalledTimes(1)
+    // Let the rejected promises settle. An unhandled rejection here fails the
+    // whole test file — that IS the assertion, not just this line.
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
 
   it('skips the animation under reduced motion, but still updates', () => {

@@ -445,7 +445,10 @@ describe('ConversationShell', () => {
     // reason it does there — the property isn't declared optional on `Document`.
     type VTDocument = Document & { startViewTransition?: (cb: () => void) => ViewTransition }
     const doc = document as VTDocument
-    const vt = vi.fn((cb: () => void) => { cb(); return {} as ViewTransition })
+    const vt = vi.fn((cb: () => void) => {
+      cb()
+      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+    })
     doc.startViewTransition = vt
     try {
       const state = createApplication('app-1', PROFILE, OWNER)
@@ -472,7 +475,10 @@ describe('ConversationShell', () => {
   it('does not fire a second view transition on a later action', async () => {
     type VTDocument = Document & { startViewTransition?: (cb: () => void) => ViewTransition }
     const doc = document as VTDocument
-    const vt = vi.fn((cb: () => void) => { cb(); return {} as ViewTransition })
+    const vt = vi.fn((cb: () => void) => {
+      cb()
+      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+    })
     doc.startViewTransition = vt
     try {
       const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }

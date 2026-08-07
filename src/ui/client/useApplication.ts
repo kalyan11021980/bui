@@ -24,7 +24,6 @@ import {
  * it is built, the server has seen every answer already on screen.
  */
 
-const READING = 'Reading your document…'
 const NOTHING_READ =
   'We could not read anything from that photo. The questions below are still yours to answer.'
 const NO_READER =
@@ -155,7 +154,6 @@ export function useApplication(): UseApplication {
 
   const readDocument = (docType: DocType, image: PreparedImage) => {
     if (!state) return
-    setNotice(READING)
     // Listed before the request is even queued, so the entry covers a wait
     // behind an earlier write too, not just the fetch itself.
     setReadingDocs((held) => [...held, docType])

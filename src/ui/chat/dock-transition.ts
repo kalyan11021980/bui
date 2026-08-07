@@ -11,5 +11,9 @@ export function withViewTransition(update: () => void): void {
     update()
     return
   }
-  document.startViewTransition(() => { flushSync(update) })
+  const transition = document.startViewTransition(() => { flushSync(update) })
+  // A skipped animation (hidden tab, concurrent transition) rejects these;
+  // the update itself still ran, so there is nothing to recover.
+  transition.ready.catch(() => undefined)
+  transition.finished.catch(() => undefined)
 }
