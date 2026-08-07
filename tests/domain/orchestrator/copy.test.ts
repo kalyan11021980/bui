@@ -29,11 +29,19 @@ describe('vetted copy', () => {
     for (const id of ALL_COPY_IDS) expect(COPY[id]).toBe(vettedCopy(id))
   })
 
-  it('carries the section-flow copy under version 7', () => {
-    expect(COPY_VERSION).toBe('7')
+  it('still carries the section-flow copy', () => {
     expect(vettedCopy('done_chip')).toBe("Done with this section — what's next?")
     expect(vettedCopy('section_incomplete')).toBe(
       "A few answers in this section are still blank — they're marked below.",
+    )
+  })
+
+  it('carries the start-screen copy under version 8', () => {
+    expect(COPY_VERSION).toBe('8')
+    expect(vettedCopy('start_headline')).toBe("Hi — let's get you set up to bid at IAA.")
+    expect(vettedCopy('start_subline')).toBe(
+      "I'm your registration agent. I'll ask a few things and fill in what I can "
+      + "from your documents — the fastest start is your driver's license.",
     )
   })
 })

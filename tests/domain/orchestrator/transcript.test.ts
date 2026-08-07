@@ -89,6 +89,6 @@ describe('shownCopyMaterial', () => {
       [{ kind: 'section_header', section: 'address', done: 1, total: 4 }],
       () => 'unused',
     )
-    expect(material).toBe('v7|section:address:Address:1/4')
+    expect(material).toBe('v8|section:address:Address:1/4')
   })
 })
