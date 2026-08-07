@@ -12,12 +12,13 @@ const NUMERAL = /\p{Nd}/u
 
 /**
  * A model narrating its tools instead of calling them — observed as
- * `[askFor(field: …)]` emitted as prose. Bracketed call syntax, or a tool's
- * own name used as a call. `explain`/`orient` are ordinary words, so those
- * two only match with the paren flush against the name.
+ * `[askFor(field: …)]` or `[explained: location_country]` emitted as prose.
+ * Bracketed call-or-marker syntax, or a tool's own name used as a call.
+ * `explain`/`orient` are ordinary words, so those two only match with the
+ * paren flush against the name.
  */
 const TOOL_SYNTAX =
-  /\[\s*\w+\s*\(|\b(?:askfor|setprofile|requestdocument)\s*\(|\b(?:explain|orient)\(/i
+  /\[\s*\w+\s*[(:]|\b(?:askfor|setprofile|requestdocument)\s*\(|\b(?:explain|orient)\(/i
 const PERCENTAGE = /%|\bpercent\b|\bper cent\b/i
 const STATUTE = /§|\bU\.?S\.?C\.?\b|\bC\.?F\.?R\.?\b|\bIRC\b|\bTitle\s+\p{Nd}/iu
 

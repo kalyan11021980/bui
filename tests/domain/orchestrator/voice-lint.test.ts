@@ -46,4 +46,18 @@ describe('lintVoice', () => {
   it('rejects non-ASCII digits, not just 0-9', () => {
     expect(lintVoice('You have ٣ left.').ok).toBe(false)
   })
+
+  it('drops a bracketed completed-tool marker as tool syntax', () => {
+    expect(lintVoice('[explained: location_country]'))
+      .toEqual({ ok: false, violation: 'tool_syntax' })
+  })
+
+  it('still drops bracketed call syntax', () => {
+    expect(lintVoice('[askFor(field: last_name)]'))
+      .toEqual({ ok: false, violation: 'tool_syntax' })
+  })
+
+  it('keeps ordinary bracketed prose without a marker shape', () => {
+    expect(lintVoice('We ask [almost] nothing else.')).toEqual({ ok: true })
+  })
 })
