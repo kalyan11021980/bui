@@ -21,6 +21,21 @@ type Props = {
 }
 
 /**
+ * The doc type this card would show, or null once it wouldn't render at all
+ * (submitted, or that document already recorded). Shared with
+ * ConversationShell so the "is the card visible" call is made exactly once —
+ * a second, independently-written copy could drift and either silence a read
+ * or announce it twice.
+ */
+export function visibleCardDocType(state: ApplicationState): DocType | null {
+  if (state.submittedAt !== null) return null
+  // documentsToUpload always leads with profile.idForm, so the array is
+  // never empty.
+  const docType = documentsToUpload(state.profile)[0]!
+  return state.documents.some((d) => d.docType === docType) ? null : docType
+}
+
+/**
  * The opening beat promises "the fastest start is your driver's license";
  * this is where the license goes. Fixed UI, not a model turn — a cold model
  * cannot cost the applicant the entry point.
@@ -29,12 +44,9 @@ export function OpeningUploadCard({
   state, onReadDocument, readingDocTypes = [], variant = 'opening', prepare,
 }: Props) {
   const [notice, setNotice] = useState<string | null>(null)
-  // documentsToUpload always leads with profile.idForm, so the array is
-  // never empty.
-  const docType = documentsToUpload(state.profile)[0]!
+  const docType = visibleCardDocType(state)
 
-  if (state.submittedAt !== null) return null
-  if (state.documents.some((d) => d.docType === docType)) return null
+  if (docType === null) return null
 
   const reading = readingDocTypes.includes(docType)
 

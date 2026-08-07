@@ -413,6 +413,19 @@ describe('ConversationShell', () => {
     expect(screen.getByText(/reading your photo/i)).toBeInTheDocument()
   })
 
+  it('shows no floating reading line when nothing is being read', () => {
+    stubFetch(() => ({ status: 200, body: {} }))
+    const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: 'Welcome back.', blocks: [] }
+    const base = createApplication('app-1', PROFILE, OWNER)
+    const state: ApplicationState = { ...base, transcript: [turn] }
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+    )
+
+    expect(screen.queryByText(/reading your photo/i)).toBeNull()
+  })
+
   it('a resumed conversation never sees the start screen', () => {
     stubFetch(() => ({ status: 200, body: {} }))
     const turn: Turn = { seq: 1, at: AT, role: 'agent', voice: 'Welcome back.', blocks: [] }
@@ -448,6 +461,40 @@ describe('ConversationShell', () => {
         <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
       )
       await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+      await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+      expect(vt).toHaveBeenCalledTimes(1)
+    } finally {
+      delete (doc as any).startViewTransition
+    }
+  })
+
+  it('does not fire a second view transition on a later action', async () => {
+    type VTDocument = Document & { startViewTransition?: (cb: () => void) => ViewTransition }
+    const doc = document as VTDocument
+    const vt = vi.fn((cb: () => void) => { cb(); return {} as ViewTransition })
+    doc.startViewTransition = vt
+    try {
+      const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
+      const agentTurn: Turn = { seq: 2, at: AT, role: 'agent', voice: 'Hello!', blocks: [] }
+      const state = createApplication('app-1', PROFILE, OWNER)
+      const after: ApplicationState = { ...state, transcript: [applicantTurn, agentTurn] }
+
+      stubFetch((call) =>
+        call.url.endsWith('/turn')
+          ? { status: 200, body: { state: after, turn: agentTurn } }
+          : { status: 200, body: after },
+      )
+
+      render(
+        <ConversationShell applicationId="app-1" ownerToken={OWNER} state={state} {...noHandlers} />,
+      )
+
+      await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+      await userEvent.click(screen.getByRole('button', { name: /send/i }))
+      await screen.findByText('Hello!')
+
+      await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Again')
       await userEvent.click(screen.getByRole('button', { name: /send/i }))
 
       expect(vt).toHaveBeenCalledTimes(1)

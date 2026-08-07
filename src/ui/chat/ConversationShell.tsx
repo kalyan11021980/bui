@@ -4,14 +4,13 @@ import { useEffect, useRef } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
-import { documentsToUpload } from '@/domain/requirements/documents'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import type { BlockHandlers } from './blocks'
 import { CompletionCard } from './CompletionCard'
 import { Composer } from './Composer'
 import { withViewTransition } from './dock-transition'
-import { OpeningUploadCard } from './OpeningUploadCard'
+import { OpeningUploadCard, visibleCardDocType } from './OpeningUploadCard'
 import { SectionDoneBar } from './SectionDoneBar'
 import { StartScreen } from './StartScreen'
 import { StatusLine, READING_PHOTO } from './StatusLine'
@@ -54,19 +53,21 @@ const shellStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
-/** Grows with the conversation; the composer below it never moves off-screen. */
-const logStyle: React.CSSProperties = {
+/**
+ * Flex-grow column, shared by the docked content wrapper and the log inside
+ * it — both need to grow the same way so the sticky composer stays pinned
+ * below whatever is on screen.
+ */
+const growStyle: React.CSSProperties = {
   flex: 1, display: 'flex', flexDirection: 'column',
 }
 
-/** The start screen centres the same column instead of growing a log. */
+/** The start screen centres the same column instead of growing a log. Same
+ *  computed padding as shellStyle (24 top, 20 sides, 24 bottom), written
+ *  without the shorthand so the flip never mixes shorthand and longhand on
+ *  the same property — React warns, and it's a real bug smell either way. */
 const startShellStyle: React.CSSProperties = {
-  ...shellStyle, justifyContent: 'center', paddingBottom: 24,
-}
-
-/** Docked only: grows so the sticky composer stays pinned below the log. */
-const contentStyle: React.CSSProperties = {
-  flex: 1, display: 'flex', flexDirection: 'column',
+  ...shellStyle, justifyContent: 'center', padding: '24px 20px',
 }
 
 /**
@@ -130,6 +131,11 @@ export function ConversationShell({
 
   // First action docks the layout, animated where the platform allows.
   // Composer refuses empty drafts before onSend, so a blank send never docks.
+  // Stays animated only because nothing here calls shell-level setState
+  // between the latch and the transition's flushSync callback below —
+  // Composer's own local state (its draft) is fine, but a shell setState on
+  // the same click would land outside the transition's snapshot and the
+  // flip would silently stop animating.
   const dockOn = <A extends unknown[]>(fn: (...args: A) => void) =>
     (...args: A): void => {
       if (startedRef.current) { fn(...args); return }
@@ -140,14 +146,12 @@ export function ConversationShell({
   const readDocking = dockOn(onReadDocument)
 
   // A read shown on the visible card is not repeated as a floating line.
-  const cardDocType = documentsToUpload(state.profile)[0]!
-  const cardVisible = state.submittedAt === null
-    && !state.documents.some((d) => d.docType === cardDocType)
-  const floatingReads = readingDocTypes.filter((t) => !(cardVisible && t === cardDocType))
+  const cardDocType = visibleCardDocType(state)
+  const floatingReads = readingDocTypes.filter((t) => t !== cardDocType)
 
   return (
     <section aria-label="Registration agent" style={started ? shellStyle : startShellStyle}>
-      <div style={started ? contentStyle : undefined}>
+      <div style={started ? growStyle : undefined}>
         {started ? (
           <>
             <OpeningUploadCard
@@ -156,7 +160,7 @@ export function ConversationShell({
 
             {/* Polite and coalesced, per §9.1: a turn arriving must not interrupt
                 whatever the applicant is doing, and must never steal focus. */}
-            <div ref={logRef} role="log" aria-live="polite" aria-relevant="additions" style={logStyle}>
+            <div ref={logRef} role="log" aria-live="polite" aria-relevant="additions" style={growStyle}>
               {turns.map((turn) => (
                 <TurnView
                   key={turn.seq}
