@@ -67,6 +67,11 @@ export function applicationReducer(
       if (!current || current.value === null) return state
       // Provenance and rejection go with the value — both described the old
       // one, and a reviewer reads provenance to decide how hard to look.
+      //
+      // A bridged determinant's profile value is left as is: five of the
+      // eight profile keys have no "unknown", and requirements must be
+      // driven by something. Only the FIELD goes back to outstanding; the
+      // engine keeps the last declaration until something re-patches it.
       return withField(state, action.fieldId, { value: null, status: 'empty' })
     }
 
@@ -162,7 +167,16 @@ function applyProfilePatch(
     for (const entry of PROFILE_BRIDGE) {
       if (!(entry.key in patch)) continue
       const value = entry.toFieldValue(profile[entry.key])
-      if (value === null) continue
+      if (value === null) {
+        // Nothing to record is fine on a field never recorded; but a field
+        // that already held a value must not stand confirmed once the
+        // profile no longer backs it.
+        const existing = fields[entry.fieldId]
+        if (existing && existing.value !== null) {
+          fields[entry.fieldId] = { value: null, status: 'empty' }
+        }
+        continue
+      }
       fields[entry.fieldId] = {
         value, status: 'confirmed', provenance: { source: 'user' },
       }

@@ -618,9 +618,13 @@ describe('profile bridge', () => {
       type: 'UPDATE_PROFILE', at: T,
       patch: { applicantType: 'business', state: 'GA', licenses: ['dealer'], wantsGsa: true },
     })
-    expect(s.fields['applicant_type']).toMatchObject({ value: 'business', status: 'confirmed' })
+    expect(s.fields['applicant_type']).toMatchObject({
+      value: 'business', status: 'confirmed', provenance: { source: 'user' },
+    })
     expect(s.fields['location_state']).toMatchObject({ value: 'GA', status: 'confirmed' })
-    expect(s.fields['wants_gsa']).toMatchObject({ value: 'yes', status: 'confirmed' })
+    expect(s.fields['wants_gsa']).toMatchObject({
+      value: 'yes', status: 'confirmed', provenance: { source: 'user' },
+    })
     expect(s.fields['licenses_held']).toMatchObject({ value: ['dealer'], status: 'confirmed' })
     expect(s.fields['license_type#0']?.value).toBe('dealer')
     const out = outstandingFields(s)
@@ -633,5 +637,30 @@ describe('profile bridge', () => {
     let s = createApplication('a', START, 'tok')
     s = applicationReducer(s, { type: 'UPDATE_PROFILE', at: T, patch: { state: null } })
     expect(s.fields['location_state']).toBeUndefined()
+  })
+
+  it('a null patch clears a field that already held a value', () => {
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'location_state', value: 'GA', source: 'user', at: T,
+    })
+    s = applicationReducer(s, { type: 'UPDATE_PROFILE', at: T, patch: { state: null } })
+    expect(s.fields['location_state']).toEqual({ value: null, status: 'empty' })
+    expect(outstandingFields(s)).toContain('location_state')
+  })
+
+  it('CLEAR_VALUE on a bridged determinant returns the field, not the profile', () => {
+    // Five of the eight profile keys have no "unknown", and requirements
+    // must be driven by something — the engine keeps the last declaration
+    // until a new SET_VALUE or UPDATE_PROFILE re-patches it.
+    let s = createApplication('a', START, 'tok')
+    s = applicationReducer(s, {
+      type: 'SET_VALUE', fieldId: 'applicant_type', value: 'business',
+      source: 'user', at: T,
+    })
+    s = applicationReducer(s, { type: 'CLEAR_VALUE', fieldId: 'applicant_type', at: T })
+    expect(s.fields['applicant_type']?.status).toBe('empty')
+    expect(outstandingFields(s)).toContain('applicant_type')
+    expect(s.profile.applicantType).toBe('business')
   })
 })
