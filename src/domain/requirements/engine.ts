@@ -1,6 +1,6 @@
 import {
   addressFields, businessFields, CORE_CONTACT, GSA_CORE,
-  identityFields, LICENSE_GROUP, profileFields, STATE_RULES, TAX_CORE,
+  identityFields, isUnitedStates, LICENSE_GROUP, profileFields, STATE_RULES, TAX_CORE,
   type ApplicantProfile,
 } from './rules'
 import { reqKey, type RequirementKey } from './key'
@@ -23,7 +23,9 @@ export function requiredFields(profile: ApplicantProfile): RequirementKey[] {
 
   if (profile.wantsGsa) for (const id of GSA_CORE) out.push(reqKey(id))
 
-  const rule = profile.state
+  // profile.state can outlive a country change — no asked field unsets it —
+  // so a state rule must not bind once the applicant is no longer in the US.
+  const rule = isUnitedStates(profile.country) && profile.state
     ? STATE_RULES[profile.state.toUpperCase()]
     : undefined
   if (rule) for (const id of rule.additional) out.push(reqKey(id))

@@ -78,6 +78,16 @@ describe('requiredFields', () => {
       .toContain('oh_foreign_buyer_form')
   })
 
+  it('does not bind a stale US state to a non-US applicant', () => {
+    // location_state answered 'OH' while country was still the US default,
+    // then location_country moved to 'CAN' — profile.state is unchanged
+    // (no asked field can unset it), so the state gate must not fire.
+    expect(requiredFields({ ...base, country: 'CAN', state: 'OH' }))
+      .not.toContain('oh_foreign_buyer_form')
+    expect(requiredFields({ ...base, country: 'US', state: 'OH' }))
+      .toContain('oh_foreign_buyer_form')
+  })
+
   it('returns the exact expected set for an individual in Georgia', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
