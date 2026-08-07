@@ -36,12 +36,16 @@ describe('vetted copy', () => {
     )
   })
 
-  it('carries the start-screen copy, dash-free, under version 9', () => {
-    expect(COPY_VERSION).toBe('9')
+  it('carries the start-screen copy, dash-free', () => {
     expect(vettedCopy('start_headline')).toBe("Hi, let's get you set up to bid at IAA.")
     expect(vettedCopy('start_subline')).toBe(
       "I'm your registration agent. I'll ask a few things and fill in what I can "
       + "from your documents. The fastest start is your driver's license.",
     )
+  })
+
+  it('carries the rationale intro under version 10', () => {
+    expect(COPY_VERSION).toBe('10')
+    expect(vettedCopy('rationale_intro')).toBe("Here's why we ask:")
   })
 })
