@@ -108,7 +108,6 @@ export default function Page() {
                 onProfileChange: app.updateProfile,
               })}
               {...(app.carry && !closed && { carry: app.carry })}
-              documents={app.documents}
             />
           )}
 

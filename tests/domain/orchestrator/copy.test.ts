@@ -44,8 +44,8 @@ describe('vetted copy', () => {
     )
   })
 
-  it('carries the rationale intro under version 10', () => {
-    expect(COPY_VERSION).toBe('10')
+  it('carries the rationale intro under version 11', () => {
+    expect(COPY_VERSION).toBe('11')
     expect(vettedCopy('rationale_intro')).toBe("Here's why we ask:")
   })
 })

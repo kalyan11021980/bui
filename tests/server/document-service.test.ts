@@ -2,20 +2,14 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { applyAction, createApplication } from '@/server/application-service'
 import { getAuditLog, __resetAuditLogForTests } from '@/server/audit'
-import { QUIET_THRESHOLD } from '@/domain/ocr/confidence'
 import { ingestDocument, type IngestOutcome } from '@/server/document-service'
 import { MAX_IMAGE_BASE64_CHARS } from '@/server/image-size'
 import { __resetStoreForTests } from '@/server/store'
-import type { Detection } from '@/domain/ocr/grounding'
+import { NO_EVIDENCE, type Candidate } from '@/domain/ocr/extract'
+import type { FieldExtractor } from '@/server/ocr/llm-extract'
 import type { OcrProvider } from '@/server/ocr/service'
 import type { Result } from '@/server/application-service'
 import { pngBase64 } from './image-bytes'
-
-/**
- * Nothing here imports a strategy module. The service has to register them
- * itself — importing `@/domain/ocr/extract/aamva` from the test would hide a
- * missing import that leaves the running server reading nothing at all.
- */
 
 const AT = '2026-08-02T00:00:00.000Z'
 
@@ -25,29 +19,24 @@ const FULL = pngBase64(1600, 1000)
 const SMALL = pngBase64(600, 380)
 const TINY = pngBase64(320, 200)
 
-const det = (text: string, box: [number, number, number, number]): Detection =>
-  ({ text, box })
-
-/** A card filling the frame: 60-940 of 1000 is 1408px at 1600 wide. */
-const CARD: Detection[] = [
-  det('4dLIC#WDLJK00580GF', [60, 200, 940, 240]),
-  det('3DOB04/17/1982', [60, 300, 940, 340]),
-]
-
-const grounded = (detections: readonly Detection[]): string =>
-  detections
-    .map((d) => `<|ref|>${d.text}<|/ref|><|det|>[[${d.box.join(',')}]]<|/det|>`)
-    .join('')
-
-/** Two passes, as the real transport makes them: grounded, then plain. */
-function providerFor(detections: readonly Detection[], plain: string): OcrProvider {
-  return async ({ prompt }) =>
-    prompt.includes('grounding')
-      ? { text: grounded(detections), detections }
-      : { text: plain, detections: [] }
+/** One markdown read: the text feeds the extractor, stubbed below. */
+function providerFor(text = ''): OcrProvider {
+  return async () => ({ text })
 }
 
-const provider = providerFor(CARD, 'WDLJK00580GF 04/17/1982')
+const candidate = (key: string, raw: string): Candidate => ({
+  key, raw, evidence: { ...NO_EVIDENCE },
+})
+
+/** What the LLM extraction step answers; stubbed, the model is not under test here. */
+const extractorFor = (candidates: readonly Candidate[]): FieldExtractor =>
+  async () => candidates
+
+const provider = providerFor()
+const extractor = extractorFor([
+  candidate('dl_number', 'WDLJK00580GF'),
+  candidate('dob', '1982-04-17'),
+])
 
 /** Fails loudly instead of returning early, which would pass vacuously. */
 function unwrap(result: Result<IngestOutcome>): IngestOutcome {
@@ -87,6 +76,7 @@ function ingest(
   app: Owned,
   imageBase64: string,
   ocr: OcrProvider = provider,
+  extract: FieldExtractor = extractor,
 ) {
   return ingestDocument({
     applicationId: app.id,
@@ -95,6 +85,7 @@ function ingest(
     imageBase64,
     at: AT,
     provider: ocr,
+    extractor: extract,
   })
 }
 
@@ -108,7 +99,7 @@ describe('ingestDocument', () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(app, FULL))
 
-    expect(outcome.band).toBe('full')
+    expect(outcome.band).toBe('text-only')
     expect(outcome.filled).toContain('dl_number')
     expect(outcome.filled).toContain('dob')
 
@@ -129,9 +120,8 @@ describe('ingestDocument', () => {
   })
 
   it('hands back the id it filed those fields under, not one of its own', async () => {
-    // The browser matches this against the photo it holds to decide whose
-    // pixels a crop is cut from. An id that matches nothing shows no crop; an
-    // id that matches the wrong photo shows the wrong document.
+    // Every field of one upload is filed under the same id, and that id is the
+    // one handed back — not a freshly minted one the caller never saw.
     const app = createApplication()
     const outcome = unwrap(await ingest(app, FULL))
 
@@ -142,59 +132,32 @@ describe('ingestDocument', () => {
     }
   })
 
-  it('records a box in original-image pixels when the band allows crops', async () => {
+  it('files a read with ocr provenance and a confidence score', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(app, FULL))
 
-    // [60,200,940,240] of 1000, stretched onto 1600x1000. Asserted as the
-    // exact rectangle: a crop that is merely "wider than it is tall" would
-    // still be the wrong part of the card.
-    expect(outcome.state.fields.dl_number?.provenance?.box).toEqual([96, 200, 1504, 240])
+    const provenance = outcome.state.fields.dl_number?.provenance
+    expect(provenance?.source).toBe('ocr')
+    expect(provenance?.documentId).toBe(outcome.documentId)
+    expect(provenance?.confidence).toBeGreaterThan(0)
   })
 
-  it('suppresses boxes in the text-only band but still fills the fields', async () => {
+  it('reads at text-only whatever the pixel width, above the re-take floor', async () => {
+    // Mistral OCR returns markdown without bounding boxes, so every legible
+    // read is text-only — a full-size photo and a 600px one land in the same band.
+    const app = createApplication()
+    const outcome = unwrap(await ingest(app, FULL))
+
+    expect(outcome.band).toBe('text-only')
+    expect(outcome.filled).toContain('dl_number')
+  })
+
+  it('reads at text-only for a medium photo too', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(app, SMALL))
 
     expect(outcome.band).toBe('text-only')
     expect(outcome.filled).toContain('dl_number')
-    expect(outcome.state.fields.dl_number?.provenance?.box).toBeUndefined()
-  })
-
-  it('suppresses boxes for a big photo of a small card, whatever its pixel width', async () => {
-    // Reads fine at 1600px wide; the card covers 200/1000 of the frame, so
-    // localisation is no better than a 320px photo of a card filling it.
-    const distant = providerFor(
-      [det('4dLIC#WDLJK00580GF', [400, 200, 600, 240])],
-      'WDLJK00580GF',
-    )
-    const app = createApplication()
-    const outcome = unwrap(await ingest(app, FULL, distant))
-
-    expect(outcome.band).toBe('text-only')
-    expect(outcome.filled).toContain('dl_number')
-    expect(outcome.state.fields.dl_number?.provenance?.box).toBeUndefined()
-  })
-
-  it('records no box for a detection covering the whole card', async () => {
-    // A box that size is a detection failure wearing a box. Cropping to it
-    // asserts the value came from a region it did not.
-    const wide = providerFor(
-      [
-        det('4dLIC#WDLJK00580GF', [0, 0, 1000, 1000]),
-        det('3DOB04/17/1982', [60, 300, 940, 340]),
-      ],
-      'WDLJK00580GF 04/17/1982',
-    )
-    const app = createApplication()
-    const outcome = unwrap(await ingest(app, FULL, wide))
-
-    expect(outcome.band).toBe('full')
-    expect(outcome.filled).toContain('dl_number')
-    expect(outcome.state.fields.dl_number?.provenance?.box).toBeUndefined()
-    // The plausible one beside it is still recorded, so this is a per-box
-    // decision rather than the band being demoted underneath it.
-    expect(outcome.state.fields.dob?.provenance?.box).toBeDefined()
   })
 
   it('refuses to call OCR below the read floor, and writes nothing', async () => {
@@ -202,7 +165,7 @@ describe('ingestDocument', () => {
     const app = createApplication()
     const result = await ingest(app, TINY, async () => {
       called = true
-      return { text: '', detections: [] }
+      return { text: '' }
     })
 
     expect(called).toBe(false)
@@ -223,7 +186,7 @@ describe('ingestDocument', () => {
 
     const result = await ingest(app, FULL, async () => {
       called = true
-      return { text: '', detections: [] }
+      return { text: '' }
     })
 
     expect(called).toBe(false)
@@ -261,7 +224,7 @@ describe('ingestDocument', () => {
     const app = createApplication()
     const result = await ingest(app, 'not-an-image', async () => {
       called = true
-      return { text: '', detections: [] }
+      return { text: '' }
     })
 
     expect(called).toBe(false)
@@ -282,25 +245,12 @@ describe('ingestDocument', () => {
     }
   })
 
-  it('scores a cross-pass agreement above a cross-pass silence', async () => {
-    // Wires the confidence scorer to the second pass. Same card, same boxes;
-    // only the plain read differs.
-    const app = createApplication()
-    const agreed = unwrap(await ingest(app, FULL))
-
-    __resetStoreForTests()
-    const other = createApplication()
-    const silent = unwrap(await ingest(other, FULL, providerFor(CARD, '')))
-
-    const score = (o: IngestOutcome) => o.state.fields.dl_number?.provenance?.confidence ?? 0
-    expect(score(agreed)).toBeGreaterThan(score(silent))
-  })
-
   it('fills nothing and fails nothing when the read yields no fields, but still records the upload', async () => {
     const app = createApplication()
     const outcome = unwrap(await ingest(
       app, FULL,
-      providerFor([det('NOTHINGUSEFUL', [60, 200, 940, 240])], 'NOTHING USEFUL'),
+      providerFor('NOTHING USEFUL'),
+      extractorFor([]),
     ))
 
     expect(outcome.filled).toEqual([])
@@ -320,7 +270,7 @@ describe('ingestDocument', () => {
   })
 
   it('404s an application that does not exist, even when it read nothing', async () => {
-    const result = await ingest({ id: 'no-such-application', ownerToken: 'any-token' }, FULL, providerFor([], ''))
+    const result = await ingest({ id: 'no-such-application', ownerToken: 'any-token' }, FULL, providerFor())
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.failure.kind).toBe('unknown')
@@ -364,63 +314,45 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
   ) as {
     imageSize: { width: number; height: number }
     text: string
-    plainText: string
-    detections: Detection[]
   }
 
   const realImage = readFileSync('sample/licenses/specimens/wa_enhanced.png').toString('base64')
 
-  const recorded: OcrProvider = async ({ prompt }) =>
-    prompt.includes('grounding')
-      ? { text: fixture.text, detections: fixture.detections }
-      : { text: fixture.plainText, detections: [] }
+  // Mistral OCR returns markdown without bounding boxes.
+  const recorded: OcrProvider = async () => ({ text: fixture.text })
+
+  // What the LLM extraction step answers for this card.
+  const extracted = extractorFor([
+    candidate('dl_number', 'WDLJK00580GF'),
+    candidate('first_name', 'JANE'),
+    candidate('last_name', 'SAMPLE'),
+    candidate('dob', '1982-04-17'),
+    candidate('addr_line1', '123 STREET ADDRESS'),
+    candidate('addr_city', 'YOUR CITY'),
+    candidate('addr_zip', '99999-0000'),
+  ])
 
   it('reads the Washington card end to end, from bytes to derived fields', async () => {
     const app = createApplication()
-    const outcome = unwrap(await ingest(app, realImage, recorded))
+    const outcome = unwrap(await ingest(app, realImage, recorded, extracted))
 
-    // 1560px wide, read off the PNG itself, with the card filling the frame.
-    expect(outcome.band).toBe('full')
-    expect(outcome.filled.length).toBeGreaterThanOrEqual(9)
-    expect([...outcome.filled].sort()).toContain('dl_number')
+    // 1560px wide, read off the PNG itself — and text-only, since a Mistral
+    // read is markdown only.
+    expect(outcome.band).toBe('text-only')
+    expect(outcome.filled.length).toBeGreaterThanOrEqual(7)
+    expect(outcome.filled).toContain('dl_number')
     expect(outcome.state.fields.dl_number?.value).toBe('WDLJK00580GF')
+    expect(outcome.state.fields.addr_line1?.value).toBe('123 STREET ADDRESS')
+    expect(outcome.state.fields.addr_city?.value).toBe('YOUR CITY')
     expect(outcome.state.fields.addr_zip?.value).toBe('99999-0000')
 
     for (const key of outcome.filled) {
-      expect(outcome.state.fields[key]?.status, key).toBe('derived')
-      expect(outcome.state.fields[key]?.provenance?.source, key).toBe('ocr')
-      expect(outcome.state.fields[key]?.provenance?.confidence, key).toBeGreaterThan(0)
+      const field = outcome.state.fields[key]
+      expect(field?.status, key).toBe('derived')
+      expect(field?.provenance?.source, key).toBe('ocr')
+      expect(field?.provenance?.confidence, key).toBeGreaterThan(0)
+      expect(field?.provenance?.confidence, key).toBeLessThanOrEqual(1)
     }
-  })
-
-  it('re-spaces the address end to end, and scores agreement on the spaced value', async () => {
-    // Guards the wiring and its order, not the algorithm. ingestDocument must
-    // compose respaceAddresses *then* withCrossPass — dropping the call
-    // entirely, or running it after cross-pass is scored, both leave the
-    // value looking right. Only the confidence tells them apart: scoring
-    // cross-pass against the still-space-stripped value caps it below
-    // QUIET_THRESHOLD even once the display value has been re-spaced, so a
-    // value-only assertion cannot see either failure — see
-    // document-service.ts.
-    const app = createApplication()
-    const outcome = unwrap(await ingest(app, realImage, recorded))
-    const line1 = outcome.state.fields.addr_line1
-    const city = outcome.state.fields.addr_city
-
-    expect(line1?.value).toBe('123 STREET ADDRESS')
-    expect(city?.value).toBe('YOUR CITY')
-    expect(line1?.provenance?.confidence).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
-    expect(city?.provenance?.confidence).toBeGreaterThanOrEqual(QUIET_THRESHOLD)
-  })
-
-  it('maps the licence number onto the pixels it was printed at', async () => {
-    const app = createApplication()
-    const outcome = unwrap(await ingest(app, realImage, recorded))
-    const box = outcome.state.fields.dl_number?.provenance?.box
-
-    // The whole chain in one number: PNG header to 1560x1006, grounded box
-    // 339-694 of 1000, stretched. Nothing else in the suite crosses all of it.
-    expect(box?.map(Math.round)).toEqual([529, 242, 1083, 292])
   })
 
   it('reads the same card from a JPEG re-encode, which is what a phone sends', async () => {
@@ -428,31 +360,13 @@ describe('ingestDocument — a recorded read of a real specimen', () => {
     // read should be able to tell, and every specimen in the corpus is a PNG.
     const jpeg = readFileSync('sample/licenses/encodings/wa_enhanced.jpg').toString('base64')
     const app = createApplication()
-    const fromJpeg = unwrap(await ingest(app, jpeg, recorded))
+    const fromJpeg = unwrap(await ingest(app, jpeg, recorded, extracted))
 
     __resetStoreForTests()
     const other = createApplication()
-    const fromPng = unwrap(await ingest(other, realImage, recorded))
+    const fromPng = unwrap(await ingest(other, realImage, recorded, extracted))
 
     expect(fromJpeg.band).toBe(fromPng.band)
     expect(fromJpeg.filled).toEqual(fromPng.filled)
-    expect(fromJpeg.state.fields.dl_number?.provenance?.box)
-      .toEqual(fromPng.state.fields.dl_number?.provenance?.box)
-  })
-
-  it('places every recorded box inside the image it came from', async () => {
-    const app = createApplication()
-    const outcome = unwrap(await ingest(app, realImage, recorded))
-    const boxes = outcome.filled
-      .map((key) => outcome.state.fields[key]?.provenance?.box)
-      .filter((box): box is readonly [number, number, number, number] => box !== undefined)
-
-    expect(boxes.length).toBeGreaterThan(0)
-    for (const [x0, y0, x1, y1] of boxes) {
-      expect(x1).toBeGreaterThan(x0)
-      expect(y1).toBeGreaterThan(y0)
-      expect(x1).toBeLessThanOrEqual(fixture.imageSize.width)
-      expect(y1).toBeLessThanOrEqual(fixture.imageSize.height)
-    }
   })
 })

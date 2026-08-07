@@ -40,43 +40,6 @@ describe('FieldRow', () => {
     expect(screen.getByText(/from your document/i)).toBeInTheDocument()
   })
 
-  it('passes the document image down to the crop when both are given', () => {
-    render(
-      <FieldRow
-        fieldId="dob"
-        state={{ ...derived, provenance: { ...derived.provenance!, box: [10, 20, 100, 60] } }}
-        documents={{ 'doc-1': { url: 'blob:doc', size: { width: 800, height: 500 } } }}
-      />,
-    )
-    expect(screen.getByRole('img')).toBeInTheDocument()
-  })
-
-  it('shows no crop when a box exists but the row was never given a document', () => {
-    // `documents` is threaded from ApplicationPanel and can be absent
-    // (pre-upload, or after a reload); the row must degrade cleanly rather
-    // than assume it is always there.
-    render(
-      <FieldRow
-        fieldId="dob"
-        state={{ ...derived, provenance: { ...derived.provenance!, box: [10, 20, 100, 60] } }}
-      />,
-    )
-    expect(screen.queryByRole('img')).toBeNull()
-    expect(screen.getByText(/from your document/i)).toBeInTheDocument()
-  })
-
-  it('shows no crop when the browser holds another document than this row was read from', () => {
-    render(
-      <FieldRow
-        fieldId="dob"
-        state={{ ...derived, provenance: { ...derived.provenance!, box: [10, 20, 100, 60] } }}
-        documents={{ 'doc-2': { url: 'blob:other', size: { width: 800, height: 500 } } }}
-      />,
-    )
-    expect(screen.queryByRole('img')).toBeNull()
-    expect(screen.getByText(/from your document/i)).toBeInTheDocument()
-  })
-
   it('asks the user to check a carried value rather than stating it as fact', () => {
     render(
       <FieldRow

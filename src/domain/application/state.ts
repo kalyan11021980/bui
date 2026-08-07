@@ -11,8 +11,6 @@ export type ProvenanceSource = 'ocr' | 'user' | 'lookup' | 'carried'
 export type Provenance = {
   source: ProvenanceSource
   documentId?: string
-  /** Original-image coordinates. Absent when the provider cannot supply them. */
-  box?: readonly [number, number, number, number]
   confidence?: number
   /** For `carried` values: the RequirementKey the value was copied from. */
   fromFieldId?: RequirementKey
@@ -59,7 +57,6 @@ export type Action =
       source: ProvenanceSource
       at: string
       documentId?: string
-      box?: readonly [number, number, number, number]
       confidence?: number
       fromFieldId?: RequirementKey
     }

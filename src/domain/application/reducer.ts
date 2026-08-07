@@ -50,7 +50,6 @@ export function applicationReducer(
         provenance: {
           source: action.source,
           ...(action.documentId !== undefined && { documentId: action.documentId }),
-          ...(action.box !== undefined && { box: action.box }),
           ...(action.confidence !== undefined && { confidence: action.confidence }),
           ...(action.fromFieldId !== undefined && { fromFieldId: action.fromFieldId }),
         },

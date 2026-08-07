@@ -52,13 +52,10 @@ const PROFILE: ApplicantProfile = {
   bizCountry: null,
 }
 
-const BOX = [100, 200, 400, 260] as const
-
 /**
  * The application as the server would return it after reading a licence.
- * Below the crop floor it records no box at all, so `placed` is false there.
  */
-function withDlNumber(state: ApplicationState, placed = true): ApplicationState {
+function withDlNumber(state: ApplicationState): ApplicationState {
   return {
     ...state,
     fields: {
@@ -68,24 +65,6 @@ function withDlNumber(state: ApplicationState, placed = true): ApplicationState 
         status: 'derived',
         provenance: {
           source: 'ocr', documentId: 'doc-1', confidence: 0.9,
-          ...(placed && { box: BOX }),
-        },
-      },
-    },
-  }
-}
-
-/** A field read off a second document, with a box of its own. */
-function withDob(state: ApplicationState): ApplicationState {
-  return {
-    ...state,
-    fields: {
-      ...state.fields,
-      dob: {
-        value: '1978-01-06',
-        status: 'derived',
-        provenance: {
-          source: 'ocr', documentId: 'doc-2', confidence: 0.9, box: BOX,
         },
       },
     },
@@ -124,7 +103,7 @@ const readNothing = (call: Call) =>
   call.url.endsWith('/documents')
     ? {
         status: 200,
-        body: { band: 'full', documentId: 'doc-1', filled: [], state: created() },
+        body: { band: 'text-only', documentId: 'doc-1', filled: [], state: created() },
       }
     : asServer(call)
 
@@ -304,7 +283,7 @@ describe('the page', () => {
         ? {
             status: 200,
             body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
               state: withDlNumber(created()),
             },
           }
@@ -344,7 +323,7 @@ describe('the page', () => {
         ? {
             status: 200,
             body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
               state: { ...withDlNumber(created()), transcript: [presentingTurn] },
             },
           }
@@ -383,7 +362,7 @@ describe('the page', () => {
         ? {
             status: 200,
             body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
               state: { ...withDlNumber(created()), transcript: [presentingTurn] },
             },
           }
@@ -400,81 +379,6 @@ describe('the page', () => {
     await screen.findByRole('group', { name: /driver's license number/i })
     expect(screen.getAllByRole('group', { name: /driver's license number/i })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: /done with this section/i })).toHaveLength(1)
-  })
-
-  it('shows the part of the document each value was read from', async () => {
-    respond = (call) =>
-      call.url.endsWith('/documents')
-        ? {
-            status: 200,
-            body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
-              state: withDlNumber(created()),
-            },
-          }
-        : asServer(call)
-
-    render(<Page />)
-    await screen.findByRole('region', { name: /your application/i })
-
-    await uploadPhoto()
-
-    const crop = await screen.findByRole('img', { name: /part of your document/i })
-    const image = crop.querySelector('img')
-    // The pixels the browser measured, clipped to the box the server returned.
-    expect(image).toHaveAttribute('src', PREPARED.imageUrl)
-    expect(image?.style.width).toBe(`${1560 * (260 / 300)}px`)
-    expect(image?.style.left).toBe(`${-100 * (260 / 300)}px`)
-  })
-
-  it('never repaints an earlier crop with a second document’s pixels', async () => {
-    // Two successful uploads of different photos. Server state is cumulative,
-    // so the first document's field keeps its box — and would happily have it
-    // clipped out of the second photo, under a label saying it was read there.
-    let seen = 0
-    respond = (call) => {
-      if (!call.url.endsWith('/documents')) return asServer(call)
-      seen += 1
-      return seen === 1
-        ? {
-            status: 200,
-            body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
-              state: withDlNumber(created()),
-            },
-          }
-        : {
-            status: 200,
-            body: {
-              band: 'full', documentId: 'doc-2', filled: ['dob'],
-              state: withDob(withDlNumber(created())),
-            },
-          }
-    }
-
-    render(<Page />)
-    await screen.findByRole('region', { name: /your application/i })
-
-    await uploadPhoto()
-    await screen.findByRole('img', { name: /part of your document/i })
-
-    decoder.next = SECOND
-    await uploadPhoto()
-
-    const dob = await screen.findByRole('group', { name: /date of birth/i })
-    await waitFor(() =>
-      expect(within(dob).getByRole('img', { name: /part of your document/i }))
-        .toBeInTheDocument())
-
-    // The licence number was read off the first photo and must still be shown
-    // against it — never against the passport uploaded after it.
-    const licence = screen.getByRole('group', { name: /driver's license number/i })
-    const carried = within(licence).queryByRole('img', { name: /part of your document/i })
-    expect(carried?.querySelector('img')).toHaveAttribute('src', PREPARED.imageUrl)
-    expect(within(dob).getByRole('img', { name: /part of your document/i })
-      .querySelector('img')).toHaveAttribute('src', SECOND.imageUrl)
-    // Whatever else changed, the second photo is nowhere near the first row.
-    expect(carried?.querySelector('img')).not.toHaveAttribute('src', SECOND.imageUrl)
   })
 
   it('shows a reading-photo status while the OCR read is in flight, and clears it after', async () => {
@@ -517,9 +421,9 @@ describe('the page', () => {
       return seenDocs === 1
         ? {
             status: 200,
-            body: { band: 'full', documentId: 'doc-1', filled: ['dl_number'], state: withDlNumber(created()) },
+            body: { band: 'text-only', documentId: 'doc-1', filled: ['dl_number'], state: withDlNumber(created()) },
           }
-        : { status: 200, body: { band: 'full', documentId: 'doc-2', filled: [], state: created() } }
+        : { status: 200, body: { band: 'text-only', documentId: 'doc-2', filled: [], state: created() } }
     }
 
     render(<Page />)
@@ -643,7 +547,7 @@ describe('the page', () => {
   it('says plainly when the document gave up nothing, without calling it a failure', async () => {
     respond = (call) =>
       call.url.endsWith('/documents')
-        ? { status: 200, body: { band: 'full', documentId: 'doc-1', filled: [], state: created() } }
+        ? { status: 200, body: { band: 'text-only', documentId: 'doc-1', filled: [], state: created() } }
         : asServer(call)
 
     render(<Page />)
@@ -655,17 +559,18 @@ describe('the page', () => {
       .toHaveTextContent(/still yours to answer/i)
   })
 
-  it('explains missing crops when the server is the one that says the card was small', async () => {
-    // A big photo of a distant card reads fine and crops wrong, and the server
-    // demotes it after the read. The client's own pre-flight never fires here,
-    // so this sentence is the only place the applicant learns why.
+  it('does not call a text-only read "too small" — the photo may be full-size', async () => {
+    // Mistral OCR returns no bounding boxes, so every read lands in the
+    // text-only band whatever the photo size. The notice must not claim the
+    // photo was too small to crop: that was only true when crops existed, and
+    // a full-size photo reads at text-only just the same.
     respond = (call) =>
       call.url.endsWith('/documents')
         ? {
             status: 200,
             body: {
               band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
-              state: withDlNumber(created(), false),
+              state: withDlNumber(created()),
             },
           }
         : asServer(call)
@@ -676,7 +581,7 @@ describe('the page', () => {
     await uploadPhoto()
 
     const said = await screen.findByText(/we filled in 1 answer/i)
-    expect(said).toHaveTextContent(/too small to show you where each answer came from/i)
+    expect(said).not.toHaveTextContent(/too small to show/i)
   })
 
   it('takes down what it said about the last photo when a new one is chosen', async () => {
@@ -753,7 +658,7 @@ describe('the page', () => {
         ? {
             status: 200,
             body: {
-              band: 'full', documentId: 'doc-1', filled: ['dl_number'],
+              band: 'text-only', documentId: 'doc-1', filled: ['dl_number'],
               state: withDlNumber(created()),
             },
           }

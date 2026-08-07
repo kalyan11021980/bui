@@ -32,7 +32,7 @@ describe('presentPlan, reached through ingestDocument — a throw must not 500 a
     const { ingestDocument } = await import('@/server/document-service')
 
     const app = createApplication()
-    const emptyRead: OcrProvider = async () => ({ text: '', detections: [] })
+    const emptyRead: OcrProvider = async () => ({ text: '' })
 
     const outcome = await ingestDocument({
       applicationId: app.id,
@@ -41,6 +41,9 @@ describe('presentPlan, reached through ingestDocument — a throw must not 500 a
       imageBase64: FULL,
       at: AT,
       provider: emptyRead,
+      // The read is empty, so extraction returns nothing; presentPlan is the
+      // only thing left that can throw, which is what this test isolates.
+      extractor: async () => [],
     })
 
     // The upload itself is not what threw — RECORD_DOCUMENT already

@@ -1,25 +1,15 @@
-// Strategies register themselves on import. Without these the pipeline has
-// nothing to dispatch to and silently reads nothing. aamva also registers
-// via the named import below, but this line stays explicit on purpose —
-// registration must not depend on something else needing a re-space helper.
-import '@/domain/ocr/extract/aamva'
-import '@/domain/ocr/extract/labelled'
-import '@/domain/ocr/extract/mrz'
-
 import { randomUUID } from 'node:crypto'
 import { submittedRefusal } from '@/domain/application/guards'
-import { scoreEvidence, withCrossPass } from '@/domain/ocr/confidence'
-import { extractFor, parseCandidates } from '@/domain/ocr/extract'
-import { respaceAddresses } from '@/domain/ocr/extract/aamva'
-import { FIT_MODEL, isPlausibleBox, toPixels, type ImageSize } from '@/domain/ocr/geometry'
-import { bandForWidth, demoteForCardExtent, type QualityBand } from '@/domain/ocr/quality'
+import { scoreEvidence } from '@/domain/ocr/confidence'
+import { parseCandidates } from '@/domain/ocr/extract'
+import { bandForWidth, type QualityBand } from '@/domain/ocr/quality'
 import { vettedCopy } from '@/domain/orchestrator/copy'
 import { applyAction, getApplication, presentPlan, type Result } from './application-service'
 import { failure } from './http'
 import { imageSizeOf, MAX_IMAGE_BASE64_CHARS } from './image-size'
+import { envExtractor, type FieldExtractor } from './ocr/llm-extract'
 import { readDocument, type OcrProvider } from './ocr/service'
 import type { ApplicationState } from '@/domain/application/state'
-import type { Box } from '@/domain/ocr/grounding'
 import type { DocType } from '@/domain/field-id'
 import type { RequirementKey } from '@/domain/requirements/key'
 
@@ -32,12 +22,12 @@ export type IngestInput = {
   readonly imageBase64: string
   readonly at: string
   readonly provider?: OcrProvider
+  readonly extractor?: FieldExtractor
 }
 
 export type IngestOutcome = {
   readonly band: QualityBand
-  /** What this upload was filed as. The browser draws crops from the photo
-   * that carries this id, and from no other. */
+  /** What this upload was filed as. */
   readonly documentId: string
   readonly filled: readonly RequirementKey[]
   readonly state: ApplicationState
@@ -53,7 +43,8 @@ export async function ingestDocument(
 ): Promise<Result<IngestOutcome>> {
   // Before the read: an application that does not exist, one the caller does
   // not hold the token for, or one already sent for review cannot be told
-  // anything — and a two-pass OCR call on its behalf is spent for nothing.
+  // anything — and an OCR read plus an extraction call on its behalf is
+  // spent for nothing.
   const existing = getApplication(input.applicationId, input.ownerToken)
   if (!existing.ok) return existing
 
@@ -79,7 +70,9 @@ export async function ingestDocument(
   }
 
   const read = await readDocument(input.imageBase64, input.provider)
-  const band = demoteForCardExtent(preflight, read.detections, imageSize.width)
+  // Above the re-take floor every read is text-only: Mistral returns markdown
+  // with no boxes, so there is no fuller band to demote to or from.
+  const band: QualityBand = preflight
   const documentId = randomUUID()
 
   // Recorded through the same commit path as the derived fields below, so it
@@ -93,18 +86,13 @@ export async function ingestDocument(
   })
   if (!recorded.ok) return recorded
 
-  // Re-spaced before cross-pass is scored, so agreement is checked against
-  // the value the applicant will actually see, not the space-stripped one
-  // that always disagreed on a spacing artefact rather than a misread.
-  const parsed = parseCandidates(extractFor(input.docType, read.detections, read.text))
-  const candidates = withCrossPass(respaceAddresses(parsed, read.plainText), read.plainText)
+  const extractor = input.extractor ?? envExtractor()
+  const candidates = parseCandidates(await extractor(input.docType, read.text))
 
   const filled: RequirementKey[] = []
   let state: ApplicationState = recorded.value
 
   for (const candidate of candidates) {
-    const box = provenanceBox(band, candidate.box, imageSize)
-
     const result = applyAction(input.applicationId, input.ownerToken, {
       type: 'SET_VALUE',
       fieldId: candidate.key,
@@ -113,7 +101,6 @@ export async function ingestDocument(
       at: input.at,
       documentId,
       confidence: scoreEvidence(candidate.evidence),
-      ...(box && { box }),
     })
 
     // One field the engine does not want must not sink the other eleven.
@@ -133,23 +120,4 @@ export async function ingestDocument(
   // for as they are today. The document itself is still on the record, via
   // the RECORD_DOCUMENT committed above.
   return { ok: true, value: { band, documentId, filled, state } }
-}
-
-/**
- * Below the crop floor a box is recorded nowhere: a crop drawn from an
- * untrustworthy box asserts a value came from a region it did not, which is
- * worse than showing no crop at all. Same reasoning for a box the size of the
- * whole card, which is a detection failure wearing a box.
- */
-function provenanceBox(
-  band: QualityBand,
-  box: Box | undefined,
-  imageSize: ImageSize,
-): readonly [number, number, number, number] | null {
-  if (band !== 'full' || !box || !isPlausibleBox(box)) return null
-  const pixels = toPixels(box, imageSize, FIT_MODEL)
-  return [
-    pixels.x, pixels.y,
-    pixels.x + pixels.width, pixels.y + pixels.height,
-  ] as const
 }

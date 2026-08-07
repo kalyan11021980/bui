@@ -49,7 +49,7 @@ describe('useApplication readingDocTypes', () => {
       expect(result.current.readingDocTypes).toEqual(['drivers_license']))
 
     act(() => {
-      settleRead[0]!(json({ band: 'full', documentId: 'doc-1', filled: [], state }))
+      settleRead[0]!(json({ band: 'text-only', documentId: 'doc-1', filled: [], state }))
     })
     await waitFor(() => expect(result.current.readingDocTypes).toEqual([]))
   })
@@ -68,7 +68,7 @@ describe('useApplication readingDocTypes', () => {
       .toEqual(['drivers_license', 'dealer_license']))
 
     act(() => {
-      settleRead[0]!(json({ band: 'full', documentId: 'doc-1', filled: [], state }))
+      settleRead[0]!(json({ band: 'text-only', documentId: 'doc-1', filled: [], state }))
     })
     await waitFor(() =>
       expect(result.current.readingDocTypes).toEqual(['dealer_license']))

@@ -32,4 +32,17 @@ describe('readConfig', () => {
     expect(readConfig({ ...base }).effort).toBe('low')
     expect(readConfig({ ...base, ORCHESTRATOR_EFFORT: 'high' }).effort).toBe('high')
   })
+
+  it('carries an api key for the local provider when one is set', () => {
+    const config = readConfig({ ...base, ORCHESTRATOR_API_KEY: 'sk-test' })
+    if (config.provider !== 'local') throw new Error('expected local')
+    expect(config.apiKey).toBe('sk-test')
+  })
+
+  it('leaves the local provider keyless when none is set', () => {
+    // LM Studio answers without a key; it must keep working that way.
+    const config = readConfig({ ...base })
+    if (config.provider !== 'local') throw new Error('expected local')
+    expect(config.apiKey).toBeUndefined()
+  })
 })

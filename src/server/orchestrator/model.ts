@@ -8,6 +8,8 @@ export type OrchestratorConfig =
       modelId: string
       endpoint: string
       effort: string
+      /** Absent for a keyless local server (LM Studio); required by hosted ones. */
+      apiKey?: string
     }
   | {
       provider: 'anthropic'
@@ -46,7 +48,8 @@ export function readConfig(env: Record<string, string | undefined>): Orchestrato
 
   const endpoint = env.ORCHESTRATOR_ENDPOINT
   if (!endpoint) throw new Error('ORCHESTRATOR_ENDPOINT must be set when ORCHESTRATOR_PROVIDER=local')
-  return { provider: 'local', modelId, effort, endpoint }
+  const apiKey = env.ORCHESTRATOR_API_KEY
+  return { provider: 'local', modelId, effort, endpoint, ...(apiKey ? { apiKey } : {}) }
 }
 
 export function resolveModel(env: Record<string, string | undefined>): LanguageModel {
@@ -57,5 +60,8 @@ export function resolveModel(env: Record<string, string | undefined>): LanguageM
   return createOpenAICompatible({
     name: LOCAL_PROVIDER_NAME,
     baseURL: `${config.endpoint}/v1`,
+    // Keyless local servers (LM Studio) must keep working; a hosted endpoint
+    // refuses without one. Passed only when set.
+    ...(config.apiKey ? { apiKey: config.apiKey } : {}),
   })(config.modelId)
 }

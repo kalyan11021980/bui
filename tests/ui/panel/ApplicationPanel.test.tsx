@@ -97,33 +97,6 @@ describe('ApplicationPanel', () => {
     expect(onConfirm).toHaveBeenCalledWith('first_name')
   })
 
-  it('threads the document image down to the row that has a box', () => {
-    let s = createApplication('app-1', profile, OWNER)
-    s = applicationReducer(s, {
-      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
-      source: 'ocr', at: AT, documentId: 'doc-1', box: [10, 20, 100, 60],
-    })
-    render(
-      <ApplicationPanel
-        state={s}
-        documents={{ 'doc-1': { url: 'blob:doc', size: { width: 800, height: 500 } } }}
-      />,
-    )
-    expect(screen.getByRole('img')).toBeInTheDocument()
-  })
-
-  it('does not offer a crop when the panel was never given the document', () => {
-    // The common case pre-upload, and every case after a reload: a box can
-    // exist on the record while the browser holds no pixels for it.
-    let s = createApplication('app-1', profile, OWNER)
-    s = applicationReducer(s, {
-      type: 'SET_VALUE', fieldId: 'first_name', value: 'Kalyan',
-      source: 'ocr', at: AT, box: [10, 20, 100, 60],
-    })
-    render(<ApplicationPanel state={s} />)
-    expect(screen.queryByRole('img')).toBeNull()
-  })
-
   it('calls onSubmit when everything is done', async () => {
     const onSubmit = vi.fn()
     let s = createApplication('app-1', profile, OWNER)

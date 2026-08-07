@@ -129,10 +129,10 @@ describe('toAction', () => {
   it('keeps optionals that were actually supplied', () => {
     const parsed = actionSchema.parse({
       type: 'SET_VALUE', fieldId: 'dob', value: '1982-08-31', source: 'ocr', at: AT,
-      documentId: 'doc-1', confidence: 0.96, box: [1, 2, 3, 4],
+      documentId: 'doc-1', confidence: 0.96,
     })
     const action = toAction(parsed)
-    expect(action).toMatchObject({ documentId: 'doc-1', confidence: 0.96, box: [1, 2, 3, 4] })
+    expect(action).toMatchObject({ documentId: 'doc-1', confidence: 0.96 })
   })
 
   it('omits an APPEND_TURN turn\'s absent optionals rather than setting them undefined', () => {

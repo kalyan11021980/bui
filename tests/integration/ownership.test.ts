@@ -9,18 +9,28 @@ process.env.AUDIT_DIGEST_SECRET = 'ownership-test-secret-32-chars-min!!'
  * is not the same evidence as "the call was never made".
  */
 const ocr = vi.hoisted(() => ({ calls: 0 }))
-vi.mock('@/server/ocr/client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/server/ocr/client')>()
+vi.mock('@/server/ocr/mistral', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/ocr/mistral')>()
   const { readFileSync: read } = await import('node:fs')
   const fixture = JSON.parse(read('sample/licenses/fixtures/wa_enhanced.json', 'utf8'))
   return {
     ...actual,
-    requestOcr: async ({ prompt }: { prompt: string }) => {
+    requestMistralOcr: async () => {
       ocr.calls += 1
-      return prompt.includes('grounding')
-        ? { text: fixture.text, detections: fixture.detections, completionTokens: null }
-        : { text: fixture.plainText, detections: [], completionTokens: null }
+      // Mistral OCR returns markdown; detections are gone (no bounding boxes).
+      return { text: fixture.text }
     },
+  }
+})
+
+vi.mock('@/server/ocr/llm-extract', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/ocr/llm-extract')>()
+  const { NO_EVIDENCE } = await import('@/domain/ocr/extract')
+  return {
+    ...actual,
+    envExtractor: () => async () => [
+      { key: 'dl_number', raw: 'WDLJK00580GF', evidence: { ...NO_EVIDENCE } },
+    ],
   }
 })
 
@@ -103,6 +113,7 @@ beforeEach(() => {
   ocr.calls = 0
   vi.stubEnv('OCR_ENDPOINT', 'http://ocr.test')
   vi.stubEnv('OCR_MODEL', 'test-model')
+  vi.stubEnv('OCR_API_KEY', 'test-key')
 })
 
 describe('an application id is not enough on its own', () => {
@@ -196,7 +207,7 @@ describe('an application id is not enough on its own', () => {
 
   it('spends no OCR call on an upload it refuses', async () => {
     // The photograph is of an identity document. Refusing it after paying for
-    // two model passes would still have read it.
+    // the OCR read would still have read it.
     const { id } = await newApp()
 
     expect((await upload(id, null)).status).toBe(404)

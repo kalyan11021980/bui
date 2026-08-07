@@ -63,7 +63,10 @@ describe('DocumentUpload', () => {
     expect(onRead).toHaveBeenCalledWith(prepared(1600, 1000))
   })
 
-  it('warns without blocking in the band that reads but cannot crop', async () => {
+  it('reads a medium photo without warning — below the old crop floor, but crops are gone', async () => {
+    // Mistral OCR gives no bounding boxes, so a photo that used to warn "too
+    // small to crop" now just reads. No pre-upload notice: the read comes back
+    // and says what it filled. Guards against re-adding the misleading warning.
     const onRead = vi.fn()
     render(
       <DocumentUpload docType="drivers_license" onRead={onRead} prepare={prepare(600, 380)} />,
@@ -72,7 +75,7 @@ describe('DocumentUpload', () => {
     await userEvent.upload(screen.getByLabelText(/photo of your/i), photo())
 
     await vi.waitFor(() => expect(onRead).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('status')).toHaveTextContent(/read it, but/i)
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('takes back the re-take message once a good photo replaces the bad one', async () => {

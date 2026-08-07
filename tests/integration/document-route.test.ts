@@ -4,20 +4,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 process.env.AUDIT_DIGEST_SECRET = 'document-route-test-secret-32-chars!!'
 
 /**
- * The transport is stubbed, not the service: the route resolves its own
- * provider from the environment, so the only way to drive its success path
- * without a model on the other end is to replace the HTTP call underneath.
+ * The transport and the extractor are stubbed, not the service: the route
+ * resolves both from the environment, so the only way to drive its success
+ * path without a model on the other end is to replace the two calls
+ * underneath.
  */
-vi.mock('@/server/ocr/client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/server/ocr/client')>()
+vi.mock('@/server/ocr/mistral', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/ocr/mistral')>()
   const { readFileSync: read } = await import('node:fs')
   const fixture = JSON.parse(read('sample/licenses/fixtures/wa_enhanced.json', 'utf8'))
   return {
     ...actual,
-    requestOcr: async ({ prompt }: { prompt: string }) =>
-      prompt.includes('grounding')
-        ? { text: fixture.text, detections: fixture.detections, completionTokens: null }
-        : { text: fixture.plainText, detections: [], completionTokens: null },
+    requestMistralOcr: async () => ({ text: fixture.text }),
+  }
+})
+
+vi.mock('@/server/ocr/llm-extract', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/ocr/llm-extract')>()
+  const { NO_EVIDENCE } = await import('@/domain/ocr/extract')
+  return {
+    ...actual,
+    envExtractor: () => async () => [
+      { key: 'dl_number', raw: 'WDLJK00580GF', evidence: { ...NO_EVIDENCE } },
+    ],
   }
 })
 
@@ -116,6 +125,7 @@ describe('POST /api/application/[id]/documents — a successful upload', () => {
   beforeEach(() => {
     vi.stubEnv('OCR_ENDPOINT', 'http://ocr.test')
     vi.stubEnv('OCR_MODEL', 'test-model')
+    vi.stubEnv('OCR_API_KEY', 'test-key')
   })
 
   it('returns the band, the fields it filled and the updated application', async () => {
@@ -131,13 +141,14 @@ describe('POST /api/application/[id]/documents — a successful upload', () => {
       state: ApplicationState
     }
 
-    expect(body.band).toBe('full')
+    // Mistral OCR returns markdown without bounding boxes, so a full-width
+    // photo reads at the text-only band.
+    expect(body.band).toBe('text-only')
     expect(body.filled).toContain('dl_number')
     expect(body.state.id).toBe(id)
     expect(body.state.fields.dl_number?.value).toBe('WDLJK00580GF')
     expect(body.state.fields.dl_number?.status).toBe('derived')
     expect(body.state.fields.dl_number?.provenance?.source).toBe('ocr')
-    expect(body.state.fields.dl_number?.provenance?.box).toHaveLength(4)
     expect(body.state.fields.dl_number?.provenance?.confidence).toBeGreaterThan(0)
   })
 

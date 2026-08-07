@@ -14,7 +14,6 @@ export const DOC_LABEL: Record<DocType, string> = {
 // Module-locals: no importer outside intake.ts needs the raw notice text or
 // the standalone judgement — every surface goes through intakeFile.
 const TOO_SMALL = vettedCopy('upload_too_small')
-const TEXT_ONLY = vettedCopy('upload_text_only')
 const UNOPENABLE = vettedCopy('upload_unopenable')
 
 export type IntakeVerdict =
@@ -35,7 +34,10 @@ async function judgeFile(
   }
   const band = bandForWidth(image.imageSize.width)
   if (band === 're-take') return { kind: 're-take' }
-  return { kind: 'ok', image, notice: band === 'text-only' ? TEXT_ONLY : null }
+  // Below the re-take floor a photo is too small to read; above it, it reads
+  // fine. Mistral OCR gives no bounding boxes, so there is no crop to warn
+  // about and no notice to show before the read comes back.
+  return { kind: 'ok', image, notice: null }
 }
 
 /** The last mile every upload surface repeats: judge, notice, deliver. */

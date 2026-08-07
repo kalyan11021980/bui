@@ -223,7 +223,8 @@ describe('POST /turn', () => {
       docType: 'drivers_license',
       imageBase64: pngBase64(1600, 1000),
       at: AT,
-      provider: async () => ({ text: '', detections: [] }),
+      provider: async () => ({ text: '' }),
+      extractor: async () => [],
     })
     expect(ingested.ok).toBe(true)
 

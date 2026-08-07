@@ -27,7 +27,6 @@ const setValue = z
     source: provenanceSource,
     at: timestamp,
     documentId: z.string().optional(),
-    box: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
     confidence: z.number().optional(),
     fromFieldId: requirementKey.optional(),
   })
@@ -196,7 +195,6 @@ export function toAction(parsed: ParsedAction): Action {
         source: parsed.source,
         at: parsed.at,
         ...(parsed.documentId !== undefined && { documentId: parsed.documentId }),
-        ...(parsed.box !== undefined && { box: parsed.box }),
         ...(parsed.confidence !== undefined && { confidence: parsed.confidence }),
         ...(parsed.fromFieldId !== undefined && { fromFieldId: parsed.fromFieldId }),
       }

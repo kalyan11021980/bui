@@ -1,22 +1,13 @@
 import { parseReqKey, type RequirementKey } from '@/domain/requirements/key'
-import type { Box, Detection } from '../grounding'
 
 /**
- * What we observed about how a value was obtained. `null` means the signal
- * does not apply to this document — a card has no checksum — which is not the
- * same as failing it.
+ * What we observed about how a value was obtained. Under the Mistral-markdown
+ * pipeline there are no boxes, labels, check digits or a second pass to compare
+ * against — only whether the value parsed against its catalog schema and, for
+ * identifiers, whether the glyphs read are confusable.
  */
 export type Evidence = {
   readonly schemaParsed: boolean
-  readonly labelAnchored: boolean
-  /**
-   * `true` or "does not apply", never `false`: a failed check digit
-   * suppresses the field at the point it is read, so a value that reaches
-   * scoring has never failed one.
-   */
-  readonly checksumValid: true | null
-  readonly crossPassAgreed: boolean | null
-  readonly boxPlausible: boolean | null
   /** Null where the field is not identifier-shaped and the confusion cannot arise. */
   readonly glyphAmbiguous: boolean | null
 }
@@ -24,23 +15,11 @@ export type Evidence = {
 export type Candidate = {
   readonly key: RequirementKey
   readonly raw: string
-  readonly box?: Box
-  /** The as-printed text `raw` was parsed from, e.g. `08/31/1977` for a
-   * `raw` of `1977-08-31`. Cross-pass compares this when present — the
-   * plain OCR pass never saw the ISO conversion, only the print. */
-  readonly asRead?: string
   readonly evidence: Evidence
 }
 
-export type ExtractStrategy = (
-  detections: readonly Detection[],
-  text: string,
-) => readonly Candidate[]
-
 export const NO_EVIDENCE: Evidence = {
-  schemaParsed: false, labelAnchored: false,
-  checksumValid: null, crossPassAgreed: null, boxPlausible: null,
-  glyphAmbiguous: null,
+  schemaParsed: false, glyphAmbiguous: null,
 }
 
 /**

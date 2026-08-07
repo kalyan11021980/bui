@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { bandForWidth, demoteForCardExtent } from '@/domain/ocr/quality'
-import type { Detection } from '@/domain/ocr/grounding'
+import { bandForWidth } from '@/domain/ocr/quality'
 
 describe('bandForWidth', () => {
-  it('crops at and above the localisation floor', () => {
-    expect(bandForWidth(1012)).toBe('full')
-    expect(bandForWidth(1000)).toBe('full')
-  })
-
-  it('reads without crops in the band where grounding fails but text survives', () => {
-    // The gate measured 12/12 fields read and 3/12 boxes placed at 405px.
-    expect(bandForWidth(999)).toBe('text-only')
+  it('reads at or above the recognition floor', () => {
+    // The gate measured 12/12 fields read at 405px. Under the Mistral-markdown
+    // pipeline every legible read is text-only — there are no boxes, so there
+    // is no fuller band.
+    expect(bandForWidth(1600)).toBe('text-only')
+    expect(bandForWidth(1000)).toBe('text-only')
     expect(bandForWidth(405)).toBe('text-only')
     expect(bandForWidth(400)).toBe('text-only')
   })
@@ -19,43 +16,5 @@ describe('bandForWidth', () => {
     expect(bandForWidth(399)).toBe('re-take')
     expect(bandForWidth(202)).toBe('re-take')
     expect(bandForWidth(0)).toBe('re-take')
-  })
-})
-
-describe('demoteForCardExtent', () => {
-  const spanning = (x0: number, x1: number): Detection =>
-    ({ text: 'X', box: [x0, 0, x1, 100] })
-
-  it('keeps full when the card fills most of the frame', () => {
-    const detections = [spanning(20, 980)]
-    expect(demoteForCardExtent('full', detections, 2000)).toBe('full')
-  })
-
-  it('demotes a large photo of a small card', () => {
-    // Card occupies 250/1000 of the frame: 2000px image, 500px of card.
-    const detections = [spanning(400, 650)]
-    expect(demoteForCardExtent('full', detections, 2000)).toBe('text-only')
-  })
-
-  it('never promotes', () => {
-    const detections = [spanning(0, 1000)]
-    expect(demoteForCardExtent('text-only', detections, 4000)).toBe('text-only')
-  })
-
-  it('demotes when nothing was detected at all', () => {
-    expect(demoteForCardExtent('full', [], 2000)).toBe('text-only')
-  })
-
-  it('spans across all detections, not just the first', () => {
-    // Combined span 100-800 = 700/1000 * 2000px = 1400px, full. Reading only
-    // detections[0] (span 100-200) would give 200px and demote wrongly.
-    const detections = [spanning(100, 200), spanning(700, 800)]
-    expect(demoteForCardExtent('full', detections, 2000)).toBe('full')
-  })
-
-  it('keeps full at exactly the 1000px card-width boundary', () => {
-    // 500/1000 * 2000px = 1000px of card, right at CROP_FLOOR_PX.
-    const detections = [spanning(0, 500)]
-    expect(demoteForCardExtent('full', detections, 2000)).toBe('full')
   })
 })

@@ -8,7 +8,6 @@ import type { Action, ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
 import type { RequirementKey } from '@/domain/requirements/key'
 import type { ApplicantProfile } from '@/domain/requirements/rules'
-import type { DocumentImages } from '@/ui/panel/document-images'
 import type { PreparedImage } from '@/ui/panel/prepare-image'
 import {
   sendAction, sendDocument, startApplication, type UploadOutcome,
@@ -29,14 +28,11 @@ const NOTHING_READ =
 const NO_READER =
   'We could not read your document just now. Nothing is lost — answer the questions '
   + 'below and send your application as usual.'
-const NO_CROPS = ' The photo is too small to show you where each answer came from.'
 const NO_START =
   'We could not start your application. Reload the page to try again.'
 
 export type UseApplication = {
   state: ApplicationState | null
-  /** The photos this browser uploaded, for the crops. Gone after a reload. */
-  documents: DocumentImages
   /** What to tell the applicant about their document, or about starting up. */
   notice: string | null
   /** The server is behind what is on screen, and the applicant should know. */
@@ -74,7 +70,6 @@ export type UseApplication = {
 
 export function useApplication(): UseApplication {
   const [state, setState] = useState<ApplicationState | null>(null)
-  const [docImages, setDocImages] = useState<DocumentImages>({})
   const [notice, setNotice] = useState<string | null>(null)
   const [outOfStep, setOutOfStep] = useState(false)
   // An array, not a flag: nothing here disables an upload input mid-read, so
@@ -177,10 +172,6 @@ export function useApplication(): UseApplication {
         // Filed under the server's id, not over the last photo: a value read
         // from an earlier document must keep showing that document, and the
         // pixels never leave this browser either way.
-        setDocImages((held) => ({
-          ...held,
-          [result.value.documentId]: { url: image.imageUrl, size: image.imageSize },
-        }))
         setState(result.value.state)
         setCarry(null)
         setNotice(readNotice(result.value))
@@ -194,7 +185,7 @@ export function useApplication(): UseApplication {
   }
 
   return {
-    state, documents: docImages, notice, outOfStep,
+    state, notice, outOfStep,
     readingDocTypes: readingDocs, carry,
     ownerToken: ownerToken.current,
     confirm, change, clear, updateProfile, submit, readDocument,
@@ -209,8 +200,8 @@ function readNotice(outcome: UploadOutcome): string {
   if (count === 0) return NOTHING_READ
 
   const answers = count === 1 ? '1 answer' : `${count} answers`
-  return (
-    `We filled in ${answers} from your document. Check each one and mark it "Looks right".`
-    + (outcome.band === 'full' ? '' : NO_CROPS)
-  )
+  // Mistral OCR returns no bounding boxes, so there is never a crop to show
+  // and never a "too small" story to tell. The check is the applicant's: each
+  // answer is a draft until they say it looks right.
+  return `We filled in ${answers} from your document. Check each one and mark it "Looks right".`
 }
