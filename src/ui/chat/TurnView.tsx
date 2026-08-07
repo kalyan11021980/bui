@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { ApplicationState } from '@/domain/application/state'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { BlockView, type BlockHandlers } from './blocks'
@@ -7,6 +8,9 @@ import { BlockView, type BlockHandlers } from './blocks'
 type Props = BlockHandlers & {
   turn: Turn
   state: ApplicationState
+  /** Rendered as the last child of the block column — the slot the shell uses
+   *  to place the Done control inside this turn's group. */
+  trailing?: ReactNode
 }
 
 /**
@@ -15,7 +19,7 @@ type Props = BlockHandlers & {
  * then its blocks; a dropped or absent voice renders nothing in its place —
  * no placeholder, no empty bubble.
  */
-export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocument }: Props) {
+export function TurnView({ turn, state, trailing, onChange, onClear, onConfirm, onReadDocument }: Props) {
   if (turn.role === 'applicant') {
     // No entrance animation: this bubble is the applicant's own act, shown
     // the instant they send — and the optimistic echo is remounted under its
@@ -28,7 +32,9 @@ export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocu
   }
 
   // A turn whose every ask was already on screen ends up empty — nothing to
-  // show, so no spaced empty div either.
+  // show, so no spaced empty div either. A trailing control (the Done bar)
+  // only ever attaches to a turn with a section_header, so it never rescues
+  // this empty case.
   if (turn.voice === null && turn.blocks.length === 0) return null
 
   return (
@@ -56,6 +62,7 @@ export function TurnView({ turn, state, onChange, onClear, onConfirm, onReadDocu
             onReadDocument={onReadDocument}
           />
         ))}
+        {trailing}
       </div>
     </div>
   )

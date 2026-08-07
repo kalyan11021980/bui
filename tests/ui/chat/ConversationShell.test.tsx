@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConversationShell } from '@/ui/chat/ConversationShell'
 import type { BlockHandlers } from '@/ui/chat/blocks'
@@ -273,7 +273,7 @@ describe('ConversationShell', () => {
     expect(sendButton).toHaveFocus()
   })
 
-  it('mounts the Done bar under the log once a group is on screen', async () => {
+  it('mounts the Done bar inside the section group once it is on screen', async () => {
     const applicantTurn: Turn = { seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }
     const agentTurn: Turn = {
       seq: 2, at: AT, role: 'agent', voice: null,
@@ -294,6 +294,37 @@ describe('ConversationShell', () => {
 
     await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
     await userEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    // The Done control is part of the section's own group — the same turn
+    // bubble that holds the section header — not a separate bar after the log.
+    const heading = await screen.findByRole('heading', { name: 'Identification' })
+    const bubble = heading.closest('.animate-rise')
+    expect(bubble).not.toBeNull()
+    expect(
+      within(bubble as HTMLElement).getByRole('button', { name: 'Done with this section' }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the Done bar on resume when the group is committed-only and no session turn hosts it', async () => {
+    // A returning applicant lands with an empty session log (§12.1: no
+    // transcript replay) but the committed transcript still names the section
+    // they were on. With no log turn to host the control, it falls back to
+    // standing alone after the log — still present, still gated by state.
+    const agentTurn: Turn = {
+      seq: 2, at: AT, role: 'agent', voice: null,
+      blocks: [{ kind: 'section_header', section: 'identification', done: 0, total: 3 }],
+    }
+    const state = createApplication('app-1', PROFILE, OWNER)
+    const resumed: ApplicationState = {
+      ...state,
+      transcript: [{ seq: 1, at: AT, role: 'applicant', voice: null, blocks: [], text: 'Hi' }, agentTurn],
+    }
+
+    stubFetch(() => ({ status: 200, body: resumed }))
+
+    render(
+      <ConversationShell applicationId="app-1" ownerToken={OWNER} state={resumed} {...noHandlers} />,
+    )
 
     expect(await screen.findByRole('button', { name: 'Done with this section' })).toBeInTheDocument()
   })

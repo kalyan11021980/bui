@@ -45,12 +45,23 @@ export function sectionProgress(
 
 /** The newest section_header in the transcript — the group the applicant is looking at. */
 export function lastPresentedSection(transcript: readonly Turn[]): Section | null {
+  return lastPresentedSectionTurn(transcript)?.section ?? null
+}
+
+/**
+ * The turn that last presented a section, and which section. The Done control
+ * is part of that group, so the UI needs the turn's seq to place the control
+ * inside the right turn bubble — not just the section name.
+ */
+export function lastPresentedSectionTurn(
+  transcript: readonly Turn[],
+): { section: Section; seq: number } | null {
   for (let i = transcript.length - 1; i >= 0; i -= 1) {
     const turn = transcript[i]!
     if (turn.role !== 'agent') continue
     for (let j = turn.blocks.length - 1; j >= 0; j -= 1) {
       const block = turn.blocks[j]!
-      if (block.kind === 'section_header') return block.section
+      if (block.kind === 'section_header') return { section: block.section, seq: turn.seq }
     }
   }
   return null

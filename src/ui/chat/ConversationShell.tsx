@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
+import { lastPresentedSectionTurn } from '@/domain/orchestrator/plan'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import type { BlockHandlers } from './blocks'
@@ -120,6 +121,17 @@ export function ConversationShell({
   const sendable = !pending && ownerToken !== null && !closed
   const suggestible = outstandingFields(state)
 
+  // The Done control is part of the section group that last presented — the
+  // same turn bubble that holds its section_header. When that turn is in this
+  // session's log it rides as the bubble's trailing slot; when it is
+  // committed-only (a resume with an empty log, §12.1) it falls back to
+  // standing alone after the log. SectionDoneBar owns the visibility gates
+  // (submitted / nothing outstanding / panel-only), so exactly one instance
+  // renders either way.
+  const activeGroup = lastPresentedSectionTurn([...state.transcript, ...turns])
+  const activeInLog = activeGroup !== null && turns.some((t) => t.seq === activeGroup.seq)
+  const doneBar = <SectionDoneBar state={state} turns={turns} sendable={sendable} onDone={sendDone} />
+
   const startedNow = turns.length > 0 || state.transcript.length > 0
     || state.documents.length > 0 || readingDocTypes.length > 0 || pending
     || state.submittedAt !== null
@@ -170,6 +182,7 @@ export function ConversationShell({
                   onClear={blockClear}
                   onConfirm={blockConfirm}
                   onReadDocument={readDocking}
+                  trailing={activeInLog && turn.seq === activeGroup?.seq ? doneBar : undefined}
                 />
               ))}
             </div>
@@ -183,7 +196,7 @@ export function ConversationShell({
                 composer clears reads as an app that dropped what you said. */}
             {pending && <StatusLine text="Thinking…" />}
 
-            <SectionDoneBar state={state} turns={turns} sendable={sendable} onDone={sendDone} />
+            {activeGroup !== null && !activeInLog && doneBar}
 
             <CompletionCard state={state} onSubmit={onSubmit} />
           </>
