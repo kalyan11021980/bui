@@ -89,4 +89,32 @@ describe('OpeningUploadCard', () => {
     expect(screen.getByLabelText(/upload photo/i)).toBeInTheDocument()
     expect(screen.queryByText(/reading your photo/i)).toBeNull()
   })
+
+  it('applies variant styles to the wrapper: opening variant includes mb-3, card variant does not', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+
+    // Default (opening) variant
+    const { container: openingContainer } = render(
+      <OpeningUploadCard state={state} onReadDocument={vi.fn()} prepare={prepare} />,
+    )
+    const openingWrapper = openingContainer.firstElementChild as HTMLElement
+    expect(openingWrapper.className).toContain('mb-3')
+
+    // Card variant
+    const { container: cardContainer } = render(
+      <OpeningUploadCard state={state} onReadDocument={vi.fn()} prepare={prepare} variant="card" />,
+    )
+    const cardWrapper = cardContainer.firstElementChild as HTMLElement
+    expect(cardWrapper.className).not.toContain('mb-3')
+  })
+
+  it('sets view-transition-name on the wrapper for animation coordination', () => {
+    const state = createApplication('app-1', PROFILE, 'owner-1')
+    const { container } = render(
+      <OpeningUploadCard state={state} onReadDocument={vi.fn()} prepare={prepare} />,
+    )
+
+    const wrapper = container.firstElementChild as HTMLElement
+    expect(wrapper.style.viewTransitionName).toBe('upload-card')
+  })
 })

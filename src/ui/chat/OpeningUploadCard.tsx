@@ -78,7 +78,7 @@ export function OpeningUploadCard({
       <p className="mb-0 mt-2 text-[12px] text-text-muted">
         {vettedCopy('opening_upload_alternative')}
       </p>
-      {notice && <p role="status" className="mb-0 mt-2 text-[12px]">{notice}</p>}
+      {notice && !reading && <p role="status" className="mb-0 mt-2 text-[12px]">{notice}</p>}
     </div>
   )
 }
