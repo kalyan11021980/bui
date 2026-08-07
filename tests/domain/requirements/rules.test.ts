@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ID_NUMBER, STATE_RULES } from '@/domain/requirements/rules'
+import { ALL_PROFILE_KEYS, ID_NUMBER, STATE_RULES, isUnitedStates } from '@/domain/requirements/rules'
 import { RULES_VERSION } from '@/domain/requirements/version'
 import { CATALOG } from '@/domain/catalog'
 
@@ -68,5 +68,20 @@ describe('STATE_RULES sign-off', () => {
     for (const code of Object.keys(STATE_RULES)) {
       expect(code).toMatch(/^[A-Z]{2}$/)
     }
+  })
+})
+
+describe('bizCountry', () => {
+  it('is a listed profile key', () => {
+    expect(ALL_PROFILE_KEYS).toContain('bizCountry')
+  })
+})
+
+describe('isUnitedStates', () => {
+  it('accepts null, US and USA; rejects others', () => {
+    expect(isUnitedStates(null)).toBe(true)
+    expect(isUnitedStates('US')).toBe(true)
+    expect(isUnitedStates('USA')).toBe(true)
+    expect(isUnitedStates('CAN')).toBe(false)
   })
 })

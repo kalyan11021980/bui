@@ -12,6 +12,7 @@ const base: ApplicantProfile = {
   licenses: [],
   addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 describe('requiredFields', () => {

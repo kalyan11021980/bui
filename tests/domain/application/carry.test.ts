@@ -18,6 +18,7 @@ const business: ApplicantProfile = {
   licenses: ['dealer'],
   addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 function withAddress() {
@@ -144,7 +145,7 @@ function everyEmittableKey(): Set<string> {
             for (const addressDiffersFromId of [false, true]) {
               const profile: ApplicantProfile = {
                 applicantType, country: 'US', state, wantsGsa, licenses,
-                addressDiffersFromId, idForm,
+                addressDiffersFromId, idForm, bizCountry: null,
               }
               for (const key of requiredFields(profile)) keys.add(key)
             }

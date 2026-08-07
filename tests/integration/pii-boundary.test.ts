@@ -26,6 +26,7 @@ function everythingFilled(): ApplicationState {
   let state = createApplication('app-1', {
     applicantType: 'business', country: 'US', state: 'GA', wantsGsa: true,
     licenses: ['dealer'], addressDiffersFromId: true, idForm: 'drivers_license',
+    bizCountry: null,
   }, 'tok')
   const required = new Set(requiredFields(state.profile))
   for (const def of ALL_FIELDS) {

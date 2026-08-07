@@ -198,6 +198,16 @@ describe('toAction', () => {
     if (action.type !== 'UPDATE_PROFILE') throw new Error('unreachable')
     expect(action.patch.state).toBeNull()
   })
+
+  it('accepts bizCountry in a profile patch and threads it through toAction', () => {
+    const parsed = actionSchema.parse({
+      type: 'UPDATE_PROFILE', at: '2026-08-07T00:00:00Z', patch: { bizCountry: 'CAN' },
+    })
+    const action = toAction(parsed)
+    expect(action).toEqual({
+      type: 'UPDATE_PROFILE', at: '2026-08-07T00:00:00Z', patch: { bizCountry: 'CAN' },
+    })
+  })
 })
 
 describe('describeZodError', () => {
@@ -228,6 +238,7 @@ describe('every profile key is reachable over the wire', () => {
     licenses: ['dealer'],
     addressDiffersFromId: true,
     idForm: 'passport',
+    bizCountry: 'USA',
   }
 
   it('declares exactly the keys the wire schema accepts', () => {

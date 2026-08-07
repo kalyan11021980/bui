@@ -16,6 +16,7 @@ const profile: ApplicantProfile = {
   licenses: [],
   addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 const AT = '2026-08-01T12:00:00.000Z'
@@ -321,6 +322,7 @@ describe('UPDATE_PROFILE resyncs fields the profile no longer requires', () => {
     applicantType: 'business', country: 'US', state: 'GA',
     wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
     idForm: 'drivers_license',
+    bizCountry: null,
   }
 
   function withTwoLicenceNumbers() {

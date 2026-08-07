@@ -18,12 +18,14 @@ const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
   wantsGsa: false, licenses: ['dealer'], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 /** Scoped to the form element — the row wrapper carries an aria-label too. */

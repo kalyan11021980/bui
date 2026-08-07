@@ -16,6 +16,7 @@ const PROFILE = {
   applicantType: 'individual' as const, country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license' as const,
+  bizCountry: null,
 }
 // tax_id is only required for a business applicant — needed to exercise
 // sensitive-field suppression, since explain(tax_id) is only reachable once

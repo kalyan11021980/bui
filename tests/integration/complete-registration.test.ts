@@ -25,6 +25,7 @@ const business: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'GA',
   wantsGsa: false, licenses: ['dealer'], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 const digest = createDigester('integration-test-secret-32-chars-min!')
 

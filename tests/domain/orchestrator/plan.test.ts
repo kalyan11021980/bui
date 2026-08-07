@@ -15,6 +15,7 @@ const PROFILE = {
   applicantType: 'individual' as const, country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license' as const,
+  bizCountry: null,
 }
 
 function fresh(): ApplicationState { return createApplication('app-1', PROFILE, 'tok') }

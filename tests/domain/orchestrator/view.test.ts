@@ -9,6 +9,7 @@ function seeded(): ApplicationState {
     applicantType: 'individual', country: 'US', state: 'GA',
     wantsGsa: false, licenses: [], addressDiffersFromId: false,
     idForm: 'drivers_license',
+    bizCountry: null,
   }, 'tok')
   return applicationReducer(base, {
     type: 'SET_VALUE', fieldId: 'tax_id', value: '123456789',

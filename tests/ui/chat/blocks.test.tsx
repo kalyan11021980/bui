@@ -14,6 +14,7 @@ const CONTROL = { selector: 'input, select, textarea' } as const
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 const state = createApplication('app-1', PROFILE, 'owner-token-1')
 

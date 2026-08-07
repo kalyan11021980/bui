@@ -5,6 +5,7 @@ import type { ApplicantProfile } from '@/domain/requirements/rules'
 const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 describe('documentsToUpload', () => {

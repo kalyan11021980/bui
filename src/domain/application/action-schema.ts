@@ -87,6 +87,7 @@ export const profilePatch = z
     licenses: z.array(licenseType).optional(),
     addressDiffersFromId: z.boolean().optional(),
     idForm: z.enum(['drivers_license', 'state_id', 'passport']).optional(),
+    bizCountry: z.string().min(1).nullable().optional(),
   })
   .strict()
 
@@ -234,6 +235,7 @@ export function toAction(parsed: ParsedAction): Action {
           ...(p.addressDiffersFromId !== undefined
             && { addressDiffersFromId: p.addressDiffersFromId }),
           ...(p.idForm !== undefined && { idForm: p.idForm }),
+          ...(p.bizCountry !== undefined && { bizCountry: p.bizCountry }),
         },
       }
     }

@@ -21,6 +21,7 @@ const OWNER = 'owner-token-1'
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: null, wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 /** A prior session's history — settled, not something the panel replays. */

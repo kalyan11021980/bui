@@ -8,6 +8,7 @@ const view = (over: Partial<OrchestratorView> = {}): OrchestratorView => ({
   profile: {
     applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
     licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+    bizCountry: null,
   },
   outstanding: [{ id: 'first_name', label: 'First name', status: 'empty', sensitive: false }],
   settled: [],

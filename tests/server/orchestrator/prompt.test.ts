@@ -8,6 +8,7 @@ const view: OrchestratorView = {
   profile: {
     applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
     licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+    bizCountry: null,
   },
   outstanding: [{ id: 'tax_id', label: 'Taxpayer ID', status: 'empty', sensitive: true }],
   settled: [],

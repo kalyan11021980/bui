@@ -8,6 +8,7 @@ import type { Turn } from '@/domain/orchestrator/transcript'
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 const state = createApplication('app-1', PROFILE, 'owner-token-1')
 const AT = '2026-08-04T00:00:00.000Z'

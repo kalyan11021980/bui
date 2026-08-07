@@ -9,6 +9,7 @@ const PROFILE = {
   applicantType: 'individual' as const, country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license' as const,
+  bizCountry: null,
 }
 
 function turn(seq: number): Turn {

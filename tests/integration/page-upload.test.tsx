@@ -49,6 +49,7 @@ vi.mock('@/ui/panel/prepare-image', () => ({
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 const BOX = [100, 200, 400, 260] as const

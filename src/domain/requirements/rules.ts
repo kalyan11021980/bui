@@ -24,6 +24,8 @@ export type ApplicantProfile = {
    * who later reads the record.
    */
   idForm: IdForm
+  /** Where the business is registered. Null before asked; null reads as US. */
+  bizCountry: string | null
 }
 
 /**
@@ -34,7 +36,7 @@ export type ApplicantProfile = {
  */
 export const ALL_PROFILE_KEYS = [
   'applicantType', 'country', 'state', 'wantsGsa', 'licenses',
-  'addressDiffersFromId', 'idForm',
+  'addressDiffersFromId', 'idForm', 'bizCountry',
 ] as const satisfies readonly (keyof ApplicantProfile)[]
 
 /** A profile key missing from the array above is a compile error, not a gap. */
@@ -100,6 +102,11 @@ export const LICENSE_GROUP: readonly FieldId[] = [
 ]
 
 export const GSA_CORE: readonly FieldId[] = ['gsa_bidder_number', 'gsa_email']
+
+/** The catalog stores ISO-3 'USA'; an agent volunteering 'US' must not read as foreign. */
+export function isUnitedStates(country: string | null): boolean {
+  return country === null || country === 'USA' || country === 'US'
+}
 
 export type StateRule = {
   /** Fields this state requires on top of the national baseline. */

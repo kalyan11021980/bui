@@ -10,12 +10,14 @@ const individual: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 const twoLicences: ApplicantProfile = {
   applicantType: 'business', country: 'US', state: 'OH',
   wantsGsa: true, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 describe('field sections', () => {
@@ -113,7 +115,7 @@ function everyProfile(): ApplicantProfile[] {
             for (const addressDiffersFromId of [false, true]) {
               out.push({
                 applicantType, country: 'US', state, wantsGsa, licenses,
-                idForm, addressDiffersFromId,
+                idForm, addressDiffersFromId, bizCountry: null,
               })
             }
           }

@@ -12,6 +12,7 @@ const business: ApplicantProfile = {
   licenses: ['dealer'],
   addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 const individual: ApplicantProfile = { ...business, applicantType: 'individual', licenses: [] }

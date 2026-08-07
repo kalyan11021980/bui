@@ -9,6 +9,7 @@ import type { PreparedImage } from '@/ui/panel/prepare-image'
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 /* 1600px ≥ CROP_FLOOR_PX, so the band is 'full' and no notice shows. */

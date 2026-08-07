@@ -11,6 +11,7 @@ import type { PreparedImage } from '@/ui/panel/prepare-image'
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 const DEALER_PROFILE: ApplicantProfile = {
   ...PROFILE,

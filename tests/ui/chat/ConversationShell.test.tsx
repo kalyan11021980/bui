@@ -20,6 +20,7 @@ const AT = '2026-08-04T00:00:00.000Z'
 const PROFILE: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA', wantsGsa: false,
   licenses: [], addressDiffersFromId: false, idForm: 'drivers_license',
+  bizCountry: null,
 }
 const OWNER = 'owner-token-1'
 

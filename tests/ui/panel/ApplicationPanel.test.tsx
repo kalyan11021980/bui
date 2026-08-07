@@ -15,6 +15,7 @@ const profile: ApplicantProfile = {
   applicantType: 'individual', country: 'US', state: 'GA',
   wantsGsa: false, licenses: [], addressDiffersFromId: false,
   idForm: 'drivers_license',
+  bizCountry: null,
 }
 
 describe('ApplicationPanel', () => {
@@ -157,6 +158,7 @@ describe('ApplicationPanel', () => {
       applicantType: 'business', country: 'US', state: 'GA',
       wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
       idForm: 'drivers_license',
+  bizCountry: null,
     }
     const s = createApplication('app-2', bizProfile, OWNER)
     render(<ApplicationPanel state={s} />)
@@ -177,6 +179,7 @@ describe('ApplicationPanel', () => {
       applicantType: 'business', country: 'US', state: 'GA',
       wantsGsa: false, licenses: ['dealer', 'salvage'], addressDiffersFromId: false,
       idForm: 'drivers_license',
+  bizCountry: null,
     }
     let s = createApplication('app-2', bizProfile, OWNER)
     s = applicationReducer(s, {
