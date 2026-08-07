@@ -82,10 +82,13 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   const voice = decideVoice(result.text, blocks)
 
   // A rationale with no surviving voice reads as bare catalog copy; the
-  // vetted intro makes it an answer.
-  const framedRationale = voice.text === null && blocks.some((b) => b.kind === 'rationale')
+  // vetted intro makes it an answer. Inserted right before the rationale
+  // itself, not the turn's front — a document_request ahead of it must stay
+  // ahead of it.
+  const firstRationale = blocks.findIndex((b) => b.kind === 'rationale')
+  const framedRationale = voice.text === null && firstRationale !== -1
   if (framedRationale) {
-    blocks.unshift({ kind: 'notice', copyId: 'rationale_intro' })
+    blocks.splice(firstRationale, 0, { kind: 'notice', copyId: 'rationale_intro' })
   }
 
   // A turn with nothing to show and nothing to say reads as a broken page;

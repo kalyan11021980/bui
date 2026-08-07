@@ -350,6 +350,28 @@ describe('why-shaped turns', () => {
     expect(turn.blocks[0]).toMatchObject({ kind: 'notice', copyId: 'rationale_intro' })
     expect(turn.blocks[1]).toMatchObject({ kind: 'rationale', fieldId: 'primary_activity' })
   })
+
+  it('answers a why-question about a sensitive field with the intro and rationale alone', async () => {
+    // dl_number is outstanding on the seed profile (idForm: drivers_license)
+    // and marked sensitive — this pins the headline case end to end: a
+    // sensitive rationale drops voice AND would independently satisfy the
+    // sensitive-drop fallback, so without the framedRationale guard this
+    // turn would show a stacked, contradictory pair of notices; without the
+    // section-suppression wiring it would also carry the section group.
+    seed()
+    useModel(stubModel('Because we confirm the ID you uploaded belongs to you.', [
+      { toolName: 'explain', input: { fieldId: 'dl_number' } },
+    ]))
+
+    const response = await post('app-1', { text: 'Why do you need my license number?' })
+    const { turn } = await response.json()
+
+    expect(turn.voice).toBeNull()
+    expect(turn.blocks).toEqual([
+      { kind: 'notice', copyId: 'rationale_intro' },
+      { kind: 'rationale', fieldId: 'dl_number' },
+    ])
+  })
 })
 
 describe('applyTurn — text-less turns (service-level)', () => {

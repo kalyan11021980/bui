@@ -87,23 +87,19 @@ describe('runTurn', () => {
     expect(turn.voiceDropped).toBe('lint')
   })
 
-  it('suppresses voice when an accepted rationale touches a sensitive field', async () => {
+  it('suppresses voice when an accepted rationale touches a sensitive field, framing it with the vetted intro alone (group still on screen)', async () => {
+    // A sensitive rationale always drops voice, so it would also satisfy the
+    // sensitive-drop fallback below — without a guard there, the applicant
+    // sees two contradictory notices ("keep going with what's left" then
+    // "here's why we ask") stacked above one rationale block. The profile
+    // group is also presented this turn (a fresh application, nothing on
+    // screen yet) — the intro leads regardless.
     const { turn } = await run('Here is why we ask.', [
       { toolName: 'explain', input: { fieldId: 'tax_id' } },
     ], freshBusiness())
     expect(turn.blocks).toContainEqual({ kind: 'rationale', fieldId: 'tax_id' })
     expect(turn.voice).toBeNull()
     expect(turn.voiceDropped).toBe('sensitive')
-  })
-
-  it('frames a sensitive rationale with the vetted intro alone, not stacked with guard_fallback', async () => {
-    // A sensitive rationale always drops voice, so it would also satisfy the
-    // sensitive-drop fallback below — without a guard there, the applicant
-    // sees two contradictory notices ("keep going with what's left" then
-    // "here's why we ask") above one rationale block.
-    const { turn } = await run('Here is why we ask.', [
-      { toolName: 'explain', input: { fieldId: 'tax_id' } },
-    ], freshBusiness())
     expect(turn.blocks[0]).toEqual({ kind: 'notice', copyId: 'rationale_intro' })
     expect(turn.blocks).not.toContainEqual({ kind: 'notice', copyId: 'guard_fallback' })
   })
