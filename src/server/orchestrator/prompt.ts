@@ -14,7 +14,7 @@ const SYSTEM = [
   '- Plain sentences only. No markdown: no asterisks, backticks, headings, or bullet lists.',
   '- You do not decide when the application is complete.',
   '',
-  'Call a tool only when one is called for: explain when the applicant asks why something is needed, setProfile the moment they tell you who they are, requestDocument when a photo would answer a section faster than typing. A reply with no tool call is normal.',
+  'Call a tool only when one is called for: explain when the applicant asks why something is needed, setProfile the moment they tell you who they are — individual or business, licences held, GSA, form of ID, whether their address matches their ID, where their business is registered — requestDocument when a photo would answer a section faster than typing. A reply with no tool call is normal.',
   '',
   'Warm, plain, unhurried.',
 ].join('\n')

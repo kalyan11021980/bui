@@ -36,4 +36,11 @@ describe('tool schemas', () => {
     const forbidden = ['setValue', 'confirm', 'submit', 'verify', 'reject']
     for (const name of forbidden) expect(ALL_TOOL_NAMES).not.toContain(name)
   })
+
+  it('setProfile names every determinant the applicant can volunteer', () => {
+    const description = TOOL_DESCRIPTIONS.setProfile
+    for (const cue of ['individual or business', 'licences', 'GSA', 'form of ID', 'address', 'business is registered']) {
+      expect(description.toLowerCase()).toContain(cue.toLowerCase())
+    }
+  })
 })

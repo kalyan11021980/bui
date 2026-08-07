@@ -30,7 +30,7 @@ export const TOOL_DESCRIPTIONS: Readonly<Record<ToolName, string>> = Object.free
   explain:
     'Show the vetted explanation for one field — what it is for and who requires it. Call this when the applicant asks why something is needed, hesitates over a field, or says they would rather not answer.',
   setProfile:
-    'Record what the applicant told you about who they are: individual or business, their state, which licences they hold, whether they want GSA access, which form of ID they carry. Call this as soon as they mention any of it, including in passing. The requirements engine cannot tell what to ask for until the profile is set, and a fact left unrecorded is one you will ask for twice.',
+    'Record what the applicant told you about who they are: individual or business, their state and country, which licences they hold, whether they want GSA access, which form of ID they carry, whether their address differs from the one on their ID, and which country their business is registered in. Call this as soon as they mention any of it, including in passing. The requirements engine cannot tell what to ask for until the profile is set, and a fact left unrecorded is one you will ask for twice.',
   requestDocument:
     'Ask the applicant to photograph one document. Call this before asking for fields that document can fill in — one licence photo answers around eight questions, so requesting it first saves the applicant typing. Only documents this applicant actually owes are accepted.',
   orient:
