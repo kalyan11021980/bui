@@ -62,10 +62,10 @@ const growStyle: React.CSSProperties = {
   flex: 1, display: 'flex', flexDirection: 'column',
 }
 
-/** The start screen centres the same column instead of growing a log. Same
- *  computed padding as shellStyle (24 top, 20 sides, 24 bottom), written
- *  without the shorthand so the flip never mixes shorthand and longhand on
- *  the same property — React warns, and it's a real bug smell either way. */
+/** The start screen centres the same column instead of growing a log. Padding
+ *  uses the shorthand here too, matching shellStyle — mixing shorthand and
+ *  longhand for the same property across the flip makes React drop
+ *  properties mid-rerender and warn. */
 const startShellStyle: React.CSSProperties = {
   ...shellStyle, justifyContent: 'center', padding: '24px 20px',
 }
@@ -203,6 +203,10 @@ export function ConversationShell({
         className={started ? 'sticky bottom-0 flex flex-col gap-2 bg-page pb-5' : 'mt-5'}
         style={{ viewTransitionName: 'composer' }}
       >
+        {/* Load-bearing slot contract: Composer must stay the second child
+            here (false at index 0, Composer at index 1) across the flip.
+            A conditional that changes the CHILD COUNT instead of swapping
+            `false` for an element would remount Composer and drop focus. */}
         {started && (
           <Suggestions fieldIds={suggestible} disabled={!sendable} onPick={sendDocking} />
         )}

@@ -346,12 +346,16 @@ describe('ConversationShell', () => {
     )
     expect(screen.getByRole('heading', { name: /set up to bid/i })).toBeInTheDocument()
 
-    await userEvent.type(screen.getByLabelText(/tell the agent something/i), 'Hi')
+    const composerInput = screen.getByLabelText(/tell the agent something/i)
+    await userEvent.type(composerInput, 'Hi')
     await userEvent.click(screen.getByRole('button', { name: /send/i }))
 
     // The optimistic echo alone docks the layout — before the agent answers.
     expect(screen.queryByRole('heading', { name: /set up to bid/i })).toBeNull()
     expect(screen.getByRole('log')).toBeInTheDocument()
+    // Same mounted DOM element across the flip — not just an equivalent one —
+    // or the applicant's focus and any in-flight IME composition drop.
+    expect(screen.getByLabelText(/tell the agent something/i)).toBe(composerInput)
     await screen.findByText('Hello!')
   })
 
@@ -447,7 +451,9 @@ describe('ConversationShell', () => {
     const doc = document as VTDocument
     const vt = vi.fn((cb: () => void) => {
       cb()
-      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+      return {
+        ready: Promise.resolve(), finished: Promise.resolve(), updateCallbackDone: Promise.resolve(),
+      } as ViewTransition
     })
     doc.startViewTransition = vt
     try {
@@ -477,7 +483,9 @@ describe('ConversationShell', () => {
     const doc = document as VTDocument
     const vt = vi.fn((cb: () => void) => {
       cb()
-      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+      return {
+        ready: Promise.resolve(), finished: Promise.resolve(), updateCallbackDone: Promise.resolve(),
+      } as ViewTransition
     })
     doc.startViewTransition = vt
     try {

@@ -51,7 +51,7 @@ export function StartScreen({
           variant="card"
           {...(prepare && { prepare })}
         />
-        {!disabled && suggestionTexts(fieldIds).slice(0, 3).map((text) => (
+        {!disabled && suggestionTexts(fieldIds).map((text) => (
           <button key={text} type="button" className={cardClass} onClick={() => onPick(text)}>
             {text}
           </button>

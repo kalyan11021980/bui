@@ -50,7 +50,7 @@ describe('StartScreen', () => {
 
   it('positions the upload card before suggestion cards in DOM order', () => {
     const state = createApplication('app-1', PROFILE, 'owner-1')
-    const { container } = render(<StartScreen state={state} {...props} />)
+    render(<StartScreen state={state} {...props} />)
 
     const uploadLabel = screen.getByLabelText(/upload photo/i)
     const uploadCard = uploadLabel.closest('div[class*="rounded-xl"]')!

@@ -22,19 +22,22 @@ describe('withViewTransition', () => {
     doc.startViewTransition = vi.fn((cb: () => void) => {
       calls.push('vt')
       cb()
-      return { ready: Promise.resolve(), finished: Promise.resolve() } as ViewTransition
+      return {
+        ready: Promise.resolve(), finished: Promise.resolve(), updateCallbackDone: Promise.resolve(),
+      } as ViewTransition
     })
     withViewTransition(() => calls.push('update'))
     expect(calls).toEqual(['vt', 'update'])
   })
 
-  it('swallows a rejected ready/finished from a skipped or aborted transition', async () => {
+  it('swallows a rejected ready/finished/updateCallbackDone from a skipped or aborted transition', async () => {
     const update = vi.fn()
     doc.startViewTransition = vi.fn((cb: () => void) => {
       cb()
       return {
         ready: Promise.reject(new DOMException('aborted', 'InvalidStateError')),
         finished: Promise.reject(new DOMException('aborted', 'InvalidStateError')),
+        updateCallbackDone: Promise.reject(new DOMException('aborted', 'InvalidStateError')),
       } as unknown as ViewTransition
     })
     withViewTransition(update)

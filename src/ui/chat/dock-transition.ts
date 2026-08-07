@@ -16,4 +16,6 @@ export function withViewTransition(update: () => void): void {
   // the update itself still ran, so there is nothing to recover.
   transition.ready.catch(() => undefined)
   transition.finished.catch(() => undefined)
+  // A throwing update rejects this one too — same reasoning.
+  transition.updateCallbackDone.catch(() => undefined)
 }
