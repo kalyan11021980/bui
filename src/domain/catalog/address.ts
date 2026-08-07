@@ -5,9 +5,6 @@ import { zipSchema } from './schemas'
 
 export { zipSchema } from './schemas'
 
-// A state ID prints the address as fully as a licence does — both ID specimens
-// in the fixture corpus do, and OCR reads all four parts off them. Not line 2:
-// neither prints an apartment line.
 export const ADDRESS_FIELDS: readonly FieldDef[] = [
   defineField({
     id: 'addr_line1',
@@ -53,6 +50,26 @@ export const ADDRESS_FIELDS: readonly FieldDef[] = [
     authority: 'IAA_POLICY',
     validation: zipSchema,
     derivableFrom: ['drivers_license', 'state_id'],
+    neverBulkConfirm: true,
+  }),
+  defineField({
+    id: 'addr_region',
+    label: 'State / province / region',
+    type: 'text',
+    section: 'address',
+    purpose: 'Where we send your title documents and payments',
+    authority: 'IAA_POLICY',
+    validation: z.string().min(1, 'Enter your region'),
+    neverBulkConfirm: true,
+  }),
+  defineField({
+    id: 'addr_postal',
+    label: 'Postal code',
+    type: 'text',
+    section: 'address',
+    purpose: 'Where we send your title documents and payments',
+    authority: 'IAA_POLICY',
+    validation: z.string().min(1, 'Enter your postal code'),
     neverBulkConfirm: true,
   }),
 ]

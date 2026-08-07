@@ -6,7 +6,7 @@
  * Bump COPY_VERSION on any edit: it is an input to the shown-copy hash, which
  * is what lets an attestation be reconstructed after a change.
  */
-export const COPY_VERSION = '6'
+export const COPY_VERSION = '7'
 
 export const ALL_COPY_IDS = [
   'opening_beat',
@@ -30,6 +30,7 @@ export const ALL_COPY_IDS = [
   'completion_ready',
   'done_chip',
   'section_incomplete',
+  'w9_certification',
 ] as const
 
 export type VettedCopyId = (typeof ALL_COPY_IDS)[number]
@@ -84,6 +85,14 @@ export const COPY: Readonly<Record<VettedCopyId, string>> = Object.freeze({
 
   section_incomplete:
     "A few answers in this section are still blank — they're marked below.",
+
+  w9_certification: [
+    'Under penalties of perjury, I certify that:',
+    '1. The number shown on this form is my correct taxpayer identification number (or I am waiting for a number to be issued to me); and',
+    '2. I am not subject to backup withholding because: (a) I am exempt from backup withholding, or (b) I have not been notified by the Internal Revenue Service (IRS) that I am subject to backup withholding as a result of a failure to report all interest or dividends, or (c) the IRS has notified me that I am no longer subject to backup withholding; and',
+    '3. I am a U.S. citizen or other U.S. person (defined below); and',
+    '4. The FATCA code(s) entered on this form (if any) indicating that I am exempt from FATCA reporting is correct.',
+  ].join('\n'),
 })
 
 export function vettedCopy(id: VettedCopyId): string {

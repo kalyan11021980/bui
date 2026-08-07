@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defineField, type FieldDef } from '../field-def'
-import { US_STATES, usStateSchema } from './geography'
+import { ID_COUNTRIES, US_STATES, countrySchema, usStateSchema } from './geography'
 import { zipSchema } from './address'
 import { phoneSchema } from './contact'
 
@@ -76,5 +76,34 @@ export const BUSINESS_FIELDS: readonly FieldDef[] = [
     purpose: 'How Buyer Services reaches your business',
     authority: 'IAA_POLICY',
     validation: phoneSchema,
+  }),
+  defineField({
+    id: 'biz_country',
+    label: 'Country where the business is registered',
+    type: 'select',
+    options: ID_COUNTRIES,
+    section: 'business',
+    purpose: 'Which country\'s authority we verify your business against',
+    authority: 'STATE_DEALER_BOARD',
+    validation: countrySchema,
+    orchestratorVisible: true,
+  }),
+  defineField({
+    id: 'biz_addr_region',
+    label: 'Business state / province / region',
+    type: 'text',
+    section: 'business',
+    purpose: 'Where your dealer license is registered',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().min(1, 'Enter the region'),
+  }),
+  defineField({
+    id: 'biz_addr_postal',
+    label: 'Business postal code',
+    type: 'text',
+    section: 'business',
+    purpose: 'Where your dealer license is registered',
+    authority: 'STATE_DEALER_BOARD',
+    validation: z.string().min(1, 'Enter the postal code'),
   }),
 ]

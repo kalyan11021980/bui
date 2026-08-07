@@ -1,5 +1,6 @@
 import type { FieldDef } from '../field-def'
 import type { DocType, FieldId } from '../field-id'
+import { PROFILE_FIELDS } from './profile'
 import { PREFERENCE_FIELDS } from './preferences'
 import { IDENTITY_FIELDS } from './identity'
 import { ADDRESS_FIELDS } from './address'
@@ -11,6 +12,7 @@ import { GSA_FIELDS } from './gsa'
 import { STATE_FORM_FIELDS } from './state-forms'
 
 export const ALL_FIELDS: readonly FieldDef[] = [
+  ...PROFILE_FIELDS,
   ...PREFERENCE_FIELDS,
   ...IDENTITY_FIELDS,
   ...ADDRESS_FIELDS,
@@ -42,6 +44,7 @@ export function docTypeBacksSensitiveField(docType: DocType): boolean {
 }
 
 export {
+  PROFILE_FIELDS,
   PREFERENCE_FIELDS,
   IDENTITY_FIELDS, ADDRESS_FIELDS, CONTACT_FIELDS,
   BUSINESS_FIELDS, LICENSE_FIELDS, TAX_FIELDS, GSA_FIELDS,

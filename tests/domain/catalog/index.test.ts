@@ -41,4 +41,13 @@ describe('catalog index', () => {
     expect(tax.handling?.trim()).toBeTruthy()
     expect(tax.destination).toBeTruthy()
   })
+
+  it('resolves the new determinant and tax fields with their wire values', () => {
+    expect(fieldDef('applicant_type').options?.map((o) => o.value))
+      .toEqual(['business', 'individual'])
+    expect(fieldDef('licenses_held').type).toBe('multiselect')
+    expect(fieldDef('tax_certification').attestation).toBe('w9_certification')
+    expect(fieldDef('wants_gsa').validation.safeParse('yes').success).toBe(true)
+    expect(fieldDef('licenses_held').validation.safeParse([]).success).toBe(false)
+  })
 })
