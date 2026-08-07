@@ -54,10 +54,17 @@ export const ID_NUMBER: Readonly<Record<IdForm, FieldId>> = {
   passport: 'passport_number',
 }
 
-/** Asked of everyone, on the first screen. */
-export const CORE_PROFILE: readonly FieldId[] = [
-  'primary_activity', 'preferred_language',
-]
+/** Determinants first: each answer reshapes what follows. */
+export function profileFields(profile: ApplicantProfile): readonly FieldId[] {
+  return [
+    'applicant_type', 'location_country',
+    ...(isUnitedStates(profile.country) ? ['location_state' as const] : []),
+    'id_form', 'address_differs',
+    ...(profile.applicantType === 'business' ? ['licenses_held' as const] : []),
+    'wants_gsa',
+    'primary_activity', 'preferred_language',
+  ]
+}
 
 /**
  * Identity, in the order the panel asks it. A function rather than a list
@@ -83,16 +90,30 @@ export function identityFields(profile: ApplicantProfile): readonly FieldId[] {
   ]
 }
 
-export const CORE_ADDRESS: readonly FieldId[] = [
-  'addr_line1', 'addr_city', 'addr_state', 'addr_zip',
-]
+export function addressFields(profile: ApplicantProfile): readonly FieldId[] {
+  return [
+    'addr_line1', 'addr_city',
+    ...(isUnitedStates(profile.country)
+      ? ['addr_state' as const, 'addr_zip' as const]
+      : ['addr_region' as const, 'addr_postal' as const]),
+  ]
+}
 
-export const CORE_CONTACT: readonly FieldId[] = ['phone_mobile']
+export function businessFields(profile: ApplicantProfile): readonly FieldId[] {
+  return [
+    'biz_name', 'biz_legal_name', 'biz_country',
+    'biz_addr_line1', 'biz_addr_city',
+    ...(isUnitedStates(profile.bizCountry)
+      ? ['biz_addr_state' as const, 'biz_addr_zip' as const]
+      : ['biz_addr_region' as const, 'biz_addr_postal' as const]),
+    'biz_phone',
+  ]
+}
 
-export const BUSINESS_CORE: readonly FieldId[] = [
-  'biz_name', 'biz_legal_name',
-  'biz_addr_line1', 'biz_addr_city', 'biz_addr_state', 'biz_addr_zip',
-  'biz_phone',
+export const CORE_CONTACT: readonly FieldId[] = ['phone_primary', 'phone_mobile']
+
+export const TAX_CORE: readonly FieldId[] = [
+  'tax_classification', 'tax_id', 'tax_certification',
 ]
 
 /** Repeated once per licence held. Emitted as instance-qualified keys. */
@@ -120,7 +141,11 @@ export type StateRule = {
   signedOff: boolean
 }
 
-/** Keyed by upper-case two-letter code. Absent means national baseline only. */
+/**
+ * Keyed by upper-case two-letter code. Absent means national baseline only.
+ * `poa_form` and `bid_card` are defined in the catalog and await a
+ * signed-off entry that references them (spec §7).
+ */
 export const STATE_RULES: Readonly<Record<string, StateRule>> = {
   GA: {
     additional: [],

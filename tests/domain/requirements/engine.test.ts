@@ -81,9 +81,12 @@ describe('requiredFields', () => {
   it('returns the exact expected set for an individual in Georgia', () => {
     expect([...requiredFields(base)].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'address_differs', 'applicant_type',
       'dl_expiry', 'dl_number', 'dob', 'first_name',
-      'id_country', 'id_images', 'id_state',
-      'last_name', 'phone_mobile', 'preferred_language', 'primary_activity',
+      'id_country', 'id_form', 'id_images', 'id_state',
+      'last_name', 'location_country', 'location_state',
+      'phone_mobile', 'phone_primary', 'preferred_language', 'primary_activity',
+      'wants_gsa',
     ])
   })
 
@@ -144,18 +147,24 @@ describe('the declared ID form decides which number is owed', () => {
   it('returns the exact expected set for a state ID holder', () => {
     expect([...requiredFields({ ...base, idForm: 'state_id' })].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'address_differs', 'applicant_type',
       'dl_expiry', 'dob', 'first_name',
-      'id_country', 'id_images', 'id_number', 'id_state',
-      'last_name', 'phone_mobile', 'preferred_language', 'primary_activity',
+      'id_country', 'id_form', 'id_images', 'id_number', 'id_state',
+      'last_name', 'location_country', 'location_state',
+      'phone_mobile', 'phone_primary', 'preferred_language', 'primary_activity',
+      'wants_gsa',
     ])
   })
 
   it('returns the exact expected set for a passport holder', () => {
     expect([...requiredFields({ ...base, idForm: 'passport' })].sort()).toEqual([
       'addr_city', 'addr_line1', 'addr_state', 'addr_zip',
+      'address_differs', 'applicant_type',
       'dl_expiry', 'dob', 'first_name',
-      'id_country', 'id_images', 'last_name', 'passport_number',
-      'phone_mobile', 'preferred_language', 'primary_activity',
+      'id_country', 'id_form', 'id_images', 'last_name',
+      'location_country', 'location_state', 'passport_number',
+      'phone_mobile', 'phone_primary', 'preferred_language', 'primary_activity',
+      'wants_gsa',
     ])
   })
 
@@ -221,5 +230,45 @@ describe('the declared ID form decides which number is owed', () => {
         expect(new Set(runs).size, where).toBe(runs.length)
       }
     }
+  })
+})
+
+describe('profile determinants and expansions', () => {
+  it('asks everyone the determinants first', () => {
+    const k = requiredFields(base)
+    for (const id of ['applicant_type', 'location_country', 'location_state',
+      'id_form', 'address_differs', 'wants_gsa']) {
+      expect(k).toContain(id)
+    }
+    expect(k).not.toContain('licenses_held')
+  })
+
+  it('asks a business which licences it holds, and the full tax trio', () => {
+    const k = requiredFields({ ...base, applicantType: 'business' })
+    expect(k).toContain('licenses_held')
+    expect(k).toContain('tax_classification')
+    expect(k).toContain('tax_certification')
+  })
+
+  it('swaps US state/zip for region/postal outside the US', () => {
+    const k = requiredFields({ ...base, country: 'CAN' })
+    expect(k).not.toContain('location_state')
+    expect(k).toContain('addr_region')
+    expect(k).toContain('addr_postal')
+    expect(k).not.toContain('addr_state')
+    expect(k).not.toContain('addr_zip')
+  })
+
+  it('swaps the business address block on bizCountry', () => {
+    const k = requiredFields({ ...base, applicantType: 'business', bizCountry: 'MEX' })
+    expect(k).toContain('biz_country')
+    expect(k).toContain('biz_addr_region')
+    expect(k).not.toContain('biz_addr_state')
+  })
+
+  it('requires both phones of everyone', () => {
+    const k = requiredFields(base)
+    expect(k).toContain('phone_primary')
+    expect(k).toContain('phone_mobile')
   })
 })

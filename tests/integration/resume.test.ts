@@ -71,8 +71,8 @@ describe('resume — §12.1', () => {
 
     // Pin the fixture, not just re-derive it: if these ever drift the test
     // below stops proving anything about the arithmetic.
-    expect(requiredFields(state.profile).length).toBe(15)
-    expect(outstandingFields(state).length).toBe(10)
+    expect(requiredFields(state.profile).length).toBe(22)
+    expect(outstandingFields(state).length).toBe(17)
 
     const result = await applyTurn('app-1', OWNER, {
       text: undefined,
@@ -88,9 +88,9 @@ describe('resume — §12.1', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    // 5 confirmed of 15 required — the derived field (dl_number) still
+    // 5 confirmed of 22 required — the derived field (dl_number) still
     // counts as outstanding, so it must not also inflate `total`.
-    expect(result.value.turn.blocks).toContainEqual({ kind: 'orientation', done: 5, total: 15 })
+    expect(result.value.turn.blocks).toContainEqual({ kind: 'orientation', done: 5, total: 22 })
   })
 
   it('lands the client on the panel — a resumed session does not replay the transcript', () => {

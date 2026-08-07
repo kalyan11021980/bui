@@ -28,7 +28,7 @@ describe('what an applicant owes, by document', () => {
   it('is at the rules version these rules were last changed under', () => {
     // If you are here because this failed, `rules.ts` changed what an
     // applicant owes and the version has to move with it — deliberately.
-    expect(RULES_VERSION).toBe(3)
+    expect(RULES_VERSION).toBe(4)
   })
 })
 

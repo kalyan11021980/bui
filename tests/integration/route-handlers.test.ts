@@ -374,6 +374,9 @@ describe('POST /api/application/[id]/actions — enforcement', () => {
   it('accepts a submission once nothing is outstanding, and audits it', async () => {
     const id = await newApp()
     const answers: Array<[string, unknown]> = [
+      ['applicant_type', 'individual'], ['location_country', 'USA'],
+      ['location_state', 'GA'], ['id_form', 'drivers_license'],
+      ['address_differs', 'no'], ['wants_gsa', 'no'],
       ['primary_activity', 'dealer'], ['preferred_language', 'English'],
       ['first_name', 'Ada'], ['last_name', 'Lovelace'],
       ['dl_number', 'D1234567'],
@@ -382,7 +385,7 @@ describe('POST /api/application/[id]/actions — enforcement', () => {
       ['id_country', 'USA'], ['id_state', 'GA'],
       ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
       ['addr_state', 'GA'], ['addr_zip', '30301'],
-      ['phone_mobile', '4045551234'],
+      ['phone_primary', '4045551234'], ['phone_mobile', '4045551234'],
     ]
     for (const [fieldId, value] of answers) {
       const res = await post(id, {
@@ -421,6 +424,9 @@ describe('POST /api/application/[id]/actions — a submitted application is clos
   async function submittedApp(): Promise<string> {
     const id = await newApp()
     const answers: Array<[string, unknown]> = [
+      ['applicant_type', 'individual'], ['location_country', 'USA'],
+      ['location_state', 'GA'], ['id_form', 'drivers_license'],
+      ['address_differs', 'no'], ['wants_gsa', 'no'],
       ['primary_activity', 'dealer'], ['preferred_language', 'English'],
       ['first_name', 'Ada'], ['last_name', 'Lovelace'],
       ['dl_number', 'D1234567'],
@@ -429,7 +435,7 @@ describe('POST /api/application/[id]/actions — a submitted application is clos
       ['id_country', 'USA'], ['id_state', 'GA'],
       ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
       ['addr_state', 'GA'], ['addr_zip', '30301'],
-      ['phone_mobile', '4045551234'],
+      ['phone_primary', '4045551234'], ['phone_mobile', '4045551234'],
     ]
     for (const [fieldId, value] of answers) {
       const res = await post(id, {

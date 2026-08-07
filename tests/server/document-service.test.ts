@@ -63,12 +63,16 @@ type Owned = { id: string; ownerToken: string | null }
 /** Answers everything an individual owes, then sends it for review. */
 function submit(app: Owned): void {
   const answers: [string, unknown][] = [
+    ['applicant_type', 'individual'], ['location_country', 'USA'],
+    ['location_state', 'GA'], ['id_form', 'drivers_license'],
+    ['address_differs', 'no'], ['wants_gsa', 'no'],
     ['primary_activity', 'dealer'], ['preferred_language', 'English'],
     ['first_name', 'Ada'], ['last_name', 'Lovelace'], ['dl_number', 'D1234567'],
     ['dl_expiry', '2030-04-30'], ['dob', '1982-08-31'], ['id_images', ['front.png']],
     ['id_country', 'USA'], ['id_state', 'GA'],
     ['addr_line1', '2345 Anywhere St'], ['addr_city', 'Atlanta'],
-    ['addr_state', 'GA'], ['addr_zip', '30301'], ['phone_mobile', '4045551234'],
+    ['addr_state', 'GA'], ['addr_zip', '30301'],
+    ['phone_primary', '4045551234'], ['phone_mobile', '4045551234'],
   ]
   for (const [fieldId, value] of answers) {
     const result = applyAction(app.id, app.ownerToken, {

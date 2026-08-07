@@ -195,8 +195,13 @@ describe('a whole registration, section by section, through the routes', () => {
     expect(headerOf(first.turn.blocks).section).toBe(SECTION_ORDER[0])
     seenOrder.push(headerOf(first.turn.blocks).section)
 
-    // Answer only one of profile's two fields, so the gap below is real.
-    await set(id, [['primary_activity', 'dealer']])
+    // Answer every profile field but one, so the gap below is real.
+    await set(id, [
+      ['applicant_type', 'individual'], ['location_country', 'USA'],
+      ['location_state', 'GA'], ['id_form', 'drivers_license'],
+      ['address_differs', 'no'], ['wants_gsa', 'no'],
+      ['primary_activity', 'dealer'],
+    ])
 
     // 2. Done with a gap re-presents the same section, missing fields only.
     const gapped = (await (await postTurn(id, { doneWith: 'profile' })).json()) as TurnResponse
@@ -231,7 +236,7 @@ describe('a whole registration, section by section, through the routes', () => {
     // SECTION_ORDER's own order end to end.
     expect(seenOrder).toEqual(expectedOrder)
 
-    await set(id, [['phone_mobile', '4045551234']])
+    await set(id, [['phone_primary', '4045551234'], ['phone_mobile', '4045551234']])
 
     // 4. The final Done has nothing left to present — no blocks, no gap.
     const final = (await (await postTurn(id, { doneWith: 'contact' })).json()) as TurnResponse

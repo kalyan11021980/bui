@@ -96,6 +96,12 @@ describe('completing an application through the panel', () => {
     // Real values, each one satisfying its own catalog schema — not the
     // string 'x' shoved past a reducer that never validated anything.
     const answers: Array<[RegExp, string]> = [
+      [/what best describes you/i, 'individual'],
+      [/where are you located/i, 'USA'],
+      [/your state/i, 'GA'],
+      [/which id will you use/i, 'drivers_license'],
+      [/is your address different/i, 'no'],
+      [/bid on gsa/i, 'no'],
       [/primary activity/i, 'dealer'],
       [/preferred language/i, 'English'],
       [/first name/i, 'Ada'],
@@ -109,6 +115,7 @@ describe('completing an application through the panel', () => {
       [/^city$/i, 'Atlanta'],
       [/^state$/i, 'GA'],
       [/zip code/i, '30301'],
+      [/primary phone/i, '4045551234'],
       [/mobile phone/i, '4045551234'],
     ]
     for (const [label, value] of answers) {
