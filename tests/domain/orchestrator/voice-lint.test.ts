@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lintVoice } from '@/domain/orchestrator/voice-lint'
+import { lintVoice, tidyVoice } from '@/domain/orchestrator/voice-lint'
 
 const PASSING = [
   'Thanks — let me get a couple of details from you.',
@@ -23,7 +23,7 @@ const FAILING: ReadonlyArray<[string, string]> = [
   ['You must provide this.', 'legal_claim'],
   ['This is required by law.', 'legal_claim'],
   ['You are liable for errors here.', 'legal_claim'],
-  ['x'.repeat(241), 'length'],
+  ['x'.repeat(1001), 'length'],
 ]
 
 describe('lintVoice', () => {
@@ -39,8 +39,21 @@ describe('lintVoice', () => {
   })
 
   it('accepts a string at the length limit and rejects one past it', () => {
-    expect(lintVoice('a'.repeat(240))).toEqual({ ok: true })
-    expect(lintVoice('a'.repeat(241)).ok).toBe(false)
+    expect(lintVoice('a'.repeat(1000))).toEqual({ ok: true })
+    expect(lintVoice('a'.repeat(1001)).ok).toBe(false)
+  })
+
+  it('accepts a fuller markdown answer with bullets and bold, no numerals', () => {
+    const answer = [
+      'Here is what we still need from you:',
+      '',
+      '- **Who you are** — your full legal name and date of birth',
+      '- **Where you live** — a current residential address',
+      '- **What you do** — the business activity you want to register',
+      '',
+      'A photo of your licence would answer several of these at once.',
+    ].join('\n')
+    expect(lintVoice(answer)).toEqual({ ok: true })
   })
 
   it('rejects non-ASCII digits, not just 0-9', () => {
@@ -59,5 +72,34 @@ describe('lintVoice', () => {
 
   it('keeps ordinary bracketed prose without a marker shape', () => {
     expect(lintVoice('We ask [almost] nothing else.')).toEqual({ ok: true })
+  })
+})
+
+describe('tidyVoice', () => {
+  // Kaly calls the em dash "the AI dash". A prompt ban alone leaks — the model
+  // slips, or swaps in an en dash — so tidyVoice is the guarantee none reaches
+  // the applicant. Both dash kinds become a comma; a leading comma left behind
+  // is trimmed, and doubled commas collapse.
+  it('turns an em dash into a comma', () => {
+    expect(tidyVoice('Straightforward — we will go through it together.'))
+      .toBe('Straightforward, we will go through it together.')
+  })
+
+  it('turns an en dash into a comma', () => {
+    expect(tidyVoice('A few items – then we are done.'))
+      .toBe('A few items, then we are done.')
+  })
+
+  it('collapses the doubled comma a leading dash leaves behind', () => {
+    expect(tidyVoice('Right, — a couple more.')).toBe('Right, a couple more.')
+  })
+
+  it('trims a comma left at the front by a leading dash', () => {
+    expect(tidyVoice('— here is what comes next.')).toBe('here is what comes next.')
+  })
+
+  it('leaves a dash-free line untouched', () => {
+    expect(tidyVoice('Sure, here is exactly why we ask.'))
+      .toBe('Sure, here is exactly why we ask.')
   })
 })

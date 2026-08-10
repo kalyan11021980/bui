@@ -210,7 +210,8 @@ describe('a whole registration, section by section, through the routes', () => {
     const seenOrder: string[] = []
 
     // 1. First turn presents the first outstanding section, and only that one.
-    const first = (await (await postTurn(id, { text: 'hi' })).json()) as TurnResponse
+    //    A greeting ("hi") would hold the form back; an engagement line presents it.
+    const first = (await (await postTurn(id, { text: 'I am ready to start' })).json()) as TurnResponse
     const headers = first.turn.blocks.filter((b) => b.kind === 'section_header')
     expect(headers).toHaveLength(1)
     expect(headerOf(first.turn.blocks).section).toBe(SECTION_ORDER[0])

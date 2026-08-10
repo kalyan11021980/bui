@@ -290,7 +290,7 @@ describe('POST /turn', () => {
   })
 })
 
-describe('why-shaped turns', () => {
+describe('free-form question turns', () => {
   it('answers a first-turn why-question without presenting the section', async () => {
     seed()
     useModel(stubModel('Because it shapes what we ask next.', [
@@ -310,14 +310,20 @@ describe('why-shaped turns', () => {
     expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(false)
   })
 
-  it('still presents the section for a first-turn "what else" question', async () => {
+  it('answers a first-turn "what else" question without presenting the section', async () => {
+    // A free-form informational question is not a why-question, so the model's
+    // own answer is the voice (no rationale to swap in). The form is held —
+    // it presents on the next non-question turn, never dumped beside the answer.
     seed()
-    useModel(stubModel('Plenty — here it is.', []))
+    // The stub voice carries an em dash; tidyVoice rewrites it to a comma
+    // before it reaches the applicant, so the assertion sees the cleaned line.
+    useModel(stubModel('Plenty — here is what comes next.', []))
 
     const response = await post('app-1', { text: 'What else do you need?' })
     const { turn } = await response.json()
 
-    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(true)
+    expect(turn.voice).toBe('Plenty, here is what comes next.')
+    expect(turn.blocks.some((b: { kind: string }) => b.kind === 'section_header')).toBe(false)
   })
 
   it('the degraded fallback still presents even for a why-question', async () => {

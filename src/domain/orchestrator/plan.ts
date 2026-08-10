@@ -67,19 +67,34 @@ export function lastPresentedSectionTurn(
   return null
 }
 
-/** A question about a field, not a demand to fill the form. Closed heuristic
- *  — the model never chooses grouping, so neither does it choose this. */
-export function isWhyShaped(text: string): boolean {
+/** A question, not a demand to fill the form. Closed heuristic — the model
+ *  never chooses grouping, so neither does it choose this. Catches a typed
+ *  question mark, a WH-word opener (what / how / why / which / who / when /
+ *  where), and the "why do you" phrasing the question pills use. Auxiliary
+ *  openers (do / is / will …) are deliberately left out: "Will do" and "Is
+ *  fine" are acks, and a question phrased that way ends with "?" anyway. */
+export function isFreeQuestion(text: string): boolean {
   const t = text.trim().toLowerCase()
-  return /^why\b/.test(t) || t.includes('why do you')
+  if (t.endsWith('?')) return true
+  if (t.includes('why do you')) return true
+  return /^(?:what|which|who|whom|whose|when|where|why|how)\b/.test(t)
+}
+
+/** A greeting or casual opener, not engagement with the form. Closed list so
+ *  it stays auditable. A greeting suppresses the section just like a question:
+ *  the agent greets back and the form presents on the next turn. */
+const GREETING = /^(?:hi|hello|hey|hiya|howdy|yo|sup|greetings|good\s+(?:morning|afternoon|evening)|what'?s\s+up)\b/i
+
+export function isGreeting(text: string): boolean {
+  return GREETING.test(text.trim())
 }
 
 /**
  * The planned half of a turn. A Done always presents (same section's gaps
  * behind the vetted notice, or the next group); otherwise a section is
  * presented only when it is not already the newest one on screen — a typed
- * question mid-section gets its answer and stays put. A why-question gets
- * its answer alone; the group presents on the next non-why turn.
+ * question mid-section gets its answer and stays put. A free-form question
+ * gets its answer alone; the group presents on the next non-question turn.
  */
 export function planTurnBlocks(
   state: ApplicationState,
@@ -97,9 +112,11 @@ export function planTurnBlocks(
       : group
   }
 
-  // A why-question gets its answer alone; the group presents on the next
-  // non-why turn (or upload, or Done).
-  if (applicantText !== null && isWhyShaped(applicantText)) return []
+  // A free-form question or greeting gets its answer alone; the group
+  // presents on the next non-conversational turn (or upload, or Done).
+  if (applicantText !== null && (isFreeQuestion(applicantText) || isGreeting(applicantText))) {
+    return []
+  }
 
   if (lastPresentedSection(transcript) === plan.section) return []
   return groupBlocks(state, plan)

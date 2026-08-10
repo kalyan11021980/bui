@@ -38,12 +38,41 @@ describe('systemPrompt', () => {
     expect(systemPrompt()).toMatch(/cannot ask questions/i)
   })
 
-  // A live model narrated markdown ("your **primary activity**") and the
-  // chat renders voice as plain text — asterisks reached the applicant
-  // literally. Pins the rule so a future rewrite can't silently drop it.
-  it('tells the model to write plain sentences with no markdown', () => {
-    expect(systemPrompt()).toMatch(/no markdown/i)
-    expect(systemPrompt()).toMatch(/asterisks/i)
+  // Markdown is now allowed and the chat renders it, but the content rules
+  // that protect vetted copy still hold. Pins the rules so a future rewrite
+  // can't silently drop either side: light markdown yes, numerals and
+  // legal-obligation claims never, and the risky markdown shapes (links,
+  // headings, code, numbered lists) still off limits.
+  it('allows light markdown but keeps the no-numerals and no-legal-claim rules', () => {
+    const p = systemPrompt()
+    expect(p).toMatch(/markdown/i)
+    expect(p).toMatch(/asterisks/i)
+    expect(p).toMatch(/no numerals/i)
+    expect(p).toMatch(/no statements about legal obligation/i)
+    expect(p).toMatch(/no links/i)
+    expect(p).toMatch(/no numbered lists/i)
+  })
+
+  it('lets the model answer a free-form question with more than a couple of sentences', () => {
+    expect(systemPrompt()).toMatch(/free-form question/i)
+    expect(systemPrompt()).toMatch(/a few sentences or a short list of at most four items/i)
+  })
+
+  it('tells the model not to claim a question is on screen for a free-form turn', () => {
+    expect(systemPrompt()).toMatch(/never say a question is on screen/i)
+  })
+
+  it('tells the model to answer how-long / how-much qualitatively, never a quantity', () => {
+    expect(systemPrompt()).toMatch(/qualitatively/i)
+    expect(systemPrompt()).toMatch(/never give a specific quantity/i)
+  })
+
+  // Kaly calls the em dash "the AI dash" and does not want it in the chat.
+  // Pins both the rule and that the prompt itself does not model the thing
+  // it bans (an em dash in the prompt would leak into the model's style).
+  it('bans em dashes and contains none itself', () => {
+    expect(systemPrompt()).toMatch(/never use em dashes/i)
+    expect(systemPrompt()).not.toContain('—')
   })
 })
 

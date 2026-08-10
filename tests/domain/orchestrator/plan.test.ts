@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SECTION_ORDER, sectionPlan, sectionProgress, lastPresentedSection, planTurnBlocks, isWhyShaped,
+  SECTION_ORDER, sectionPlan, sectionProgress, lastPresentedSection, planTurnBlocks, isFreeQuestion, isGreeting,
 } from '@/domain/orchestrator/plan'
 import { applicationReducer, createApplication } from '@/domain/application/reducer'
 import { outstandingFields } from '@/domain/application/queries'
@@ -147,41 +147,97 @@ describe('planTurnBlocks', () => {
   })
 })
 
-describe('isWhyShaped', () => {
-  it('accepts the pill templates and typed variants', () => {
-    expect(isWhyShaped('Why do you need my last name?')).toBe(true)
-    expect(isWhyShaped('Why do you ask "Which ID will you use?"')).toBe(true)
-    expect(isWhyShaped('  WHY is that required')).toBe(true)
-    expect(isWhyShaped('tell me why do you need this')).toBe(true)
-    expect(isWhyShaped('Why?')).toBe(true)
-    expect(isWhyShaped("Why's that needed?")).toBe(true)
+describe('isFreeQuestion', () => {
+  it('accepts why-questions (the original pill templates and typed variants)', () => {
+    expect(isFreeQuestion('Why do you need my last name?')).toBe(true)
+    expect(isFreeQuestion('Why do you ask "Which ID will you use?"')).toBe(true)
+    expect(isFreeQuestion('  WHY is that required')).toBe(true)
+    expect(isFreeQuestion('tell me why do you need this')).toBe(true)
+    expect(isFreeQuestion('Why?')).toBe(true)
+    expect(isFreeQuestion("Why's that needed?")).toBe(true)
   })
 
-  it('rejects non-why intents', () => {
-    expect(isWhyShaped('What else do you need?')).toBe(false)
-    expect(isWhyShaped("I'm ready")).toBe(false)
-    expect(isWhyShaped('Tell me why later')).toBe(false)
+  it('accepts other free-form informational questions', () => {
+    expect(isFreeQuestion('What all things do you need')).toBe(true)
+    expect(isFreeQuestion('how much time it gonna take')).toBe(true)
+    expect(isFreeQuestion('What else do you need?')).toBe(true)
+    expect(isFreeQuestion('Where does this go')).toBe(true)
+    expect(isFreeQuestion('which form of ID do you want')).toBe(true)
+    expect(isFreeQuestion('Do you need my license?')).toBe(true)
+    expect(isFreeQuestion('Is that required?')).toBe(true)
+  })
+
+  it('rejects statements and acks so the form still drives forward', () => {
+    expect(isFreeQuestion("I'm ready")).toBe(false)
+    expect(isFreeQuestion('ok, keep going')).toBe(false)
+    expect(isFreeQuestion('I am an individual from Texas')).toBe(false)
+    expect(isFreeQuestion('Tell me why later')).toBe(false)
     // No word boundary between "why" and "ever" — not a why-question.
-    expect(isWhyShaped('Whyever would I mind')).toBe(false)
+    expect(isFreeQuestion('Whyever would I mind')).toBe(false)
+    // Auxiliary-starter acks are not questions; the form must still present.
+    expect(isFreeQuestion('Will do')).toBe(false)
+    expect(isFreeQuestion('Is fine with me')).toBe(false)
   })
 })
 
-describe('planTurnBlocks and why-shaped turns', () => {
+describe('isGreeting', () => {
+  it('accepts greetings and casual openers', () => {
+    expect(isGreeting('hi')).toBe(true)
+    expect(isGreeting('Hi there')).toBe(true)
+    expect(isGreeting('hello, I am John')).toBe(true)
+    expect(isGreeting('Hey')).toBe(true)
+    expect(isGreeting('howdy')).toBe(true)
+    expect(isGreeting('good morning')).toBe(true)
+    expect(isGreeting("what's up")).toBe(true)
+  })
+
+  it('rejects non-greetings so the form still drives forward', () => {
+    expect(isGreeting('I am an individual from Texas')).toBe(false)
+    expect(isGreeting('ok, keep going')).toBe(false)
+    expect(isGreeting('ready')).toBe(false)
+    expect(isGreeting("let's start")).toBe(false)
+    expect(isGreeting('yes')).toBe(false)
+    // Word-boundary guard: "his", "hint", "you", "super" are not greetings.
+    expect(isGreeting('his license')).toBe(false)
+    expect(isGreeting('hint taken')).toBe(false)
+    expect(isGreeting('you need what')).toBe(false)
+    expect(isGreeting('sure thing')).toBe(false)
+  })
+})
+
+describe('planTurnBlocks and free-form questions', () => {
   it('presents nothing for a why-question on an empty transcript', () => {
     const state = fresh()
     expect(planTurnBlocks(state, [], null, 'Why do you ask "What best describes you?"'))
       .toEqual([])
   })
 
-  it('still presents for a non-why first turn', () => {
+  it('presents nothing for a free-form informational question on an empty transcript', () => {
+    // "what all things do you need and how much time will it take" — a genuine
+    // question gets its answer alone; the form presents on the next
+    // non-question turn, never dumped beside the answer.
     const state = fresh()
-    const blocks = planTurnBlocks(state, [], null, 'What else do you need?')
+    expect(planTurnBlocks(state, [], null, 'what all things do you need and how much time it gonna take'))
+      .toEqual([])
+  })
+
+  it('still presents the form for a statement first turn', () => {
+    const state = fresh()
+    const blocks = planTurnBlocks(state, [], null, 'I am an individual from Texas')
     expect(blocks[0]).toMatchObject({ kind: 'section_header' })
   })
 
-  it('presents nothing for a why-question even when the plan has advanced', () => {
-    // The newest header on screen is an older section; a non-why turn would
-    // present the current plan section — a why turn must not.
+  it('presents nothing for a greeting on an empty transcript', () => {
+    // "hi" is a conversational opener, not engagement; the agent greets back
+    // and the form presents on the next turn, never dumped on the greeting.
+    const state = fresh()
+    expect(planTurnBlocks(state, [], null, 'hi')).toEqual([])
+    expect(planTurnBlocks(state, [], null, 'Hello there')).toEqual([])
+  })
+
+  it('presents nothing for a free question even when the plan has advanced', () => {
+    // The newest header on screen is an older section; a statement turn would
+    // present the current plan section — a question turn must not.
     const state = fresh()
     const plan = sectionPlan(state)!
     const stale: Turn = {
@@ -190,6 +246,7 @@ describe('planTurnBlocks and why-shaped turns', () => {
     }
     expect(plan.section).not.toBe('tax')
     expect(planTurnBlocks(state, [stale], null, 'why do you need all this')).toEqual([])
+    expect(planTurnBlocks(state, [stale], null, 'what else do you need')).toEqual([])
     expect(planTurnBlocks(state, [stale], null, 'ok, keep going')[0])
       .toMatchObject({ kind: 'section_header', section: plan.section })
   })

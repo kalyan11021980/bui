@@ -77,8 +77,8 @@ const EXPLAIN_FIRST_NAME = [{ toolName: 'explain', input: { fieldId: 'first_name
 
 describe('runTurn', () => {
   it('keeps voice that passes the lint', async () => {
-    const { turn } = await run('Right — a couple more.', EXPLAIN_FIRST_NAME)
-    expect(turn.voice).toBe('Right — a couple more.')
+    const { turn } = await run('Right, a couple more.', EXPLAIN_FIRST_NAME)
+    expect(turn.voice).toBe('Right, a couple more.')
     expect(turn.voiceDropped).toBeUndefined()
   })
 
@@ -160,11 +160,11 @@ describe('runTurn', () => {
     // on the document, not merely "any document_request".
     const licensedProfile = { ...PROFILE, licenses: ['dealer' as const] }
     const state = createApplication('app-1', licensedProfile, 'tok')
-    const { turn } = await run('Right — a couple more.', [
+    const { turn } = await run('Right, a couple more.', [
       { toolName: 'requestDocument', input: { docType: 'dealer_license' } },
     ], state)
     expect(turn.blocks).toContainEqual({ kind: 'document_request', docType: 'dealer_license' })
-    expect(turn.voice).toBe('Right — a couple more.')
+    expect(turn.voice).toBe('Right, a couple more.')
     expect(turn.voiceDropped).toBeUndefined()
   })
 

@@ -5,7 +5,7 @@ export type VoiceLintResult =
   | { ok: true }
   | { ok: false; violation: VoiceViolation }
 
-const MAX_LENGTH = 240
+const MAX_LENGTH = 1000
 
 /** Any Unicode decimal digit — a numeral in another script is still a numeral. */
 const NUMERAL = /\p{Nd}/u
@@ -41,6 +41,24 @@ const LEGAL_CLAIM = [
  * narrower diagnosis is the useful one when tuning the rules against real
  * output.
  */
+/**
+ * Strips the dashes the model reaches for despite the prompt's ban: the em
+ * dash and the en dash. A prompt rule alone leaks (the model slips, or
+ * substitutes an en dash), so this is the guarantee none reaches the applicant.
+ * The en dash is only legitimate in number ranges, and a range contains digits
+ * the lint already drops, so any en dash surviving to here is a clause
+ * separator and safe to turn into a comma.
+ */
+export function tidyVoice(text: string): string {
+  return text
+    .replace(/\s*—\s*/g, ', ')
+    .replace(/\s*–\s*/g, ', ')
+    .replace(/,\s*,/g, ', ')
+    .replace(/  +/g, ' ')
+    .replace(/^\s*,\s*/, '')
+    .trim()
+}
+
 export function lintVoice(text: string): VoiceLintResult {
   if (text.length > MAX_LENGTH) return { ok: false, violation: 'length' }
   if (TOOL_SYNTAX.test(text)) return { ok: false, violation: 'tool_syntax' }

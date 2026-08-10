@@ -6,7 +6,7 @@ import type { Action, ApplicationState } from '@/domain/application/state'
 import { guardToolCall, type RejectionCode } from '@/domain/orchestrator/guard'
 import { planTurnBlocks } from '@/domain/orchestrator/plan'
 import type { Block, Turn } from '@/domain/orchestrator/transcript'
-import { lintVoice } from '@/domain/orchestrator/voice-lint'
+import { lintVoice, tidyVoice } from '@/domain/orchestrator/voice-lint'
 import type { OrchestratorView } from '@/domain/orchestrator/view'
 import type { DocType } from '@/domain/field-id'
 import { docTypeBacksSensitiveField, fieldDef } from '@/domain/catalog'
@@ -79,7 +79,7 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
   )
   blocks.push(...planTurnBlocks(planState, request.transcript, request.doneWith, request.userText))
 
-  const voice = decideVoice(result.text, blocks)
+  const voice = decideVoice(tidyVoice(result.text), blocks)
 
   // A rationale with no surviving voice reads as bare catalog copy; the
   // vetted intro makes it an answer. Inserted right before the rationale
