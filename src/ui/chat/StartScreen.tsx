@@ -10,8 +10,8 @@ import { suggestionTexts } from './Suggestions'
 
 type Props = {
   state: ApplicationState
-  /** The fields still outstanding, most relevant first. */
-  fieldIds: readonly RequirementKey[]
+  /** The field the active section is asking now, or null once nothing is outstanding. */
+  currentField: RequirementKey | null
   /** Hidden, not greyed out, while sending is unavailable (§9.1). */
   disabled: boolean
   onPick: (text: string) => void
@@ -30,7 +30,7 @@ const cardClass =
  * few things to say. Gone for good after the first action docks the composer.
  */
 export function StartScreen({
-  state, fieldIds, disabled, onPick, onReadDocument, readingDocTypes, prepare,
+  state, currentField, disabled, onPick, onReadDocument, readingDocTypes, prepare,
 }: Props) {
   return (
     <div className="flex flex-col gap-5" style={{ viewTransitionName: 'start-hero' }}>
@@ -51,7 +51,7 @@ export function StartScreen({
           variant="card"
           {...(prepare && { prepare })}
         />
-        {!disabled && suggestionTexts(fieldIds).map((text) => (
+        {!disabled && suggestionTexts(currentField).map((text) => (
           <button key={text} type="button" className={cardClass} onClick={() => onPick(text)}>
             {text}
           </button>

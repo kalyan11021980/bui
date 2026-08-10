@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { outstandingFields } from '@/domain/application/queries'
 import type { ApplicationState } from '@/domain/application/state'
 import type { DocType } from '@/domain/field-id'
-import { lastPresentedSectionTurn } from '@/domain/orchestrator/plan'
+import { lastPresentedSectionTurn, sectionPlan } from '@/domain/orchestrator/plan'
 import type { RequirementKey } from '@/domain/requirements/key'
 import { useConversation } from '@/ui/client/useConversation'
 import type { BlockHandlers } from './blocks'
@@ -119,7 +118,10 @@ export function ConversationShell({
   // it (§9.1 — "focus is never stolen by an update"). Sending is refused
   // here instead, so the control stays focusable throughout.
   const sendable = !pending && ownerToken !== null && !closed
-  const suggestible = outstandingFields(state)
+  // The chips track the section the applicant is in: the first outstanding
+  // field of the first section that still owes one. Null once nothing is
+  // outstanding, so the suggestions vanish at the completion moment.
+  const currentField = sectionPlan(state)?.fieldIds[0] ?? null
 
   // The Done control is part of the section group that last presented — the
   // same turn bubble that holds its section_header. When that turn is in this
@@ -203,7 +205,7 @@ export function ConversationShell({
         ) : (
           <StartScreen
             state={state}
-            fieldIds={suggestible}
+            currentField={currentField}
             disabled={!sendable}
             onPick={sendDocking}
             onReadDocument={readDocking}
@@ -221,7 +223,7 @@ export function ConversationShell({
             A conditional that changes the CHILD COUNT instead of swapping
             `false` for an element would remount Composer and drop focus. */}
         {started && (
-          <Suggestions fieldIds={suggestible} disabled={!sendable} onPick={sendDocking} />
+          <Suggestions currentField={currentField} disabled={!sendable} onPick={sendDocking} />
         )}
         <Composer
           size={started ? 'docked' : 'hero'}

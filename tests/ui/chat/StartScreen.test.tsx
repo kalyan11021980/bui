@@ -12,7 +12,7 @@ const PROFILE: ApplicantProfile = {
 }
 
 const props = {
-  fieldIds: ['first_name', 'last_name', 'email'] as const,
+  currentField: 'first_name' as const,
   disabled: false,
   onPick: vi.fn(),
   onReadDocument: vi.fn(),
@@ -33,18 +33,18 @@ describe('StartScreen', () => {
     const state = createApplication('app-1', PROFILE, 'owner-1')
     render(<StartScreen state={state} {...props} onPick={onPick} />)
 
-    const cards = screen.getAllByRole('button', { name: /why do you|what else/i })
+    const cards = screen.getAllByRole('button', { name: /why do you|next step|how much/i })
     expect(cards.length).toBeLessThanOrEqual(3)
 
-    await userEvent.click(screen.getByRole('button', { name: /what else do you need/i }))
-    expect(onPick).toHaveBeenCalledWith('What else do you need?')
+    await userEvent.click(screen.getByRole('button', { name: /next step/i }))
+    expect(onPick).toHaveBeenCalledWith('What’s my next step?')
   })
 
   it('hides the suggestion cards while sending is unavailable', () => {
     const state = createApplication('app-1', PROFILE, 'owner-1')
     render(<StartScreen state={state} {...props} disabled />)
 
-    expect(screen.queryByRole('button', { name: /what else do you need/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /next step/i })).toBeNull()
     expect(screen.getByLabelText(/upload photo/i)).toBeInTheDocument()
   })
 
@@ -55,7 +55,7 @@ describe('StartScreen', () => {
     const uploadLabel = screen.getByLabelText(/upload photo/i)
     const uploadCard = uploadLabel.closest('div[class*="rounded-xl"]')!
 
-    const suggestionButton = screen.getByRole('button', { name: /what else do you need/i })
+    const suggestionButton = screen.getByRole('button', { name: /next step/i })
 
     const position = uploadCard.compareDocumentPosition(suggestionButton)
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

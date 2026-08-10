@@ -4,8 +4,8 @@ import type { RequirementKey } from '@/domain/requirements/key'
 import { displayLabel } from '@/ui/panel/label'
 
 type Props = {
-  /** The fields still outstanding, most relevant first. */
-  fieldIds: readonly RequirementKey[]
+  /** The field the active section is asking now, or null once nothing is outstanding. */
+  currentField: RequirementKey | null
   disabled: boolean
   onPick: (text: string) => void
 }
@@ -18,29 +18,33 @@ const chipClass =
  * own question mark and reads as nonsense lowercased into "need my…" — it
  * is quoted back instead, so nothing is folded or doubled.
  */
-export function suggestionTexts(fieldIds: readonly RequirementKey[]): string[] {
-  const asks = fieldIds.slice(0, 2).map((id) => {
-    const label = displayLabel(id)
-    return label.endsWith('?') ? `Why do you ask “${label}”` : `Why do you need my ${label.toLowerCase()}?`
-  })
-  return [...asks, 'What else do you need?']
+function whyChip(fieldId: RequirementKey): string {
+  const label = displayLabel(fieldId)
+  return label.endsWith('?') ? `Why do you ask “${label}”` : `Why do you need my ${label.toLowerCase()}?`
 }
 
 /**
- * Something to say next, so the composer is never a blank prompt with no
- * indication of what this thing accepts.
+ * The chips track the section the applicant is in, not a fixed list: a
+ * why-chip for the field they are on, then a next-step and a progress
+ * prompt. Null once nothing is outstanding, so the composer is bare at the
+ * completion moment (the CompletionCard takes over).
  *
  * The wording is built here from the field's own catalog label — it is not
  * model-authored and does not travel through a turn as text the agent chose.
  * Picking one sends it as ordinary intent, which is all it is: a question,
  * never an answer. Values are still only ever typed into a field.
  */
-export function Suggestions({ fieldIds, disabled, onPick }: Props) {
-  if (disabled || fieldIds.length === 0) return null
+export function suggestionTexts(currentField: RequirementKey | null): string[] {
+  if (currentField === null) return []
+  return [whyChip(currentField), 'What’s my next step?', 'How much is left?']
+}
+
+export function Suggestions({ currentField, disabled, onPick }: Props) {
+  if (disabled || currentField === null) return null
 
   return (
     <div aria-label="Things you could ask" className="mt-3 flex flex-wrap gap-2">
-      {suggestionTexts(fieldIds).map((text) => (
+      {suggestionTexts(currentField).map((text) => (
         <button key={text} type="button" className={chipClass} onClick={() => onPick(text)}>
           {text}
         </button>
