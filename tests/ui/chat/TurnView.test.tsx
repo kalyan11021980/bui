@@ -23,6 +23,34 @@ describe('TurnView — agent turns', () => {
     expect(container.querySelectorAll('p')).toHaveLength(1)
   })
 
+  it('renders the voice as markdown: bold and bullet list, no literal asterisks', () => {
+    const turn: Turn = {
+      seq: 1, at: AT, role: 'agent',
+      voice: ['Here is what is left:', '', '- **Who you are**', '- **Where you live**'].join('\n'),
+      blocks: [],
+    }
+    const { container } = render(<TurnView turn={turn} state={state} {...handlers} />)
+    // Bold renders as <strong>, not literal asterisks.
+    expect(screen.getByText('Who you are').tagName).toBe('STRONG')
+    expect(container.textContent).not.toContain('**')
+    // A bullet list renders as <ul><li>.
+    expect(container.querySelector('ul')).not.toBeNull()
+    expect(container.querySelectorAll('li')).toHaveLength(2)
+  })
+
+  it('strips a link in the voice to its text, never rendering an anchor', () => {
+    const turn: Turn = {
+      seq: 1, at: AT, role: 'agent',
+      voice: 'See [our guide](https://example.com) for more.',
+      blocks: [],
+    }
+    const { container } = render(<TurnView turn={turn} state={state} {...handlers} />)
+    // The link text survives inline; no anchor is rendered.
+    expect(container.textContent).toContain('our guide')
+    expect(container.querySelector('a')).toBeNull()
+    expect(container.textContent).not.toContain('https://example.com')
+  })
+
   it('renders nothing at all for an agent turn with no voice and no blocks', () => {
     // A turn whose every ask was already on screen ends up empty; it must
     // leave no gap in the log, not a spaced empty div.

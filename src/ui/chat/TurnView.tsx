@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { ApplicationState } from '@/domain/application/state'
 import type { Turn } from '@/domain/orchestrator/transcript'
 import { BlockView, type BlockHandlers } from './blocks'
+import { VoiceMarkdown } from './VoiceMarkdown'
 
 type Props = BlockHandlers & {
   turn: Turn
@@ -48,7 +49,7 @@ export function TurnView({ turn, state, trailing, onChange, onClear, onConfirm, 
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         {turn.voice !== null && (
-          <p className="m-0 text-[15px] leading-relaxed">{turn.voice}</p>
+          <VoiceMarkdown voice={turn.voice} />
         )}
         {turn.blocks.map((block, index) => (
           <BlockView
