@@ -184,7 +184,7 @@ describe('a whole registration, section by section, through the routes', () => {
     tokens.clear()
     __setModelForTurnTests(() => ({
       model: stubModel('Right, let’s get started.', []),
-      effort: 'low', isAnthropic: false,
+      effort: 'low',
     }))
   })
 

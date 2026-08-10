@@ -69,7 +69,7 @@ async function run(
     model: stubModel(text, calls),
     view: toOrchestratorView(state, []),
     state, transcript, uploadedDocs: [], userText,
-    isResume: false, at: AT, effort: 'low', isAnthropic: false, doneWith,
+    isResume: false, at: AT, effort: 'low', doneWith,
   })
 }
 
@@ -314,7 +314,7 @@ describe('runTurn', () => {
 
 describe('effort', () => {
   /** Captures what generateText actually put on the wire. */
-  async function optionsFor(isAnthropic: boolean, effort: string) {
+  async function optionsFor(effort: string) {
     let seen: unknown
     const model = new MockLanguageModelV4({
       doGenerate: async (options) => {
@@ -334,21 +334,17 @@ describe('effort', () => {
     await runTurn({
       model, view: toOrchestratorView(state, []), state,
       transcript: [], uploadedDocs: [], userText: null,
-      isResume: false, at: AT, effort, isAnthropic, doneWith: null,
+      isResume: false, at: AT, effort, doneWith: null,
     })
     return seen as Record<string, Record<string, unknown>> | undefined
   }
 
-  it('sends effort to anthropic under its own key', async () => {
-    expect(await optionsFor(true, 'high')).toEqual({ anthropic: { effort: 'high' } })
-  })
-
   // A local reasoning model spends most of its output on hidden thinking —
   // measured at two thirds of generated tokens, and five times the latency —
-  // and only reaches the applicant as a slower turn. The effort setting was
-  // anthropic-only, so there was no way to turn that off.
-  it('sends effort to a local provider as its reasoning effort', async () => {
-    expect(await optionsFor(false, 'none')).toEqual({
+  // and only reaches the applicant as a slower turn. `none` is the only value
+  // that stops it; the effort is filed under the provider's own key.
+  it('sends effort to the local provider as its reasoning effort', async () => {
+    expect(await optionsFor('none')).toEqual({
       [LOCAL_PROVIDER_NAME]: { reasoningEffort: 'none' },
     })
   })

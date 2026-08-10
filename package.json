@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4",
     "@ai-sdk/openai-compatible": "^3",
     "@openuidev/lang-core": "0.2.10",
     "@openuidev/react-lang": "0.2.10",

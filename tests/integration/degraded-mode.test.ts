@@ -92,7 +92,7 @@ function throwingModel() {
 }
 
 function useModel(model: ReturnType<typeof throwingModel>): void {
-  __setModelForTurnTests(() => ({ model, effort: 'low', isAnthropic: false }))
+  __setModelForTurnTests(() => ({ model, effort: 'low' }))
 }
 
 /** Fills every outstanding field through the panel path — POST /actions. */
@@ -146,7 +146,7 @@ describe('degraded mode — §11.1 the agent is not a single point of failure', 
       model: stubModel('Right, one to start.', [
         { toolName: 'explain', input: { fieldId: 'primary_activity' } },
       ]),
-      effort: 'low', isAnthropic: false,
+      effort: 'low',
     }))
 
     const workingTurn = await postTurn(workingId, { text: 'hi' })

@@ -38,7 +38,7 @@ function post(id: string, body: unknown, token: string | null = 'tok') {
 
 /** The seam the route exposes: swap the model (and its config) for one call. */
 function useModel(model: ReturnType<typeof stubModel>): void {
-  __setModelForTurnTests(() => ({ model, effort: 'low', isAnthropic: false }))
+  __setModelForTurnTests(() => ({ model, effort: 'low' }))
 }
 
 /**
@@ -328,7 +328,7 @@ describe('free-form question turns', () => {
 
   it('the degraded fallback still presents even for a why-question', async () => {
     seed()
-    __setModelForTurnTests(() => ({ model: throwingModel(), effort: 'low', isAnthropic: false }))
+    __setModelForTurnTests(() => ({ model: throwingModel(), effort: 'low' }))
 
     const response = await post('app-1', { text: 'Why do you need my address?' })
     const { turn } = await response.json()

@@ -147,7 +147,7 @@ export type TurnInput = {
    * misconfigured provider throws inside the same try/catch as an unreachable
    * one, and both land on the same degraded turn instead of a 500.
    */
-  modelForTurn: () => { model: LanguageModel; effort: string; isAnthropic: boolean }
+  modelForTurn: () => { model: LanguageModel; effort: string }
   isResume: boolean
   uploadedDocs: readonly DocType[]
   at: string
@@ -281,12 +281,12 @@ export async function applyTurn(
  * either way, and nothing it returns is mistaken for a guard rejection.
  */
 async function runTurnSafely(
-  modelForTurn: () => { model: LanguageModel; effort: string; isAnthropic: boolean },
-  rest: Omit<TurnRequest, 'model' | 'effort' | 'isAnthropic'>,
+  modelForTurn: () => { model: LanguageModel; effort: string },
+  rest: Omit<TurnRequest, 'model' | 'effort'>,
 ): Promise<TurnResult> {
   try {
-    const { model, effort, isAnthropic } = modelForTurn()
-    return await runTurn({ ...rest, model, effort, isAnthropic })
+    const { model, effort } = modelForTurn()
+    return await runTurn({ ...rest, model, effort })
   } catch (error) {
     // Server-side only: the applicant still gets the vetted degraded_notice
     // below, never this. Without this line a bad model call is

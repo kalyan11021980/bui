@@ -6,15 +6,11 @@ import { readConfig, resolveModel } from './model'
  * how `runTurn` calls it. Bundled together so a test override replaces both
  * at once, never a model paired with the wrong effort or provider.
  */
-export type ModelForTurn = () => { model: LanguageModel; effort: string; isAnthropic: boolean }
+export type ModelForTurn = () => { model: LanguageModel; effort: string }
 
 function defaultModelForTurn(): ReturnType<ModelForTurn> {
   const config = readConfig(process.env)
-  return {
-    model: resolveModel(process.env),
-    effort: config.effort,
-    isAnthropic: config.provider === 'anthropic',
-  }
+  return { model: resolveModel(process.env), effort: config.effort }
 }
 
 let current: ModelForTurn = defaultModelForTurn

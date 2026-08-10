@@ -79,7 +79,7 @@ describe('resume — §12.1', () => {
       doneWith: undefined,
       modelForTurn: () => ({
         model: stubModel('', [{ toolName: 'orient', input: {} }]),
-        effort: 'low', isAnthropic: false,
+        effort: 'low',
       }),
       isResume: true,
       uploadedDocs: [],

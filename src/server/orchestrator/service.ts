@@ -26,7 +26,6 @@ export type TurnRequest = {
   isResume: boolean
   at: string
   effort: string
-  isAnthropic: boolean
   doneWith: Section | null
 }
 
@@ -51,10 +50,10 @@ export async function runTurn(request: TurnRequest): Promise<TurnResult> {
     tools: buildToolSet(),
     activeTools: activeToolsFor(request.view, request.isResume),
     // A local reasoning model spends most of its output on thinking nobody
-    // sees, so effort is worth setting on both paths, not just anthropic's.
-    providerOptions: request.isAnthropic
-      ? { anthropic: { effort: request.effort } }
-      : { [LOCAL_PROVIDER_NAME]: { reasoningEffort: request.effort } },
+    // sees, so the effort setting is filed under the provider's own key as
+    // reasoningEffort. `none` is the only value that stops a thinking model
+    // reasoning at us; `low` and `minimal` still spend most of the output on it.
+    providerOptions: { [LOCAL_PROVIDER_NAME]: { reasoningEffort: request.effort } },
   })
 
   const blocks: Block[] = []

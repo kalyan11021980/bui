@@ -4,28 +4,14 @@ import { readConfig } from '@/server/orchestrator/model'
 const base = { ORCHESTRATOR_MODEL: 'some-model', ORCHESTRATOR_ENDPOINT: 'http://host:1234' }
 
 describe('readConfig', () => {
-  it('defaults to the local provider', () => {
-    expect(readConfig({ ...base }).provider).toBe('local')
-  })
-
-  it('requires an endpoint for the local provider', () => {
+  it('requires an endpoint', () => {
     expect(() => readConfig({ ORCHESTRATOR_MODEL: 'm' }))
       .toThrow(/ORCHESTRATOR_ENDPOINT/)
   })
 
-  it('requires a model id whatever the provider', () => {
+  it('requires a model id', () => {
     expect(() => readConfig({ ORCHESTRATOR_ENDPOINT: 'http://h:1' }))
       .toThrow(/ORCHESTRATOR_MODEL/)
-  })
-
-  it('requires an api key for the anthropic provider', () => {
-    expect(() => readConfig({ ...base, ORCHESTRATOR_PROVIDER: 'anthropic' }))
-      .toThrow(/ANTHROPIC_API_KEY/)
-  })
-
-  it('rejects an unrecognised provider rather than falling back to local', () => {
-    expect(() => readConfig({ ...base, ORCHESTRATOR_PROVIDER: 'openai' }))
-      .toThrow(/openai/)
   })
 
   it('carries effort through, defaulting to low', () => {
@@ -33,16 +19,13 @@ describe('readConfig', () => {
     expect(readConfig({ ...base, ORCHESTRATOR_EFFORT: 'high' }).effort).toBe('high')
   })
 
-  it('carries an api key for the local provider when one is set', () => {
+  it('carries an api key when one is set', () => {
     const config = readConfig({ ...base, ORCHESTRATOR_API_KEY: 'sk-test' })
-    if (config.provider !== 'local') throw new Error('expected local')
     expect(config.apiKey).toBe('sk-test')
   })
 
-  it('leaves the local provider keyless when none is set', () => {
+  it('is keyless when no api key is set', () => {
     // LM Studio answers without a key; it must keep working that way.
-    const config = readConfig({ ...base })
-    if (config.provider !== 'local') throw new Error('expected local')
-    expect(config.apiKey).toBeUndefined()
+    expect(readConfig({ ...base }).apiKey).toBeUndefined()
   })
 })
